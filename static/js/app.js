@@ -1,0 +1,269 @@
+// Main SPA entry point
+
+import { getToken, getMe, getWsUrl, clearToken } from './api.js';
+import { WebSocketManager } from './ws.js';
+import { renderSelectScreen, renderCreateScreen } from './select.js';
+import { renderAdventure } from './adventure.js';
+
+const app = document.getElementById('app');
+let ws = null;
+let currentView = null;
+let gameState = null;
+
+async function init() {
+    const token = getToken();
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    try {
+        await getMe();
+    } catch {
+        window.location.href = '/login';
+        return;
+    }
+
+    connectWebSocket();
+}
+
+function connectWebSocket() {
+    ws = new WebSocketManager(getWsUrl(), {
+        onOpen: () => {
+            showSelectScreen();
+        },
+        onMessage: (msg) => handleServerMsg(msg),
+        onClose: () => {},
+        onError: () => {},
+    });
+    ws.connect();
+}
+
+function handleServerMsg(msg) {
+    switch (msg.type) {
+        case 'connected':
+            break;
+        case 'adventure_list':
+            if (currentView === 'select') {
+                renderSelectScreen(app, msg.adventures, {
+                    onLoad: (id) => ws.send({ type: 'load_adventure', adventure_id: id }),
+                    onDelete: (id) => ws.send({ type: 'delete_adventure', adventure_id: id }),
+                    onNew: () => showCreateScreen(),
+                });
+            }
+            break;
+        case 'adventure_created':
+        case 'adventure_loaded':
+            if (msg.state) gameState = msg.state;
+            showAdventureScreen();
+            break;
+        case 'narrative_chunk':
+            appendNarrativeChunk(msg.text);
+            break;
+        case 'narrative_end':
+            endNarrative();
+            break;
+        case 'dice_roll_request':
+            showDiceRollUI(msg);
+            break;
+        case 'dice_roll_result':
+            showDiceResult(msg);
+            break;
+        case 'present_choices':
+            showChoices(msg);
+            break;
+        case 'state_update':
+            gameState = msg.state;
+            updateInfoPanel();
+            break;
+        case 'error':
+            showToast(msg.message, true);
+            break;
+    }
+}
+
+function showSelectScreen() {
+    currentView = 'select';
+    ws.send({ type: 'list_adventures' });
+    app.innerHTML = '<div class="select-screen"><h1>RuneQuest</h1><div class="loading">Loading adventures</div></div>';
+}
+
+function showCreateScreen() {
+    currentView = 'create';
+    renderCreateScreen(app, {
+        onBack: () => showSelectScreen(),
+        onCreate: (data) => ws.send({
+            type: 'create_adventure',
+            ...data,
+        }),
+    });
+}
+
+function showAdventureScreen() {
+    currentView = 'adventure';
+    renderAdventure(app, gameState, {
+        onSendMessage: (text) => ws.send({ type: 'send_message', content: text }),
+        onSelectChoice: (index, text) => ws.send({ type: 'select_choice', index, text }),
+        onRollDice: () => ws.send({ type: 'roll_dice' }),
+        onBack: () => showSelectScreen(),
+        onGetStats: () => ws.send({ type: 'get_character_sheet' }),
+    });
+}
+
+// Narrative streaming
+let currentNarrativeEl = null;
+
+function appendNarrativeChunk(text) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    if (!currentNarrativeEl) {
+        currentNarrativeEl = document.createElement('div');
+        currentNarrativeEl.className = 'narrative-block streaming';
+        storyContent.appendChild(currentNarrativeEl);
+    }
+
+    currentNarrativeEl.textContent += text;
+    storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function endNarrative() {
+    if (currentNarrativeEl) {
+        currentNarrativeEl.classList.remove('streaming');
+        currentNarrativeEl = null;
+    }
+}
+
+function showDiceRollUI(data) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    endNarrative();
+
+    const div = document.createElement('div');
+    div.className = 'dice-roll-ui';
+    div.innerHTML = `
+        <div class="dice-description">${escapeHtml(data.description)}</div>
+        <div class="dice-info">
+            <div>Dice: <span>${data.count}${data.dice_type}</span></div>
+            <div>Modifier: <span>${data.modifier >= 0 ? '+' : ''}${data.modifier}</span></div>
+            <div>DC: <span>${data.dc}</span></div>
+        </div>
+        <div class="probability">Success chance: ${Math.round(data.success_probability * 100)}%</div>
+        <button class="btn-roll-dice" onclick="document.dispatchEvent(new Event('roll-dice'))">Roll Dice</button>
+    `;
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+
+    const handler = () => {
+        ws.send({ type: 'roll_dice' });
+        div.querySelector('.btn-roll-dice').disabled = true;
+        div.querySelector('.btn-roll-dice').textContent = 'Rolling...';
+        document.removeEventListener('roll-dice', handler);
+    };
+    document.addEventListener('roll-dice', handler);
+}
+
+function showDiceResult(data) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    // Remove the roll button if still there
+    const rollBtn = storyContent.querySelector('.btn-roll-dice');
+    if (rollBtn) rollBtn.closest('.dice-roll-ui')?.remove();
+
+    const div = document.createElement('div');
+    div.className = `dice-result ${data.success ? 'success' : 'failure'}`;
+    div.innerHTML = `
+        <div>Rolled: ${data.rolls.join(' + ')} = <strong>${data.total}</strong> vs DC ${data.dc}</div>
+        <div>${data.success ? 'SUCCESS!' : 'FAILURE'}</div>
+    `;
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function showChoices(data) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    endNarrative();
+
+    const div = document.createElement('div');
+    div.className = 'choices-container';
+
+    let html = `<div class="choices-prompt">${escapeHtml(data.prompt)}</div><div class="choices-grid">`;
+    data.choices.forEach((choice, i) => {
+        html += `<button class="choice-btn" data-index="${i}" data-text="${escapeAttr(choice)}">
+            <span class="choice-number">${i + 1}.</span> ${escapeHtml(choice)}
+        </button>`;
+    });
+    html += '</div>';
+
+    if (data.allow_custom_input) {
+        html += `<div class="custom-input-area">
+            <input type="text" placeholder="Or type your own action..." id="customAction">
+            <button class="stone-btn" id="customActionBtn">Go</button>
+        </div>`;
+    }
+
+    div.innerHTML = html;
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+
+    // Attach handlers
+    div.querySelectorAll('.choice-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index);
+            const text = btn.dataset.text;
+            div.remove();
+            ws.send({ type: 'select_choice', index, text });
+        });
+    });
+
+    if (data.allow_custom_input) {
+        const input = div.querySelector('#customAction');
+        const btn = div.querySelector('#customActionBtn');
+        const submit = () => {
+            const text = input.value.trim();
+            if (text) {
+                div.remove();
+                ws.send({ type: 'send_message', content: text });
+            }
+        };
+        btn.addEventListener('click', submit);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submit();
+        });
+    }
+}
+
+function updateInfoPanel() {
+    if (currentView !== 'adventure' || !gameState) return;
+
+    // Update the info panel content based on active tab
+    const event = new CustomEvent('state-update', { detail: gameState });
+    document.dispatchEvent(event);
+}
+
+function showToast(message, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${isError ? 'error' : ''}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function escapeAttr(str) {
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Make ws accessible globally for inline handlers
+window.rqWs = { send: (msg) => ws?.send(msg) };
+
+init();

@@ -1,0 +1,50 @@
+[package]
+name = "runequest"
+version = "0.1.0"
+edition = "2021"
+description = "D&D Adventure Chat - Grok-powered storytelling with hard-coded game engine"
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4"] }
+anyhow = "1.0"
+thiserror = "1.0"
+dirs = "5.0"
+
+# CLI
+clap = { version = "4.4", features = ["derive", "env"] }
+
+# Async Runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "signal"] }
+
+# HTTP & Streaming
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
+bytes = "1.0"
+
+# Web Server
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["trace", "fs", "set-header"] }
+
+# Auth
+argon2 = "0.5"
+jsonwebtoken = "9"
+rand = "0.8"
+
+# Environment
+dotenvy = "0.15"
+
+# File locking
+fs2 = "0.4"
+
+# Password input
+rpassword = "5"
+
+[profile.release]
+codegen-units = 4
+incremental = true

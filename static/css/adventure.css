@@ -1,0 +1,544 @@
+/* Adventure screen layout */
+
+.adventure-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    height: 100vh;
+    gap: 0;
+}
+
+/* Left panel: Story */
+.story-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-dark);
+    border-right: 3px solid var(--border-dark);
+    overflow: hidden;
+}
+
+.story-header {
+    padding: 12px 20px;
+    background: linear-gradient(180deg, var(--bg-stone) 0%, var(--bg-dark) 100%);
+    border-bottom: 2px solid var(--border-dark);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.story-header h2 {
+    font-family: var(--font-medieval);
+    color: var(--text-gold);
+    font-size: 20px;
+}
+
+.scene-location {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.story-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scroll-behavior: smooth;
+}
+
+.narrative-block {
+    margin-bottom: 16px;
+    line-height: 1.7;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.narrative-block.streaming {
+    border-right: 2px solid var(--text-gold);
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { border-color: var(--text-gold); }
+    50% { border-color: transparent; }
+}
+
+/* Dice roll UI */
+.dice-roll-ui {
+    background: linear-gradient(180deg, #2a2015 0%, #1a1108 100%);
+    border: 2px solid var(--border-gold);
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+}
+
+.dice-roll-ui .dice-description {
+    font-size: 16px;
+    color: var(--text-gold-bright);
+    margin-bottom: 12px;
+    font-family: var(--font-medieval);
+}
+
+.dice-roll-ui .dice-info {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.dice-roll-ui .dice-info span {
+    color: var(--text-gold);
+}
+
+.dice-roll-ui .probability {
+    font-size: 18px;
+    color: var(--text-light);
+    margin-bottom: 16px;
+}
+
+.btn-roll-dice {
+    background: linear-gradient(180deg, #6a4a1a 0%, #4a2a0a 100%);
+    border: 3px solid var(--text-gold);
+    color: var(--text-gold-bright);
+    font-family: var(--font-medieval);
+    font-size: 22px;
+    padding: 14px 40px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    transition: all 0.15s;
+    animation: dice-glow 2s ease-in-out infinite;
+}
+
+@keyframes dice-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(200, 168, 78, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(200, 168, 78, 0.5); }
+}
+
+.btn-roll-dice:hover {
+    background: linear-gradient(180deg, #8a6a2a 0%, #6a4a1a 100%);
+    transform: scale(1.05);
+    animation: dice-shake 0.3s ease-in-out;
+}
+
+@keyframes dice-shake {
+    0%, 100% { transform: scale(1.05) rotate(0); }
+    25% { transform: scale(1.05) rotate(-5deg); }
+    75% { transform: scale(1.05) rotate(5deg); }
+}
+
+/* Dice result */
+.dice-result {
+    padding: 16px;
+    margin: 12px 0;
+    text-align: center;
+    border: 2px solid;
+    font-size: 20px;
+    font-family: var(--font-medieval);
+}
+
+.dice-result.success {
+    border-color: var(--accent-green);
+    color: #44cc44;
+    background: rgba(42, 138, 42, 0.1);
+}
+
+.dice-result.failure {
+    border-color: var(--accent-red);
+    color: #cc4444;
+    background: rgba(170, 42, 42, 0.1);
+}
+
+/* Choice buttons */
+.choices-container {
+    padding: 16px 0;
+}
+
+.choices-prompt {
+    font-size: 16px;
+    color: var(--text-gold);
+    margin-bottom: 12px;
+    font-family: var(--font-medieval);
+}
+
+.choices-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.choice-btn {
+    background: linear-gradient(180deg, #3a2a1a 0%, #2a1a0a 100%);
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 13px;
+    padding: 12px 16px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    line-height: 1.4;
+}
+
+.choice-btn:hover {
+    border-color: var(--text-gold);
+    background: linear-gradient(180deg, #4a3a2a 0%, #3a2a1a 100%);
+    color: var(--text-gold);
+}
+
+.choice-btn .choice-number {
+    color: var(--text-gold);
+    font-family: var(--font-medieval);
+    font-size: 16px;
+    margin-right: 8px;
+}
+
+/* Custom input */
+.custom-input-area {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+}
+
+.custom-input-area input {
+    flex: 1;
+    padding: 10px 14px;
+    background: #1a1108;
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+}
+
+.custom-input-area input:focus {
+    border-color: var(--text-gold);
+}
+
+/* Right panel: Info */
+.info-panel {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--bg-stone) 0%, #1a1108 100%);
+    overflow: hidden;
+}
+
+.info-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border-dark);
+}
+
+.info-tab {
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: var(--bg-dark);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: var(--font-body);
+}
+
+.info-tab:hover {
+    color: var(--text-gold);
+}
+
+.info-tab.active {
+    color: var(--text-gold);
+    border-bottom-color: var(--text-gold);
+    background: var(--bg-stone);
+}
+
+.info-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Stats tab */
+.char-name {
+    font-family: var(--font-medieval);
+    font-size: 20px;
+    color: var(--text-gold);
+    margin-bottom: 4px;
+}
+
+.char-class {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.hp-bar-container, .xp-bar-container {
+    margin-bottom: 12px;
+}
+
+.bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+}
+
+.bar-label .value {
+    color: var(--text-light);
+}
+
+.bar-track {
+    height: 16px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    transition: width 0.3s;
+}
+
+.bar-fill.hp { background: var(--hp-green); }
+.bar-fill.hp.warning { background: var(--hp-yellow); }
+.bar-fill.hp.critical { background: var(--hp-red); }
+.bar-fill.xp { background: var(--xp-blue); }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.stat-box {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    padding: 8px;
+    text-align: center;
+}
+
+.stat-box .stat-name {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.stat-box .stat-value {
+    font-size: 22px;
+    color: var(--text-gold);
+    font-family: var(--font-medieval);
+}
+
+.stat-box .stat-mod {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* Inventory tab */
+.item-list {
+    list-style: none;
+}
+
+.item-entry {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.3);
+    gap: 10px;
+}
+
+.item-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.item-name {
+    flex: 1;
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.item-type {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* Quest tab */
+.quest-entry {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.3);
+}
+
+.quest-name {
+    font-size: 14px;
+    color: var(--text-gold);
+    font-family: var(--font-medieval);
+}
+
+.quest-name.completed {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.quest-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Adventure select screen */
+.select-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px;
+    background: var(--bg-dark);
+    background-image:
+        radial-gradient(ellipse at 30% 20%, rgba(45, 34, 21, 0.8) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(26, 17, 8, 0.9) 0%, transparent 50%);
+}
+
+.select-screen h1 {
+    font-family: var(--font-medieval);
+    color: var(--text-gold);
+    font-size: 36px;
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px rgba(200, 168, 78, 0.3);
+}
+
+.adventures-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 900px;
+    margin-bottom: 24px;
+}
+
+.adventure-card {
+    background: linear-gradient(180deg, var(--bg-stone) 0%, var(--bg-dark) 100%);
+    border: 2px solid var(--border-dark);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.adventure-card:hover {
+    border-color: var(--text-gold);
+    box-shadow: 0 0 12px rgba(200, 168, 78, 0.2);
+}
+
+.adventure-card .card-name {
+    font-family: var(--font-medieval);
+    font-size: 18px;
+    color: var(--text-gold);
+    margin-bottom: 6px;
+}
+
+.adventure-card .card-details {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Character creation */
+.create-screen {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 40px;
+}
+
+.create-screen h2 {
+    font-family: var(--font-medieval);
+    color: var(--text-gold);
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.create-form .form-group {
+    margin-bottom: 16px;
+}
+
+.create-form label {
+    display: block;
+    font-size: 11px;
+    color: var(--border-gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+
+.create-form input,
+.create-form select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+}
+
+.create-form input:focus,
+.create-form select:focus {
+    border-color: var(--text-gold);
+}
+
+.create-form select {
+    cursor: pointer;
+}
+
+.create-form select option {
+    background: var(--bg-dark);
+    color: var(--text-light);
+}
+
+.stat-allocator {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.stat-alloc-box {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    padding: 10px;
+    text-align: center;
+}
+
+.stat-alloc-box .alloc-name {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.stat-alloc-box input {
+    width: 60px;
+    text-align: center;
+    padding: 6px;
+    font-size: 18px;
+    font-family: var(--font-medieval);
+    color: var(--text-gold);
+    margin-top: 4px;
+}
+
+.points-remaining {
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-gold);
+    margin: 12px 0;
+}
