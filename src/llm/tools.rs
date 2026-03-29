@@ -186,6 +186,17 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["name"]
         })),
+        tool("move_to_room", "Move the player to an adjacent room in the dungeon via a named exit direction. This handles combat triggers, traps, and scene updates automatically. Always check the current room's available exits before calling this.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "direction": {"type": "string", "description": "Exit direction to move through (e.g. 'North', 'East', 'South', 'West', 'Descend', 'Ascend')"}
+            },
+            "required": ["direction"]
+        })),
+        tool("search_room", "Search the current dungeon room for treasure and hidden items. Uses a WIS check (DC scales with floor level). Each room can only be searched once.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
         tool("add_condition", "Apply a status condition to the player (e.g., poisoned, blinded, frightened, stunned, paralyzed, exhaustion, burning, bleeding). ALWAYS use this when the player is affected by a status effect.", serde_json::json!({
             "type": "object",
             "properties": {

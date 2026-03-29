@@ -75,7 +75,9 @@ Active Quests: {quests}
 
 Write in second person ("You see...", "You feel..."). Be vivid and atmospheric. Reference the character by name occasionally. Create tension, mystery, and excitement. Include sensory details — sounds, smells, the feel of cold stone.
 
-When combat starts, describe the enemies dramatically. During combat, narrate each action with flair. When the player succeeds on a roll, celebrate it. When they fail, make the consequence feel real but not unfair."#,
+When combat starts, describe the enemies dramatically. During combat, narrate each action with flair. When the player succeeds on a roll, celebrate it. When they fail, make the consequence feel real but not unfair.
+
+{dungeon_section}"#,
         char_name = state.character.name,
         race = state.character.race,
         class = state.character.class,
@@ -113,6 +115,60 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         } else {
             "None".to_string()
         },
+        dungeon_section = build_dungeon_section(state),
+    )
+}
+
+fn build_dungeon_section(state: &AdventureState) -> String {
+    let dungeon = match &state.dungeon {
+        Some(d) => d,
+        None => return String::new(),
+    };
+
+    let room = match dungeon.current_room() {
+        Some(r) => r,
+        None => return String::new(),
+    };
+
+    let floor_level = dungeon
+        .current_floor()
+        .map(|f| f.level)
+        .unwrap_or(1);
+
+    let exits_list = room
+        .exits
+        .iter()
+        .map(|e| {
+            let lock_tag = if e.locked { " [LOCKED]" } else { "" };
+            format!("{}{}", e.direction, lock_tag)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let cleared = if room.cleared { "yes" } else { "no" };
+    let searched = if room.searched { "yes" } else { "no" };
+
+    format!(
+        r#"## DUNGEON STATE
+Dungeon: {} (Floor {}/3)
+Current Room: {} ({})
+Exits: {}
+Room cleared: {}
+Room searched: {}
+
+DUNGEON RULES:
+- The player navigates room-to-room. Use `move_to_room` tool when the player wants to move.
+- Always present available exits as choices. Include the exit directions.
+- When entering a room with enemies, combat starts automatically.
+- Describe each new room based on its name and description.
+- Use `search_room` when the player wants to search for treasure."#,
+        dungeon.name,
+        floor_level,
+        room.name,
+        room.room_type,
+        exits_list,
+        cleared,
+        searched,
     )
 }
 

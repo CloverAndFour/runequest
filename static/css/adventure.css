@@ -818,6 +818,120 @@
     padding: 2px 0;
 }
 
+/* ===== DUNGEON MAP ===== */
+
+.map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.dungeon-name {
+    font-family: var(--font-medieval);
+    font-size: 16px;
+    color: var(--text-gold);
+}
+
+.floor-selector {
+    display: flex;
+    gap: 4px;
+}
+
+.floor-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border-dark);
+    color: var(--text-muted);
+    background: var(--bg-dark);
+}
+
+.floor-btn.active {
+    border-color: var(--text-gold);
+    color: var(--text-gold);
+    background: rgba(200, 168, 78, 0.1);
+}
+
+.current-room-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+}
+
+.room-label {
+    font-size: 13px;
+    color: var(--text-light);
+    flex: 1;
+}
+
+.room-type-badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border: 1px solid var(--border-dark);
+}
+
+.room-cleared-badge {
+    font-size: 9px;
+    color: var(--accent-green);
+    padding: 2px 6px;
+    border: 1px solid var(--accent-green);
+}
+
+.dungeon-grid {
+    display: grid;
+    gap: 0;
+    margin: 4px auto;
+    width: fit-content;
+    border: 1px solid var(--border-dark);
+    overflow: auto;
+    max-height: 240px;
+}
+
+.map-cell {
+    width: 7px;
+    height: 7px;
+}
+
+.map-cell.fog { background: #0a0804; }
+.map-cell.room { background: #3d3225; }
+.map-cell.corridor { background: #2d2215; }
+.map-cell.current { background: #c8a84e; }
+.map-cell.cleared { background: #1a3a1a; }
+.map-cell.combat { background: #4a1a1a; }
+.map-cell.boss { background: #6a1a1a; }
+.map-cell.stairs { background: #1a3a5a; }
+.map-cell.treasure { background: #4a3a1a; }
+
+.map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 2px;
+    vertical-align: middle;
+}
+
+.legend-swatch.current { background: #c8a84e; }
+.legend-swatch.room { background: #3d3225; }
+.legend-swatch.cleared { background: #1a3a1a; }
+.legend-swatch.combat { background: #4a1a1a; }
+.legend-swatch.stairs { background: #1a3a5a; }
+.legend-swatch.treasure { background: #4a3a1a; }
+
 /* ===== EQUIPMENT ===== */
 
 .equip-slots {

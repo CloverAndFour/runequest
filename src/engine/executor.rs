@@ -585,6 +585,287 @@ pub fn execute_tool_call(
             }
         }
 
+        "move_to_room" => {
+            let direction = args["direction"].as_str().unwrap_or("").to_string();
+
+            let dungeon = match &mut state.dungeon {
+                Some(d) => d,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No dungeon exists in this adventure."
+                    })));
+                }
+            };
+
+            match dungeon.move_to_room(&direction) {
+                Ok(result) => {
+                    // Update scene
+                    state.current_scene.location = result.room_name.clone();
+                    state.current_scene.description = result.description.clone();
+
+                    // Check for enemies (combat)
+                    if result.has_enemies {
+                        let enemies: Vec<Enemy> = {
+                            let room = dungeon.current_room().unwrap();
+                            room.enemies.iter().map(|t| t.to_enemy()).collect()
+                        };
+                        // Mark room as cleared so re-entry doesn't re-trigger
+                        if let Some(room) = dungeon.current_room_mut() {
+                            room.cleared = true;
+                        }
+
+                        let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
+                        state.combat.start(enemies, dex_mod);
+
+                        return Ok(ToolExecResult::CombatStarted);
+                    }
+
+                    // Check for traps
+                    if result.has_trap {
+                        let trap_info = {
+                            let room = dungeon.current_room().unwrap();
+                            room.trap.clone()
+                        };
+
+                        if let Some(trap) = trap_info {
+                            // Auto-roll WIS-based detection
+                            let wis_mod = state
+                                .character
+                                .stats
+                                .modifier_for("wis")
+                                .unwrap_or(0);
+                            let detect_result =
+                                DiceRoller::roll_with_dc("d20", 1, wis_mod, trap.detection_dc, "trap detection");
+                            let detected = detect_result.total >= trap.detection_dc;
+
+                            let mut trap_output = serde_json::json!({
+                                "room": result.room_name,
+                                "room_type": format!("{}", result.room_type),
+                                "description": result.description,
+                                "trap_name": trap.name,
+                                "trap_detected": detected,
+                                "detection_roll": detect_result.total,
+                                "detection_dc": trap.detection_dc,
+                                "exits": result.exits,
+                                "floor": result.floor + 1,
+                            });
+
+                            if !detected {
+                                // Failed detection — auto-roll saving throw
+                                let save_mod = state
+                                    .character
+                                    .stats
+                                    .modifier_for(&trap.save_stat)
+                                    .unwrap_or(0);
+                                let save_result = DiceRoller::roll_with_dc(
+                                    "d20",
+                                    1,
+                                    save_mod,
+                                    trap.save_dc,
+                                    &format!("{} save vs {}", trap.save_stat, trap.name),
+                                );
+                                let saved = save_result.total >= trap.save_dc;
+
+                                let damage_result = DiceRoller::roll(&trap.damage_dice, 1, 0);
+                                let damage = if saved {
+                                    damage_result.total / 2 // half damage on save
+                                } else {
+                                    damage_result.total
+                                };
+                                let damage = std::cmp::max(damage, 0);
+
+                                state.character.hp -= damage;
+
+                                // Apply condition if any and save failed
+                                if !saved {
+                                    if let Some(ref cond) = trap.condition {
+                                        if !state.character.conditions.contains(cond) {
+                                            state.character.conditions.push(cond.clone());
+                                        }
+                                    }
+                                }
+
+                                trap_output["save_roll"] = serde_json::json!(save_result.total);
+                                trap_output["save_dc"] = serde_json::json!(trap.save_dc);
+                                trap_output["save_stat"] = serde_json::json!(trap.save_stat);
+                                trap_output["save_passed"] = serde_json::json!(saved);
+                                trap_output["damage"] = serde_json::json!(damage);
+                                trap_output["damage_dice"] = serde_json::json!(trap.damage_dice);
+                                if let Some(ref cond) = trap.condition {
+                                    if !saved {
+                                        trap_output["condition_applied"] =
+                                            serde_json::json!(cond);
+                                    }
+                                }
+                                trap_output["hp_after"] = serde_json::json!(state.character.hp);
+                                trap_output["max_hp"] =
+                                    serde_json::json!(state.character.max_hp);
+                            }
+
+                            // Mark room cleared
+                            if let Some(room) = dungeon.current_room_mut() {
+                                room.cleared = true;
+                            }
+
+                            return Ok(ToolExecResult::Immediate(trap_output));
+                        }
+                    }
+
+                    // Normal room — mark cleared if empty/rest/puzzle/stairs
+                    match result.room_type {
+                        super::dungeon::RoomType::Empty
+                        | super::dungeon::RoomType::Rest
+                        | super::dungeon::RoomType::Puzzle
+                        | super::dungeon::RoomType::Stairs
+                        | super::dungeon::RoomType::Entrance => {
+                            if let Some(room) = dungeon.current_room_mut() {
+                                room.cleared = true;
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "room": result.room_name,
+                        "room_type": format!("{}", result.room_type),
+                        "description": result.description,
+                        "exits": result.exits,
+                        "floor": result.floor + 1,
+                        "cleared": dungeon.current_room().map(|r| r.cleared).unwrap_or(false),
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": e,
+                }))),
+            }
+        }
+
+        "search_room" => {
+            let dungeon = match &mut state.dungeon {
+                Some(d) => d,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No dungeon exists in this adventure."
+                    })));
+                }
+            };
+
+            let floor_level = dungeon
+                .current_floor()
+                .map(|f| f.level)
+                .unwrap_or(1);
+
+            // WIS check DC scales with floor
+            let search_dc = match floor_level {
+                1 => 10,
+                2 => 13,
+                _ => 15,
+            };
+
+            let wis_mod = state.character.stats.modifier_for("wis").unwrap_or(0);
+            let check = DiceRoller::roll_with_dc("d20", 1, wis_mod, search_dc, "search room");
+            let passed = check.total >= search_dc;
+
+            let room = match dungeon.current_room_mut() {
+                Some(r) => r,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No current room."
+                    })));
+                }
+            };
+
+            if room.searched {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "searched": true,
+                    "found": false,
+                    "message": "You have already thoroughly searched this room.",
+                })));
+            }
+
+            room.searched = true;
+
+            if !passed {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "searched": true,
+                    "found": false,
+                    "check_roll": check.total,
+                    "check_dc": search_dc,
+                    "message": "You search the room but find nothing of interest.",
+                })));
+            }
+
+            let treasure = room.treasure.clone();
+            if treasure.gold == 0 && treasure.item_ids.is_empty() {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "searched": true,
+                    "found": false,
+                    "check_roll": check.total,
+                    "check_dc": search_dc,
+                    "message": "Your search is thorough but the room holds no valuables.",
+                })));
+            }
+
+            // Award gold
+            if treasure.gold > 0 {
+                state.character.gold += treasure.gold;
+                state.inventory.gold = state.character.gold;
+            }
+
+            // Award items
+            let mut given_items = Vec::new();
+            for item_id in &treasure.item_ids {
+                if item_id == "boss_key" {
+                    // Special key item — add as a custom item
+                    let key_item = Item {
+                        id: "boss_key".into(),
+                        name: "Boss Key".into(),
+                        description: "An ornate key that radiates dark energy. It unlocks the way to the dungeon's master.".into(),
+                        item_type: ItemType::Misc,
+                        slot: None,
+                        rarity: super::equipment::Rarity::Rare,
+                        weight: 0.5,
+                        value_gp: 0,
+                        stats: Default::default(),
+                        enchantment: None,
+                        quantity: 1,
+                        properties: None,
+                    };
+                    state.inventory.add(key_item);
+                    given_items.push("Boss Key".to_string());
+
+                    // Unlock boss doors in the dungeon
+                    // (need to re-borrow dungeon)
+                } else if let Some(item) = get_item(item_id) {
+                    let display = item.display_name();
+                    state.inventory.add(item);
+                    given_items.push(display);
+                }
+            }
+
+            // Clear treasure so it can't be collected again
+            if let Some(room) = dungeon.current_room_mut() {
+                room.treasure.gold = 0;
+                room.treasure.item_ids.clear();
+            }
+
+            // If we found a boss key, unlock the boss doors
+            if given_items.iter().any(|n| n == "Boss Key") {
+                dungeon.unlock_boss_door();
+            }
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "searched": true,
+                "found": true,
+                "check_roll": check.total,
+                "check_dc": search_dc,
+                "gold_found": treasure.gold,
+                "total_gold": state.character.gold,
+                "items_found": given_items,
+                "message": format!("You found {} gold and {} item(s)!", treasure.gold, given_items.len()),
+            })))
+        }
+
         _ => Err(RunequestError::InvalidToolCall(format!(
             "Unknown tool: {}",
             tool_name

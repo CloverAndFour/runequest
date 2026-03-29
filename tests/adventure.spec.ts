@@ -123,9 +123,9 @@ test.describe('Adventure Screen UI', () => {
     await expect(page.locator('.abilities-section')).toBeVisible();
   });
 
-  test('only 3 tabs exist (Status, Items, Quests)', async ({ page }) => {
+  test('4 tabs exist (Status, Items, Map, Quests)', async ({ page }) => {
     await expect(page.locator('.info-panel')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.info-tab')).toHaveCount(3);
+    await expect(page.locator('.info-tab')).toHaveCount(4);
   });
 
   test('info panel tabs switch correctly', async ({ page }) => {

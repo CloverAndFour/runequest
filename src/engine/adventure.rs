@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::abilities::{starting_abilities, Ability, SpellSlots};
 use super::character::{Character, Class, Race, Stats};
 use super::combat::CombatState;
+use super::dungeon::{self, Dungeon};
 use super::equipment::{get_item, Equipment};
 use super::inventory::Inventory;
 
@@ -35,6 +36,8 @@ pub struct AdventureState {
     pub combat: CombatState,
     pub current_scene: Scene,
     pub quest_log: Vec<Quest>,
+    #[serde(default)]
+    pub dungeon: Option<Dungeon>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -129,6 +132,21 @@ impl AdventureState {
         // Also set it on inventory for display convenience
         inventory.gold = character.gold;
 
+        // Generate a dungeon for this adventure
+        let dungeon_seed: u64 = rand::random();
+        let dng = dungeon::generate_dungeon(dungeon_seed);
+        let scene = if let Some(room) = dng.current_room() {
+            Scene {
+                location: format!("{} — {}", dng.name, room.name),
+                description: room.description.clone(),
+            }
+        } else {
+            Scene {
+                location: dng.name.clone(),
+                description: "Your adventure is about to begin...".to_string(),
+            }
+        };
+
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name,
@@ -138,11 +156,9 @@ impl AdventureState {
             abilities,
             spell_slots,
             combat: CombatState::new(),
-            current_scene: Scene {
-                location: "Unknown".to_string(),
-                description: "Your adventure is about to begin...".to_string(),
-            },
+            current_scene: scene,
             quest_log: Vec::new(),
+            dungeon: Some(dng),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

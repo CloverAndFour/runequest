@@ -27,6 +27,7 @@ export function renderAdventure(container, state, handlers) {
             <div class="info-tabs">
                 <button class="info-tab active" data-tab="stats">Status</button>
                 <button class="info-tab" data-tab="inventory">Items</button>
+                <button class="info-tab" data-tab="map">Map</button>
                 <button class="info-tab" data-tab="quests">Quests</button>
             </div>
             <div class="info-content" id="infoContent"></div>
@@ -78,6 +79,9 @@ function renderTab(tab, state) {
             break;
         case 'inventory':
             renderInventory(el, state);
+            break;
+        case 'map':
+            renderMap(el, state);
             break;
         case 'quests':
             renderQuests(el, state);
@@ -257,6 +261,97 @@ function renderInventory(el, state) {
         });
         html += '</ul>';
     }
+
+    el.innerHTML = html;
+}
+
+function renderMap(el, state) {
+    const dungeon = state.dungeon;
+    if (!dungeon) {
+        el.innerHTML = '<div class="empty-state">No dungeon in this adventure.</div>';
+        return;
+    }
+
+    const floor = dungeon.floors[dungeon.current_floor];
+    if (!floor) {
+        el.innerHTML = '<div class="empty-state">Invalid floor.</div>';
+        return;
+    }
+
+    // Floor selector
+    let html = `<div class="map-header">
+        <div class="dungeon-name">${escapeHtml(dungeon.name)}</div>
+        <div class="floor-selector">`;
+    dungeon.floors.forEach((f, i) => {
+        const active = i === dungeon.current_floor ? ' active' : '';
+        html += `<span class="floor-btn${active}">F${f.level}</span>`;
+    });
+    html += '</div></div>';
+
+    // Current room info
+    const currentRoom = floor.rooms[dungeon.current_room];
+    if (currentRoom) {
+        const typeLabel = currentRoom.room_type || 'unknown';
+        const clearedBadge = currentRoom.cleared ? ' <span class="room-cleared-badge">Cleared</span>' : '';
+        html += `<div class="current-room-info">
+            <span class="room-label">${escapeHtml(currentRoom.name)}</span>
+            <span class="room-type-badge">${typeLabel}</span>${clearedBadge}
+        </div>`;
+    }
+
+    // Render grid map
+    const W = floor.width || 40;
+    const H = floor.height || 30;
+    const CELL = 7;
+
+    // Build a 2D grid of cell types
+    const grid = Array.from({length: H}, () => Array(W).fill('fog'));
+
+    // Mark rooms
+    floor.rooms.forEach((room, idx) => {
+        if (!room.discovered) return;
+        for (let ry = room.y; ry < room.y + room.h && ry < H; ry++) {
+            for (let rx = room.x; rx < room.x + room.w && rx < W; rx++) {
+                let cellClass = 'room';
+                if (idx === dungeon.current_room) cellClass = 'current';
+                else if (room.room_type === 'Boss') cellClass = 'boss';
+                else if (room.room_type === 'Combat' && !room.cleared) cellClass = 'combat';
+                else if (room.room_type === 'Stairs') cellClass = 'stairs';
+                else if (room.cleared) cellClass = 'cleared';
+                else if (room.room_type === 'Treasure') cellClass = 'treasure';
+                grid[ry][rx] = cellClass;
+            }
+        }
+    });
+
+    // Mark corridors
+    floor.corridors.forEach(cor => {
+        if (!cor.discovered) return;
+        cor.cells.forEach(([cx, cy]) => {
+            if (cy < H && cx < W && grid[cy][cx] === 'fog') {
+                grid[cy][cx] = 'corridor';
+            }
+        });
+    });
+
+    // Render as CSS grid
+    html += `<div class="dungeon-grid" style="grid-template-columns:repeat(${W},${CELL}px);grid-template-rows:repeat(${H},${CELL}px);">`;
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            html += `<div class="map-cell ${grid[y][x]}"></div>`;
+        }
+    }
+    html += '</div>';
+
+    // Legend
+    html += `<div class="map-legend">
+        <span><span class="legend-swatch current"></span>You</span>
+        <span><span class="legend-swatch room"></span>Room</span>
+        <span><span class="legend-swatch cleared"></span>Cleared</span>
+        <span><span class="legend-swatch combat"></span>Enemies</span>
+        <span><span class="legend-swatch stairs"></span>Stairs</span>
+        <span><span class="legend-swatch treasure"></span>Treasure</span>
+    </div>`;
 
     el.innerHTML = html;
 }
