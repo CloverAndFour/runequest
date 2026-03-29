@@ -264,8 +264,6 @@ function displayDiceResult(data) {
         storyContent.scrollTop = storyContent.scrollHeight;
     }, 400);
 }
-    storyContent.scrollTop = storyContent.scrollHeight;
-}
 
 function showChoices(data) {
     const storyContent = document.querySelector('.story-content');
