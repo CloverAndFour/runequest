@@ -242,6 +242,21 @@ async fn handle_client_msg(
             let state_json = serde_json::to_value(&adventure)?;
             let adv_id = adventure.id.clone();
 
+            // If no display_history.jsonl exists (old adventure), build from LLM history
+            let display_events = if display_events.is_empty() {
+                history
+                    .iter()
+                    .filter(|h| h.role == "assistant" && h.content.is_some() && h.tool_calls.is_none())
+                    .map(|h| DisplayEvent {
+                        event_type: "narrative".to_string(),
+                        data: serde_json::json!({"text": h.content.as_deref().unwrap_or("")}),
+                        timestamp: h.timestamp,
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                display_events
+            };
+
             // Check if last display event was choices or dice roll (can restore without LLM)
             let last_event_type = display_events.last().map(|e| e.event_type.clone());
             let needs_resume = !matches!(last_event_type.as_deref(), Some("choices") | Some("dice_roll_request"));
