@@ -16,17 +16,52 @@ pub enum ItemType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
+    #[serde(default)]
     pub id: String,
     pub name: String,
+    #[serde(default)]
     pub description: String,
     pub item_type: ItemType,
+    #[serde(default)]
     pub slot: Option<EquipSlot>,
+    #[serde(default)]
     pub rarity: Rarity,
+    #[serde(default)]
     pub weight: f32,
+    #[serde(default)]
     pub value_gp: u32,
+    #[serde(default)]
     pub stats: ItemStats,
+    #[serde(default)]
     pub enchantment: Option<Enchantment>,
+    #[serde(default = "default_quantity")]
     pub quantity: u32,
+    /// Legacy field — kept for backward compat with old adventures.
+    #[serde(default, skip_serializing)]
+    pub properties: Option<serde_json::Value>,
+}
+
+fn default_quantity() -> u32 {
+    1
+}
+
+impl Default for Item {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            item_type: ItemType::Misc,
+            slot: None,
+            rarity: Rarity::default(),
+            weight: 0.0,
+            value_gp: 0,
+            stats: ItemStats::default(),
+            enchantment: None,
+            quantity: 1,
+            properties: None,
+        }
+    }
 }
 
 impl Item {

@@ -217,6 +217,7 @@ pub fn execute_tool_call(
                 stats: Default::default(),
                 enchantment: None,
                 quantity: 1,
+                properties: None,
             });
 
             Ok(ToolExecResult::Immediate(serde_json::json!({

@@ -99,30 +99,43 @@ pub struct Enchantment {
 /// Stat block for an item — covers weapons, armor, and accessories.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ItemStats {
+    #[serde(default)]
     pub ac_bonus: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ac_base: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub damage_dice: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub damage_modifier_stat: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub damage_type: Option<String>,
+    #[serde(default)]
     pub attack_bonus: i32,
+    #[serde(default)]
     pub str_bonus: i32,
+    #[serde(default)]
     pub dex_bonus: i32,
+    #[serde(default)]
     pub con_bonus: i32,
+    #[serde(default)]
     pub int_bonus: i32,
+    #[serde(default)]
     pub wis_bonus: i32,
+    #[serde(default)]
     pub cha_bonus: i32,
+    #[serde(default)]
     pub hp_bonus: i32,
+    #[serde(default)]
     pub speed_bonus: i32,
+    #[serde(default)]
     pub is_two_handed: bool,
+    #[serde(default)]
     pub is_finesse: bool,
+    #[serde(default)]
     pub is_ranged: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub special: Option<String>,
 }
 
@@ -379,6 +392,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "dagger".into(),
@@ -398,6 +412,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "handaxe".into(),
@@ -416,6 +431,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "mace".into(),
@@ -434,6 +450,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "quarterstaff".into(),
@@ -452,6 +469,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "spear".into(),
@@ -470,6 +488,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Martial Melee --
@@ -491,6 +510,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "longsword".into(),
@@ -509,6 +529,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "battleaxe".into(),
@@ -527,6 +548,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "warhammer".into(),
@@ -545,6 +567,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "rapier".into(),
@@ -564,6 +587,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "scimitar".into(),
@@ -583,6 +607,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "greatsword".into(),
@@ -602,6 +627,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "greataxe".into(),
@@ -621,6 +647,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "maul".into(),
@@ -640,6 +667,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Ranged --
@@ -663,6 +691,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "longbow".into(),
@@ -684,6 +713,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "light_crossbow".into(),
@@ -705,6 +735,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "heavy_crossbow".into(),
@@ -726,6 +757,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // ===== ARMOR =====
@@ -745,6 +777,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "leather_armor".into(),
@@ -761,6 +794,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "studded_leather".into(),
@@ -777,6 +811,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Medium Armor --
@@ -796,6 +831,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "chain_shirt".into(),
@@ -813,6 +849,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "scale_mail".into(),
@@ -830,6 +867,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "breastplate".into(),
@@ -847,6 +885,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "half_plate".into(),
@@ -864,6 +903,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Heavy Armor --
@@ -883,6 +923,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "chain_mail".into(),
@@ -900,6 +941,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "splint_armor".into(),
@@ -917,6 +959,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "plate_armor".into(),
@@ -934,6 +977,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Shield --
@@ -952,6 +996,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // ===== ACCESSORIES =====
@@ -971,6 +1016,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "helm_of_awareness".into(),
@@ -988,6 +1034,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Amulets --
@@ -1007,6 +1054,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "amulet_of_protection".into(),
@@ -1023,6 +1071,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Rings --
@@ -1041,6 +1090,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "ring_of_strength".into(),
@@ -1057,6 +1107,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "ring_of_evasion".into(),
@@ -1073,6 +1124,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Gloves --
@@ -1092,6 +1144,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "gloves_of_thievery".into(),
@@ -1108,6 +1161,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Boots --
@@ -1126,6 +1180,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "boots_of_elvenkind".into(),
@@ -1143,6 +1198,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Cloaks --
@@ -1161,6 +1217,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "cloak_of_elvenkind".into(),
@@ -1178,6 +1235,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // -- Leg Armor --
@@ -1196,6 +1254,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // ===== MAGIC WEAPONS =====
@@ -1221,6 +1280,7 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Flametongue".into(),
             }),
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "frostbrand_greatsword".into(),
@@ -1245,6 +1305,7 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Frostbrand".into(),
             }),
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "vorpal_longsword".into(),
@@ -1269,6 +1330,7 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Vorpal".into(),
             }),
             quantity: 1,
+            properties: None,
         },
 
         // ===== POTIONS & CONSUMABLES =====
@@ -1287,6 +1349,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "greater_health_potion".into(),
@@ -1303,6 +1366,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "scroll_of_fireball".into(),
@@ -1319,6 +1383,7 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
 
         // ===== MISC =====
@@ -1334,6 +1399,7 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "thieves_tools".into(),
@@ -1347,6 +1413,7 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "torch".into(),
@@ -1360,6 +1427,7 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
         Item {
             id: "rope_50ft".into(),
@@ -1373,6 +1441,7 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            properties: None,
         },
     ]
 }

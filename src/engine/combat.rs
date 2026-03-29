@@ -89,13 +89,21 @@ pub struct AvailableAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CombatState {
+    #[serde(default)]
     pub active: bool,
+    #[serde(default)]
     pub enemies: Vec<Enemy>,
+    #[serde(default, alias = "initiative_order")]
     pub initiative: Vec<InitiativeEntry>,
+    #[serde(default, alias = "current_turn")]
     pub current_turn_index: usize,
+    #[serde(default)]
     pub round: u32,
+    #[serde(default)]
     pub action_economy: ActionEconomy,
+    #[serde(default)]
     pub player_dodging: bool,
+    #[serde(default)]
     pub combat_log: Vec<String>,
 }
 

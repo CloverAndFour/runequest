@@ -90,6 +90,7 @@ pub struct Character {
     pub hp: i32,
     pub max_hp: i32,
     pub ac: i32,
+    #[serde(default)]
     pub gold: u32,
     pub stats: Stats,
     pub conditions: Vec<String>,

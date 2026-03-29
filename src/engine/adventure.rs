@@ -28,6 +28,7 @@ pub struct AdventureState {
     pub name: String,
     pub character: Character,
     pub inventory: Inventory,
+    #[serde(default)]
     pub equipment: Equipment,
     pub abilities: Vec<Ability>,
     pub spell_slots: SpellSlots,
