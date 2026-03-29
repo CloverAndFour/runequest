@@ -9,6 +9,7 @@ const app = document.getElementById('app');
 let ws = null;
 let currentView = null;
 let gameState = null;
+let currentModel = 'grok-4-1-fast-reasoning';
 
 async function init() {
     const token = getToken();
@@ -76,6 +77,12 @@ function handleServerMsg(msg) {
             gameState = msg.state;
             updateInfoPanel();
             break;
+        case 'cost_update':
+            updateCostDisplay(msg);
+            break;
+        case 'model_info':
+            currentModel = msg.model;
+            break;
         case 'error':
             showToast(msg.message, true);
             break;
@@ -108,6 +115,9 @@ function showAdventureScreen() {
         onBack: () => showSelectScreen(),
         onGetStats: () => ws.send({ type: 'get_character_sheet' }),
     });
+
+    // Listen for options button
+    document.addEventListener('show-options', showOptionsModal);
 }
 
 // Narrative streaming
@@ -116,6 +126,10 @@ let currentNarrativeEl = null;
 function appendNarrativeChunk(text) {
     const storyContent = document.querySelector('.story-content');
     if (!storyContent) return;
+
+    // Remove loading placeholder if present
+    const loadingEl = storyContent.querySelector('.loading-narrative');
+    if (loadingEl) loadingEl.remove();
 
     if (!currentNarrativeEl) {
         currentNarrativeEl = document.createElement('div');
@@ -168,7 +182,6 @@ function showDiceResult(data) {
     const storyContent = document.querySelector('.story-content');
     if (!storyContent) return;
 
-    // Remove the roll button if still there
     const rollBtn = storyContent.querySelector('.btn-roll-dice');
     if (rollBtn) rollBtn.closest('.dice-roll-ui')?.remove();
 
@@ -210,7 +223,6 @@ function showChoices(data) {
     storyContent.appendChild(div);
     storyContent.scrollTop = storyContent.scrollHeight;
 
-    // Attach handlers
     div.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const index = parseInt(btn.dataset.index);
@@ -239,10 +251,48 @@ function showChoices(data) {
 
 function updateInfoPanel() {
     if (currentView !== 'adventure' || !gameState) return;
-
-    // Update the info panel content based on active tab
     const event = new CustomEvent('state-update', { detail: gameState });
     document.dispatchEvent(event);
+}
+
+function updateCostDisplay(data) {
+    const el = document.getElementById('costDisplay');
+    if (!el) return;
+    const cost = data.cost_usd || 0;
+    if (cost < 0.001) el.textContent = `$${(cost * 1000).toFixed(2)}m`;
+    else if (cost < 0.01) el.textContent = `$${cost.toFixed(4)}`;
+    else if (cost < 1) el.textContent = `$${cost.toFixed(3)}`;
+    else el.textContent = `$${cost.toFixed(2)}`;
+    el.title = `${data.prompt_tokens || 0} input + ${data.completion_tokens || 0} output tokens`;
+}
+
+function showOptionsModal() {
+    const existing = document.querySelector('.options-modal');
+    if (existing) { existing.remove(); return; }
+
+    const modal = document.createElement('div');
+    modal.className = 'options-modal';
+    modal.innerHTML = `
+        <div class="options-content">
+            <h3>Options</h3>
+            <div class="option-group">
+                <label>Model</label>
+                <select id="modelSelect">
+                    <option value="grok-4-1-fast-reasoning" ${currentModel.includes('non') ? '' : 'selected'}>Grok 4.1 Reasoning (smarter)</option>
+                    <option value="grok-4-1-fast-non-reasoning" ${currentModel.includes('non') ? 'selected' : ''}>Grok 4.1 Fast (quicker)</option>
+                </select>
+            </div>
+            <button class="stone-btn" id="closeOptions" style="width:100%;margin-top:12px;">Close</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('modelSelect').addEventListener('change', (e) => {
+        ws.send({ type: 'set_model', model: e.target.value });
+        currentModel = e.target.value;
+    });
+    document.getElementById('closeOptions').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 }
 
 function showToast(message, isError = false) {
@@ -263,7 +313,6 @@ function escapeAttr(str) {
     return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Make ws accessible globally for inline handlers
 window.rqWs = { send: (msg) => ws?.send(msg) };
 
 init();

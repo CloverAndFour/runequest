@@ -11,6 +11,8 @@ pub enum ClientMsg {
         character_name: String,
         race: String,
         class: String,
+        #[serde(default)]
+        scenario: Option<String>,
         stats: StatsInput,
     },
     LoadAdventure {
@@ -30,6 +32,9 @@ pub enum ClientMsg {
     GetCharacterSheet,
     GetInventory,
     GetQuests,
+    SetModel {
+        model: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +89,15 @@ pub enum ServerMsg {
     },
     StateUpdate {
         state: serde_json::Value,
+    },
+    CostUpdate {
+        cost_usd: f64,
+        prompt_tokens: u64,
+        completion_tokens: u64,
+    },
+    ModelInfo {
+        model: String,
+        available_models: Vec<String>,
     },
     Error {
         code: String,

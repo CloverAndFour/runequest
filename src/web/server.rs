@@ -23,6 +23,7 @@ use super::websocket::handle_socket;
 pub struct AppState {
     pub data_dir: PathBuf,
     pub xai_client: Arc<XaiClient>,
+    pub default_model: String,
     pub auth_mode: AuthMode,
     pub user_store: Arc<UserStore>,
     pub jwt_manager: Arc<JwtManager>,
@@ -60,7 +61,7 @@ pub async fn run_server(
     })?;
 
     let model = std::env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4-1-fast-reasoning".to_string());
-    let xai_client = Arc::new(XaiClient::new(api_key, model));
+    let xai_client = Arc::new(XaiClient::new(api_key, &model));
 
     let user_store = Arc::new(UserStore::new(&data_dir));
     let jwt_manager = Arc::new(JwtManager::new(&data_dir)?);
@@ -74,6 +75,7 @@ pub async fn run_server(
     let app_state = Arc::new(AppState {
         data_dir: data_dir.clone(),
         xai_client,
+        default_model: model,
         auth_mode: auth_mode.clone(),
         user_store: user_store.clone(),
         jwt_manager: jwt_manager.clone(),
@@ -174,12 +176,14 @@ async fn ws_handler(
     Extension(user): Extension<AuthUser>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    let default_model = state.default_model.clone();
     ws.on_upgrade(move |socket| {
         handle_socket(
             socket,
             user,
             state.xai_client.clone(),
             state.data_dir.clone(),
+            default_model,
         )
     })
 }

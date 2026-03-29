@@ -5,6 +5,7 @@ use reqwest::Client;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::pricing::TokenUsage;
 use super::types::*;
 use crate::error::{RunequestError, Result};
 
@@ -25,14 +26,25 @@ impl XaiClient {
         }
     }
 
-    /// Non-streaming chat with tools — used for tool-call loops.
+    pub fn default_model(&self) -> &str {
+        &self.model
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    /// Non-streaming chat with tools. Returns response + optional token usage.
     pub async fn chat_with_tools(
         &self,
         messages: &[ChatMessage],
         tools: &[ToolDef],
-    ) -> Result<XaiResponse> {
+        model_override: Option<&str>,
+    ) -> Result<(XaiResponse, Option<TokenUsage>)> {
+        let model = model_override.unwrap_or(&self.model);
+
         let mut body = serde_json::json!({
-            "model": &self.model,
+            "model": model,
             "messages": messages,
             "stream": false,
         });
@@ -69,6 +81,12 @@ impl XaiClient {
             .await
             .map_err(|e| RunequestError::LlmError(format!("Parse error: {}", e)))?;
 
+        // Extract usage
+        let usage = data.get("usage").map(|u| TokenUsage {
+            prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0),
+            completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0),
+        });
+
         let choice = data
             .get("choices")
             .and_then(|c| c.get(0))
@@ -87,18 +105,17 @@ impl XaiClient {
                         .get("content")
                         .and_then(|c| c.as_str())
                         .map(String::from);
-                    return Ok(XaiResponse::ToolCalls { tool_calls, text });
+                    return Ok((XaiResponse::ToolCalls { tool_calls, text }, usage));
                 }
             }
         }
 
-        // Text response
         let content = message
             .get("content")
             .and_then(|c| c.as_str())
             .unwrap_or("")
             .to_string();
-        Ok(XaiResponse::Text(content))
+        Ok((XaiResponse::Text(content), usage))
     }
 
     /// Streaming chat — used for narrative output (no tools expected).

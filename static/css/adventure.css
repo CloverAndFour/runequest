@@ -542,3 +542,191 @@
     color: var(--text-gold);
     margin: 12px 0;
 }
+
+/* Stat cost indicator */
+.stat-cost {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Scenario cards */
+.scenario-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.scenario-card {
+    background: var(--bg-dark);
+    border: 2px solid var(--border-dark);
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.scenario-card:hover {
+    border-color: var(--border-gold);
+}
+
+.scenario-card.selected {
+    border-color: var(--text-gold);
+    background: rgba(200, 168, 78, 0.08);
+    box-shadow: 0 0 8px rgba(200, 168, 78, 0.15);
+}
+
+.scenario-name {
+    font-family: var(--font-medieval);
+    font-size: 14px;
+    color: var(--text-gold);
+    margin-bottom: 4px;
+}
+
+.scenario-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+#customScenario {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+    margin-top: 8px;
+}
+
+#customScenario:focus {
+    border-color: var(--text-gold);
+}
+
+/* Cost display */
+.cost-display {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'Courier New', monospace;
+    margin-left: 8px;
+}
+
+/* Options button */
+.btn-options {
+    background: none;
+    border: 1px solid var(--border-dark);
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 8px;
+    line-height: 1;
+}
+
+.btn-options:hover {
+    color: var(--text-gold);
+    border-color: var(--text-gold);
+}
+
+/* Options modal */
+.options-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.options-content {
+    background: var(--bg-stone);
+    border: 2px solid var(--border-gold);
+    padding: 24px;
+    min-width: 300px;
+}
+
+.options-content h3 {
+    color: var(--text-gold);
+    font-family: var(--font-medieval);
+    margin-bottom: 16px;
+}
+
+.option-group {
+    margin-bottom: 12px;
+}
+
+.option-group label {
+    display: block;
+    font-size: 11px;
+    color: var(--border-gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+
+.option-group select {
+    width: 100%;
+    padding: 8px;
+    background: var(--bg-dark);
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+}
+
+.option-group select:focus {
+    border-color: var(--text-gold);
+}
+
+/* Loading animation */
+.loading-narrative {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px;
+}
+
+.loading-text {
+    color: var(--text-muted);
+    font-style: italic;
+    animation: loading-pulse 2s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+    0%, 100% { color: var(--text-muted); }
+    50% { color: var(--text-gold); }
+}
+
+.d20-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--border-dark);
+    border-top-color: var(--text-gold);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Abilities section in Status tab */
+.abilities-section {
+    margin-top: 20px;
+    border-top: 2px solid var(--border-dark);
+    padding-top: 16px;
+}
+
+.section-title {
+    font-family: var(--font-medieval);
+    font-size: 14px;
+    color: var(--text-gold);
+    margin-bottom: 10px;
+}
+
+.ability-entry {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.3);
+}

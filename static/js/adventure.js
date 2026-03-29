@@ -6,9 +6,6 @@ export function renderAdventure(container, state, handlers) {
         return;
     }
 
-    const c = state.character || {};
-    const stats = c.stats || {};
-
     container.innerHTML = `
     <div class="adventure-layout">
         <div class="story-panel">
@@ -16,18 +13,20 @@ export function renderAdventure(container, state, handlers) {
                 <button class="btn-back" id="advBackBtn" style="position:static;">&larr;</button>
                 <h2>${escapeHtml(state.name || 'Adventure')}</h2>
                 <span class="scene-location" id="sceneLocation">${escapeHtml(state.current_scene?.location || 'Unknown')}</span>
+                <span class="cost-display" id="costDisplay" title="Session cost">$0.0000</span>
+                <button class="btn-options" id="optionsBtn" title="Options">&#9881;</button>
             </div>
             <div class="story-content" id="storyContent">
-                <div class="narrative-block" style="color: var(--text-muted); font-style: italic;">
-                    Your adventure is loading...
+                <div class="loading-narrative">
+                    <div class="d20-spinner"></div>
+                    <span class="loading-text">Your adventure is loading</span>
                 </div>
             </div>
         </div>
         <div class="info-panel">
             <div class="info-tabs">
-                <button class="info-tab active" data-tab="stats">Stats</button>
+                <button class="info-tab active" data-tab="stats">Status</button>
                 <button class="info-tab" data-tab="inventory">Items</button>
-                <button class="info-tab" data-tab="abilities">Skills</button>
                 <button class="info-tab" data-tab="quests">Quests</button>
             </div>
             <div class="info-content" id="infoContent"></div>
@@ -48,11 +47,16 @@ export function renderAdventure(container, state, handlers) {
     // Back button
     document.getElementById('advBackBtn')?.addEventListener('click', handlers.onBack);
 
+    // Options button
+    document.getElementById('optionsBtn')?.addEventListener('click', () => {
+        const event = new Event('show-options');
+        document.dispatchEvent(event);
+    });
+
     // State update listener
     const stateHandler = (e) => {
         Object.assign(state, e.detail);
         renderTab(activeTab, state);
-        // Update scene location
         const loc = document.getElementById('sceneLocation');
         if (loc && state.current_scene) {
             loc.textContent = state.current_scene.location || 'Unknown';
@@ -70,13 +74,10 @@ function renderTab(tab, state) {
 
     switch (tab) {
         case 'stats':
-            renderStats(el, state);
+            renderStatus(el, state);
             break;
         case 'inventory':
             renderInventory(el, state);
-            break;
-        case 'abilities':
-            renderAbilities(el, state);
             break;
         case 'quests':
             renderQuests(el, state);
@@ -84,7 +85,7 @@ function renderTab(tab, state) {
     }
 }
 
-function renderStats(el, state) {
+function renderStatus(el, state) {
     const c = state.character || {};
     const s = c.stats || {};
     const hpPct = c.max_hp > 0 ? (Math.max(c.hp, 0) / c.max_hp * 100) : 0;
@@ -92,7 +93,7 @@ function renderStats(el, state) {
     const xpNext = getXpNext(c.level || 1);
     const xpPct = xpNext > 0 ? ((c.xp || 0) / xpNext * 100) : 0;
 
-    el.innerHTML = `
+    let html = `
         <div class="char-name">${escapeHtml(c.name || 'Unknown')}</div>
         <div class="char-class">${escapeHtml(c.race || '?')} ${escapeHtml(c.class || '?')} &middot; Level ${c.level || 1}</div>
 
@@ -126,6 +127,36 @@ function renderStats(el, state) {
             </div>
         ` : ''}
     `;
+
+    // Abilities section (merged from Skills tab)
+    const abilities = state.abilities || [];
+    const slots = state.spell_slots || {};
+
+    html += '<div class="abilities-section">';
+    html += '<div class="section-title">Abilities & Skills</div>';
+
+    if (abilities.length === 0) {
+        html += '<div class="empty-state" style="padding:8px 0;">No abilities yet.</div>';
+    } else {
+        abilities.forEach(a => {
+            html += `<div class="ability-entry">
+                <div style="color:var(--text-gold); font-family:var(--font-medieval);">${escapeHtml(a.name)}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${escapeHtml(a.description)}</div>
+                ${a.uses_per_rest != null ? `<div style="font-size:11px; color:var(--text-light); margin-top:2px;">Uses: ${a.uses_remaining ?? '?'}/${a.uses_per_rest}</div>` : ''}
+            </div>`;
+        });
+    }
+
+    if (slots.level_1 > 0 || slots.level_2 > 0 || slots.level_3 > 0) {
+        html += '<div style="margin-top:12px; font-size:12px; color:var(--text-gold);">Spell Slots</div>';
+        if (slots.level_1 > 0) html += renderSlotRow('1st', slots.level_1, slots.level_1_used || 0);
+        if (slots.level_2 > 0) html += renderSlotRow('2nd', slots.level_2, slots.level_2_used || 0);
+        if (slots.level_3 > 0) html += renderSlotRow('3rd', slots.level_3, slots.level_3_used || 0);
+    }
+
+    html += '</div>';
+
+    el.innerHTML = html;
 }
 
 function renderStatBox(name, value) {
@@ -139,6 +170,15 @@ function renderStatBox(name, value) {
     </div>`;
 }
 
+function renderSlotRow(label, total, used) {
+    let dots = '';
+    for (let i = 0; i < total; i++) {
+        const filled = i < (total - used);
+        dots += `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid var(--border-gold);background:${filled ? 'var(--text-gold)' : 'transparent'};margin-right:3px;"></span>`;
+    }
+    return `<div style="padding:4px 0;font-size:12px;color:var(--text-muted);">${label}: ${dots}</div>`;
+}
+
 function renderInventory(el, state) {
     const inv = state.inventory || { items: [] };
     if (inv.items.length === 0) {
@@ -146,13 +186,7 @@ function renderInventory(el, state) {
         return;
     }
 
-    const typeIcons = {
-        weapon: '\u2694',
-        armor: '\u{1F6E1}',
-        potion: '\u{1F9EA}',
-        scroll: '\u{1F4DC}',
-        misc: '\u{1F4E6}',
-    };
+    const typeIcons = { weapon: '\u2694', armor: '\u{1F6E1}', potion: '\u{1F9EA}', scroll: '\u{1F4DC}', misc: '\u{1F4E6}' };
 
     let html = '<ul class="item-list">';
     inv.items.forEach(item => {
@@ -166,49 +200,9 @@ function renderInventory(el, state) {
     html += '</ul>';
 
     const totalWeight = inv.items.reduce((sum, i) => sum + (i.weight || 0), 0);
-    html += `<div style="text-align:center; font-size:11px; color:var(--text-muted); margin-top:8px;">
-        Total weight: ${totalWeight.toFixed(1)} lbs
-    </div>`;
+    html += `<div style="text-align:center; font-size:11px; color:var(--text-muted); margin-top:8px;">Total weight: ${totalWeight.toFixed(1)} lbs</div>`;
 
     el.innerHTML = html;
-}
-
-function renderAbilities(el, state) {
-    const abilities = state.abilities || [];
-    const slots = state.spell_slots || {};
-
-    let html = '';
-
-    if (abilities.length === 0) {
-        html = '<div class="empty-state">No abilities yet.</div>';
-    } else {
-        abilities.forEach(a => {
-            html += `<div style="padding:8px 0; border-bottom:1px solid rgba(74,58,42,0.3);">
-                <div style="color:var(--text-gold); font-family:var(--font-medieval);">${escapeHtml(a.name)}</div>
-                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${escapeHtml(a.description)}</div>
-                ${a.uses_per_rest != null ? `<div style="font-size:11px; color:var(--text-light); margin-top:2px;">Uses: ${a.uses_remaining ?? '?'}/${a.uses_per_rest}</div>` : ''}
-            </div>`;
-        });
-    }
-
-    // Spell slots
-    if (slots.level_1 > 0 || slots.level_2 > 0 || slots.level_3 > 0) {
-        html += '<div style="margin-top:16px; font-size:12px; color:var(--text-gold);">Spell Slots</div>';
-        if (slots.level_1 > 0) html += renderSlotRow('1st', slots.level_1, slots.level_1_used || 0);
-        if (slots.level_2 > 0) html += renderSlotRow('2nd', slots.level_2, slots.level_2_used || 0);
-        if (slots.level_3 > 0) html += renderSlotRow('3rd', slots.level_3, slots.level_3_used || 0);
-    }
-
-    el.innerHTML = html;
-}
-
-function renderSlotRow(label, total, used) {
-    let dots = '';
-    for (let i = 0; i < total; i++) {
-        const filled = i < (total - used);
-        dots += `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid var(--border-gold);background:${filled ? 'var(--text-gold)' : 'transparent'};margin-right:3px;"></span>`;
-    }
-    return `<div style="padding:4px 0;font-size:12px;color:var(--text-muted);">${label}: ${dots}</div>`;
 }
 
 function renderQuests(el, state) {

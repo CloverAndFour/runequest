@@ -20,13 +20,15 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
 4. **ALWAYS call `present_choices` when it's the player's turn.** Give 2-6 meaningful choices. Set `allow_custom_input: true` when exploration or creative actions make sense. Set it to `false` during structured situations like combat or dialogue trees.
 
-5. **Use `set_scene` when the location changes** to update the player's scene info.
+5. **Include dice requirements in choices.** When presenting choices that would require a dice roll, include the check type and DC in brackets, e.g., "[STR DC 15] Force open the door", "[DEX DC 12] Sneak past the guards", "[CHA DC 14] Persuade the merchant". This helps the player make informed decisions about risk.
 
-6. **Track combat properly.** Call `start_combat` when enemies appear. Use `attack_roll` for attacks. Call `end_combat` with appropriate XP when combat ends.
+6. **Use `set_scene` when the location changes** to update the player's scene info.
 
-7. **Be generous but fair with items and XP.** Award XP for combat, puzzle-solving, and good roleplaying. Give interesting items as rewards.
+7. **Track combat properly.** Call `start_combat` when enemies appear. Use `attack_roll` for attacks. Call `end_combat` with appropriate XP when combat ends.
 
-8. **Keep narrative segments concise** — 2-4 paragraphs max between player interactions. Don't monologue.
+8. **Be generous but fair with items and XP.** Award XP for combat, puzzle-solving, and good roleplaying. Give interesting items as rewards.
+
+9. **Keep narrative segments concise** — 2-4 paragraphs max between player interactions. Don't monologue.
 
 ## CURRENT GAME STATE
 
@@ -52,25 +54,31 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         xp_next = state.character.xp_for_next_level(),
         location = state.current_scene.location,
         combat_status = if state.combat.active {
-            format!(
-                "ACTIVE — {} enemies",
-                state.combat.enemies.len()
-            )
+            format!("ACTIVE — {} enemies", state.combat.enemies.len())
         } else {
             "None".to_string()
         },
         quests = if state.quest_log.iter().any(|q| !q.completed) {
-            state
-                .quest_log
-                .iter()
-                .filter(|q| !q.completed)
-                .map(|q| q.name.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
+            state.quest_log.iter().filter(|q| !q.completed).map(|q| q.name.as_str()).collect::<Vec<_>>().join(", ")
         } else {
             "None".to_string()
         },
     )
 }
 
-pub const ADVENTURE_START_PROMPT: &str = "The adventure begins! Set the opening scene for the player. Describe where they are, what they see, and create an intriguing hook to draw them in. Use set_scene to establish the location. Then present the player with their first set of choices. Make it exciting!";
+pub fn adventure_start_prompt(scenario: &Option<String>) -> String {
+    match scenario {
+        Some(s) if !s.is_empty() => format!(
+            "The adventure begins! The scenario is: {}. \
+             Set the opening scene based on this scenario. Describe where the player is, \
+             what they see, and create an intriguing hook. Use set_scene to establish the location. \
+             Then present the player with their first set of choices (include dice requirements where relevant). \
+             Make it exciting and atmospheric!",
+            s
+        ),
+        _ => "The adventure begins! Set the opening scene for the player. Describe where they are, \
+              what they see, and create an intriguing hook to draw them in. Use set_scene to establish \
+              the location. Then present the player with their first set of choices (include dice \
+              requirements where relevant). Make it exciting!".to_string(),
+    }
+}

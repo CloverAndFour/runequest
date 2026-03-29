@@ -4,6 +4,7 @@ use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 use crate::auth::AuthUser;
 use crate::engine::adventure::AdventureState;
@@ -11,20 +12,27 @@ use crate::engine::character::{Class, Race, Stats};
 use crate::engine::dice::DiceRoller;
 use crate::engine::executor::{execute_tool_call, ToolExecResult};
 use crate::llm::client::XaiClient;
-use crate::llm::prompts::{build_system_prompt, ADVENTURE_START_PROMPT};
+use crate::llm::pricing::SessionCost;
+use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
 use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, HistoryMessage};
 use crate::web::protocol::{ClientMsg, ServerMsg};
 
-/// Per-connection session state.
+const ALLOWED_MODELS: &[&str] = &[
+    "grok-4-1-fast-reasoning",
+    "grok-4-1-fast-non-reasoning",
+];
+
 struct Session {
-    user: AuthUser,
     store: AdventureStore,
     adventure: Option<AdventureState>,
     messages: Vec<ChatMessage>,
     pending_roll: Option<PendingRoll>,
     pending_choices: Option<PendingChoices>,
+    model: String,
+    session_cost: SessionCost,
+    precomputed: Option<PrecomputedBranches>,
 }
 
 struct PendingRoll {
@@ -40,22 +48,32 @@ struct PendingChoices {
     tool_call_id: String,
 }
 
+struct PrecomputedBranches {
+    success_text: Arc<Mutex<Option<String>>>,
+    failure_text: Arc<Mutex<Option<String>>>,
+    success_handle: JoinHandle<()>,
+    failure_handle: JoinHandle<()>,
+}
+
 pub async fn handle_socket(
     socket: WebSocket,
     user: AuthUser,
     xai_client: Arc<XaiClient>,
     data_dir: std::path::PathBuf,
+    default_model: String,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let store = AdventureStore::new(&data_dir, &user.username);
 
     let session = Arc::new(Mutex::new(Session {
-        user: user.clone(),
         store,
         adventure: None,
         messages: Vec::new(),
         pending_roll: None,
         pending_choices: None,
+        model: default_model.clone(),
+        session_cost: SessionCost::new(),
+        precomputed: None,
     }));
 
     let connected = ServerMsg::Connected {
@@ -63,6 +81,15 @@ pub async fn handle_socket(
     };
     let _ = sender
         .send(Message::Text(serde_json::to_string(&connected).unwrap().into()))
+        .await;
+
+    // Send model info
+    let model_info = ServerMsg::ModelInfo {
+        model: default_model,
+        available_models: ALLOWED_MODELS.iter().map(|s| s.to_string()).collect(),
+    };
+    let _ = sender
+        .send(Message::Text(serde_json::to_string(&model_info).unwrap().into()))
         .await;
 
     while let Some(Ok(msg)) = receiver.next().await {
@@ -126,6 +153,7 @@ async fn handle_client_msg(
             character_name,
             race,
             class,
+            scenario,
             stats,
         } => {
             let race = parse_race(&race);
@@ -151,7 +179,7 @@ async fn handle_client_msg(
             }
 
             send_msg(sender, &ServerMsg::AdventureCreated { adventure_id, state: state_json }).await;
-            start_adventure(session, xai_client, sender).await?;
+            start_adventure(session, xai_client, sender, &scenario).await?;
         }
 
         ClientMsg::LoadAdventure { adventure_id } => {
@@ -245,13 +273,15 @@ async fn handle_client_msg(
                     &pending.description,
                 );
 
+                let success = result.success.unwrap_or(false);
+
                 send_msg(
                     sender,
                     &ServerMsg::DiceRollResult {
                         rolls: result.rolls.clone(),
                         total: result.total,
                         dc: pending.dc,
-                        success: result.success.unwrap_or(false),
+                        success,
                         description: pending.description.clone(),
                     },
                 )
@@ -262,9 +292,9 @@ async fn handle_client_msg(
                 sess.messages.push(tool_result);
 
                 let adv_id = sess.adventure.as_ref().map(|a| a.id.clone());
-                if let Some(id) = adv_id {
+                if let Some(id) = &adv_id {
                     sess.store.append_message(
-                        &id,
+                        id,
                         &HistoryMessage {
                             role: "tool".to_string(),
                             content: Some(result_json),
@@ -275,8 +305,69 @@ async fn handle_client_msg(
                     )?;
                 }
 
-                drop(sess);
-                continue_tool_loop(session, xai_client, sender).await?;
+                // Check precomputed branches
+                let precomputed_text = if let Some(ref pre) = sess.precomputed {
+                    let branch = if success {
+                        pre.success_text.lock().await.clone()
+                    } else {
+                        pre.failure_text.lock().await.clone()
+                    };
+                    branch
+                } else {
+                    None
+                };
+
+                // Abort precomputation tasks
+                if let Some(pre) = sess.precomputed.take() {
+                    pre.success_handle.abort();
+                    pre.failure_handle.abort();
+                }
+
+                if let Some(text) = precomputed_text {
+                    // Use precomputed narrative
+                    drop(sess);
+                    let chunks: Vec<&str> = text.as_bytes().chunks(80).map(|c| std::str::from_utf8(c).unwrap_or("")).collect();
+                    for chunk in &chunks {
+                        if !chunk.is_empty() {
+                            send_msg(sender, &ServerMsg::NarrativeChunk { text: chunk.to_string() }).await;
+                            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+                        }
+                    }
+                    send_msg(sender, &ServerMsg::NarrativeEnd).await;
+
+                    let mut sess = session.lock().await;
+                    sess.messages.push(ChatMessage::assistant_text(&text));
+
+                    let adv_id = sess.adventure.as_ref().map(|a| a.id.clone());
+                    if let Some(id) = &adv_id {
+                        sess.store.append_message(
+                            id,
+                            &HistoryMessage {
+                                role: "assistant".to_string(),
+                                content: Some(text),
+                                tool_calls: None,
+                                tool_call_id: None,
+                                timestamp: chrono::Utc::now(),
+                            },
+                        )?;
+                    }
+
+                    // Send cost + state
+                    let cost_usd = sess.session_cost.cost_usd(&sess.model);
+                    send_msg(sender, &ServerMsg::CostUpdate {
+                        cost_usd,
+                        prompt_tokens: sess.session_cost.total_prompt_tokens,
+                        completion_tokens: sess.session_cost.total_completion_tokens,
+                    }).await;
+
+                    if let Some(ref adv) = sess.adventure {
+                        let state = serde_json::to_value(adv)?;
+                        send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                    }
+                } else {
+                    drop(sess);
+                    continue_tool_loop(session, xai_client, sender).await?;
+                }
             }
         }
 
@@ -285,6 +376,23 @@ async fn handle_client_msg(
             if let Some(ref adv) = sess.adventure {
                 let state = serde_json::to_value(adv)?;
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+            }
+        }
+
+        ClientMsg::SetModel { model } => {
+            let model_str = model.clone();
+            if ALLOWED_MODELS.contains(&model_str.as_str()) {
+                let mut sess = session.lock().await;
+                sess.model = model_str.clone();
+                send_msg(sender, &ServerMsg::ModelInfo {
+                    model: model_str,
+                    available_models: ALLOWED_MODELS.iter().map(|s| s.to_string()).collect(),
+                }).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "invalid_model".to_string(),
+                    message: format!("Model '{}' not available", model),
+                }).await;
             }
         }
     }
@@ -296,24 +404,25 @@ async fn start_adventure(
     session: &Arc<Mutex<Session>>,
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    scenario: &Option<String>,
 ) -> anyhow::Result<()> {
     {
         let mut sess = session.lock().await;
-        // Extract what we need, then mutate
         let (system_prompt, adv_id) = match &sess.adventure {
             Some(adv) => (build_system_prompt(adv), adv.id.clone()),
             None => return Ok(()),
         };
 
+        let start_prompt = adventure_start_prompt(scenario);
         let system = ChatMessage::system(&system_prompt);
-        let user_msg = ChatMessage::user(ADVENTURE_START_PROMPT);
+        let user_msg = ChatMessage::user(&start_prompt);
         sess.messages = vec![system, user_msg];
 
         sess.store.append_message(
             &adv_id,
             &HistoryMessage {
                 role: "user".to_string(),
-                content: Some(ADVENTURE_START_PROMPT.to_string()),
+                content: Some(start_prompt),
                 tool_calls: None,
                 tool_call_id: None,
                 timestamp: chrono::Utc::now(),
@@ -333,7 +442,6 @@ async fn run_game_turn(
     {
         let mut sess = session.lock().await;
 
-        // Update system prompt with current state
         let system_prompt = match &sess.adventure {
             Some(adv) => Some(build_system_prompt(adv)),
             None => None,
@@ -365,8 +473,6 @@ async fn run_game_turn(
     continue_tool_loop(session, xai_client, sender).await
 }
 
-/// The main tool-call loop: keeps calling the LLM until we get a text response
-/// or hit a pending user action (dice roll or choice).
 async fn continue_tool_loop(
     session: &Arc<Mutex<Session>>,
     xai_client: &Arc<XaiClient>,
@@ -376,22 +482,22 @@ async fn continue_tool_loop(
     let max_iterations = 15;
 
     for _ in 0..max_iterations {
-        let messages = {
+        let (messages, model) = {
             let sess = session.lock().await;
-            sess.messages.clone()
+            (sess.messages.clone(), sess.model.clone())
         };
 
-        let response = xai_client.chat_with_tools(&messages, &tools).await?;
+        let (response, usage) = xai_client.chat_with_tools(&messages, &tools, Some(&model)).await?;
+
+        // Track usage
+        if let Some(ref u) = usage {
+            let mut sess = session.lock().await;
+            sess.session_cost.add(u);
+        }
 
         match response {
             XaiResponse::Text(text) => {
-                // Stream the text to the frontend in chunks
-                let chunks: Vec<&str> = text
-                    .as_bytes()
-                    .chunks(80)
-                    .map(|c| std::str::from_utf8(c).unwrap_or(""))
-                    .collect();
-
+                let chunks: Vec<&str> = text.as_bytes().chunks(80).map(|c| std::str::from_utf8(c).unwrap_or("")).collect();
                 for chunk in &chunks {
                     if !chunk.is_empty() {
                         send_msg(sender, &ServerMsg::NarrativeChunk { text: chunk.to_string() }).await;
@@ -400,7 +506,6 @@ async fn continue_tool_loop(
                 }
                 send_msg(sender, &ServerMsg::NarrativeEnd).await;
 
-                // Save assistant message
                 let mut sess = session.lock().await;
                 sess.messages.push(ChatMessage::assistant_text(&text));
 
@@ -418,7 +523,14 @@ async fn continue_tool_loop(
                     )?;
                 }
 
-                // Send state update
+                // Send cost update
+                let cost_usd = sess.session_cost.cost_usd(&sess.model);
+                send_msg(sender, &ServerMsg::CostUpdate {
+                    cost_usd,
+                    prompt_tokens: sess.session_cost.total_prompt_tokens,
+                    completion_tokens: sess.session_cost.total_completion_tokens,
+                }).await;
+
                 if let Some(ref adv) = sess.adventure {
                     let state = serde_json::to_value(adv)?;
                     send_msg(sender, &ServerMsg::StateUpdate { state }).await;
@@ -428,14 +540,12 @@ async fn continue_tool_loop(
             }
 
             XaiResponse::ToolCalls { tool_calls, text } => {
-                // If there's text alongside tool calls, send it
                 if let Some(ref t) = text {
                     if !t.is_empty() {
                         send_msg(sender, &ServerMsg::NarrativeChunk { text: t.clone() }).await;
                     }
                 }
 
-                // Save the assistant message with tool calls
                 let mut sess = session.lock().await;
                 sess.messages
                     .push(ChatMessage::assistant_tool_calls(tool_calls.clone()));
@@ -454,12 +564,10 @@ async fn continue_tool_loop(
                     )?;
                 }
 
-                // Execute each tool call
                 for tc in &tool_calls {
                     let args: serde_json::Value =
                         serde_json::from_str(&tc.function.arguments).unwrap_or_default();
 
-                    // Take adventure out to avoid borrow conflicts
                     let mut adventure = match sess.adventure.take() {
                         Some(a) => a,
                         None => continue,
@@ -484,8 +592,6 @@ async fn continue_tool_loop(
                                     },
                                 )?;
                             }
-
-                            // Put adventure back
                             sess.adventure = Some(adventure);
                         }
 
@@ -512,14 +618,68 @@ async fn continue_tool_loop(
 
                             sess.store.save_adventure(&adventure)?;
                             sess.pending_roll = Some(PendingRoll {
-                                dice_type,
+                                dice_type: dice_type.clone(),
                                 count,
                                 modifier,
                                 dc,
-                                description,
+                                description: description.clone(),
                                 tool_call_id: tc.id.clone(),
                             });
                             sess.adventure = Some(adventure);
+
+                            // Spawn precomputation tasks
+                            let success_text = Arc::new(Mutex::new(None));
+                            let failure_text = Arc::new(Mutex::new(None));
+
+                            let mut success_msgs = sess.messages.clone();
+                            let mut failure_msgs = sess.messages.clone();
+                            let success_result = serde_json::json!({
+                                "dice_type": dice_type, "rolls": [dc], "total": dc + modifier,
+                                "modifier": modifier, "dc": dc, "success": true, "description": description
+                            });
+                            let failure_result = serde_json::json!({
+                                "dice_type": dice_type, "rolls": [1], "total": 1 + modifier,
+                                "modifier": modifier, "dc": dc, "success": false, "description": description
+                            });
+
+                            success_msgs.push(ChatMessage::tool_result(&tc.id, &serde_json::to_string(&success_result)?));
+                            failure_msgs.push(ChatMessage::tool_result(&tc.id, &serde_json::to_string(&failure_result)?));
+
+                            let s_text = success_text.clone();
+                            let f_text = failure_text.clone();
+                            let s_client = xai_client.clone();
+                            let f_client = xai_client.clone();
+                            let s_tools = tools.clone();
+                            let f_tools = tools.clone();
+                            let s_model = sess.model.clone();
+                            let f_model = sess.model.clone();
+
+                            let s_handle = tokio::spawn(async move {
+                                if let Ok((XaiResponse::Text(t), _)) = s_client.chat_with_tools(&success_msgs, &s_tools, Some(&s_model)).await {
+                                    *s_text.lock().await = Some(t);
+                                }
+                            });
+                            let f_handle = tokio::spawn(async move {
+                                if let Ok((XaiResponse::Text(t), _)) = f_client.chat_with_tools(&failure_msgs, &f_tools, Some(&f_model)).await {
+                                    *f_text.lock().await = Some(t);
+                                }
+                            });
+
+                            sess.precomputed = Some(PrecomputedBranches {
+                                success_text,
+                                failure_text,
+                                success_handle: s_handle,
+                                failure_handle: f_handle,
+                            });
+
+                            // Send cost update
+                            let cost_usd = sess.session_cost.cost_usd(&sess.model);
+                            send_msg(sender, &ServerMsg::CostUpdate {
+                                cost_usd,
+                                prompt_tokens: sess.session_cost.total_prompt_tokens,
+                                completion_tokens: sess.session_cost.total_completion_tokens,
+                            }).await;
+
                             return Ok(());
                         }
 
@@ -543,11 +703,19 @@ async fn continue_tool_loop(
                                 tool_call_id: tc.id.clone(),
                             });
                             sess.adventure = Some(adventure);
+
+                            // Send cost update
+                            let cost_usd = sess.session_cost.cost_usd(&sess.model);
+                            send_msg(sender, &ServerMsg::CostUpdate {
+                                cost_usd,
+                                prompt_tokens: sess.session_cost.total_prompt_tokens,
+                                completion_tokens: sess.session_cost.total_completion_tokens,
+                            }).await;
+
                             return Ok(());
                         }
 
                         Err(e) => {
-                            // Put adventure back and report error as tool result
                             let err_msg = format!("Error: {}", e);
                             sess.messages.push(ChatMessage::tool_result(&tc.id, &err_msg));
                             sess.adventure = Some(adventure);
@@ -555,7 +723,6 @@ async fn continue_tool_loop(
                     }
                 }
 
-                // Save adventure state after processing all tools
                 if let Some(ref adventure) = sess.adventure {
                     sess.store.save_adventure(adventure)?;
                     let state = serde_json::to_value(adventure)?;
@@ -563,7 +730,6 @@ async fn continue_tool_loop(
                 }
 
                 drop(sess);
-                // Continue the loop — call LLM again with tool results
             }
         }
     }

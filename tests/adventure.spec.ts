@@ -9,7 +9,6 @@ test.describe('Adventure Management', () => {
   });
 
   test('adventure select shows for authenticated user', async ({ page }) => {
-    // After login, should see the select screen
     await expect(page.locator('.select-screen')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('h1')).toHaveText('RuneQuest');
   });
@@ -18,7 +17,6 @@ test.describe('Adventure Management', () => {
     await expect(page.locator('#newAdventureBtn')).toBeVisible({ timeout: 10000 });
     await page.click('#newAdventureBtn');
 
-    // Should show character creation form
     await expect(page.locator('.create-screen')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('h2')).toHaveText('Create Your Adventurer');
     await expect(page.locator('#advName')).toBeVisible();
@@ -32,15 +30,13 @@ test.describe('Adventure Management', () => {
     await page.click('#newAdventureBtn');
     await page.waitForSelector('.create-screen', { timeout: 5000 });
 
-    // Default: all stats at 10, each costs 2 points (6 stats * 2 = 12), so 27 - 12 = 15 remaining
     const pointsLeft = await page.textContent('#pointsLeft');
     expect(parseInt(pointsLeft || '0')).toBe(15);
 
-    // Increase STR to 15 (cost: 9 points instead of 2, difference = +7)
     await page.fill('#statStr', '15');
     await page.dispatchEvent('#statStr', 'input');
     const newPoints = await page.textContent('#pointsLeft');
-    expect(parseInt(newPoints || '0')).toBe(8); // 15 - 7 = 8
+    expect(parseInt(newPoints || '0')).toBe(8);
   });
 
   test('creating an adventure transitions to gameplay', async ({ page }) => {
@@ -52,63 +48,151 @@ test.describe('Adventure Management', () => {
     await page.fill('#charName', 'TestHero');
     await page.selectOption('#charRace', 'elf');
     await page.selectOption('#charClass', 'mage');
-
-    // Submit form
     await page.click('.create-form .stone-btn');
 
-    // Should transition to adventure screen with two-pane layout
     await expect(page.locator('.adventure-layout')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.story-panel')).toBeVisible();
     await expect(page.locator('.info-panel')).toBeVisible();
   });
 });
 
+test.describe('Scenario Selection', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  test('character creation shows scenario chooser', async ({ page }) => {
+    await page.waitForSelector('#newAdventureBtn', { timeout: 10000 });
+    await page.click('#newAdventureBtn');
+    await page.waitForSelector('.create-screen', { timeout: 5000 });
+
+    await expect(page.locator('#scenarioCards')).toBeVisible();
+    await expect(page.locator('.scenario-card')).toHaveCount(6);
+    await expect(page.locator('#customScenario')).toBeVisible();
+  });
+
+  test('clicking a scenario card selects it', async ({ page }) => {
+    await page.waitForSelector('#newAdventureBtn', { timeout: 10000 });
+    await page.click('#newAdventureBtn');
+    await page.waitForSelector('.scenario-card', { timeout: 5000 });
+
+    await page.click('.scenario-card[data-scenario="dragons-lair"]');
+    await expect(page.locator('.scenario-card[data-scenario="dragons-lair"]')).toHaveClass(/selected/);
+    await expect(page.locator('.scenario-card[data-scenario=""]')).not.toHaveClass(/selected/);
+  });
+});
+
+test.describe('Stat Cost Display', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  test('stat inputs show cost indicators', async ({ page }) => {
+    await page.waitForSelector('#newAdventureBtn', { timeout: 10000 });
+    await page.click('#newAdventureBtn');
+    await page.waitForSelector('.create-screen', { timeout: 5000 });
+
+    await expect(page.locator('#costStr')).toBeVisible();
+    const costText = await page.textContent('#costStr');
+    expect(costText).toContain('Cost: 2');
+  });
+
+  test('changing stat updates cost indicator', async ({ page }) => {
+    await page.waitForSelector('#newAdventureBtn', { timeout: 10000 });
+    await page.click('#newAdventureBtn');
+    await page.waitForSelector('.create-screen', { timeout: 5000 });
+
+    await page.fill('#statStr', '15');
+    await page.dispatchEvent('#statStr', 'input');
+    const costText = await page.textContent('#costStr');
+    expect(costText).toContain('Cost: 9');
+  });
+});
+
 test.describe('Adventure Screen UI', () => {
   test.beforeEach(async ({ page }) => {
-    // Login and create a quick adventure
     await login(page);
     await createAdventure(page, 'UI Test Quest', 'UIHero', 'human', 'warrior');
+  });
+
+  test('Status tab shows stats and abilities (merged)', async ({ page }) => {
+    await expect(page.locator('.info-panel')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.info-tab.active')).toHaveText('Status');
+    await expect(page.locator('.stat-box')).toHaveCount(6);
+    // Abilities section should be visible in the Status tab
+    await expect(page.locator('.abilities-section')).toBeVisible();
+  });
+
+  test('only 3 tabs exist (Status, Items, Quests)', async ({ page }) => {
+    await expect(page.locator('.info-panel')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.info-tab')).toHaveCount(3);
   });
 
   test('info panel tabs switch correctly', async ({ page }) => {
     await expect(page.locator('.info-panel')).toBeVisible({ timeout: 15000 });
 
-    // Stats tab should be active by default
-    await expect(page.locator('.info-tab.active')).toHaveText('Stats');
-
-    // Click Items tab
     await page.click('.info-tab[data-tab="inventory"]');
     await expect(page.locator('.info-tab[data-tab="inventory"]')).toHaveClass(/active/);
 
-    // Click Skills tab
-    await page.click('.info-tab[data-tab="abilities"]');
-    await expect(page.locator('.info-tab[data-tab="abilities"]')).toHaveClass(/active/);
-
-    // Click Quests tab
     await page.click('.info-tab[data-tab="quests"]');
     await expect(page.locator('.info-tab[data-tab="quests"]')).toHaveClass(/active/);
   });
 
-  test('stats tab shows character information', async ({ page }) => {
-    await expect(page.locator('.info-panel')).toBeVisible({ timeout: 15000 });
-
-    // Wait for state update to populate stats
-    await expect(page.locator('.char-name')).toBeVisible({ timeout: 10000 });
-    const charName = await page.textContent('.char-name');
-    expect(charName).toContain('UIHero');
-
-    // Should show stat boxes
-    await expect(page.locator('.stat-box')).toHaveCount(6);
-  });
-
   test('story panel shows narrative content', async ({ page }) => {
-    // Wait for the adventure to load and LLM to start narrating
     await expect(page.locator('.story-content')).toBeVisible({ timeout: 15000 });
-
-    // Wait for some narrative content to appear (from LLM)
     await page.waitForSelector('.narrative-block', { timeout: 30000 });
     const narrativeBlocks = await page.locator('.narrative-block').count();
     expect(narrativeBlocks).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Cost Indicator', () => {
+  test('cost display appears in story header', async ({ page }) => {
+    await login(page);
+    await createAdventure(page, 'Cost Test', 'CostHero', 'human', 'warrior');
+    await expect(page.locator('#costDisplay')).toBeVisible({ timeout: 15000 });
+  });
+});
+
+test.describe('Model Switching', () => {
+  test('options button opens model selector', async ({ page }) => {
+    await login(page);
+    await createAdventure(page, 'Model Test', 'ModelHero', 'dwarf', 'cleric');
+    await expect(page.locator('#optionsBtn')).toBeVisible({ timeout: 15000 });
+    await page.click('#optionsBtn');
+    await expect(page.locator('.options-modal')).toBeVisible();
+    await expect(page.locator('#modelSelect')).toBeVisible();
+  });
+
+  test('closing options modal works', async ({ page }) => {
+    await login(page);
+    await createAdventure(page, 'Model Test 2', 'ModelHero2', 'dwarf', 'cleric');
+    await page.click('#optionsBtn');
+    await expect(page.locator('.options-modal')).toBeVisible();
+    await page.click('#closeOptions');
+    await expect(page.locator('.options-modal')).not.toBeVisible();
+  });
+});
+
+test.describe('Loading Animation', () => {
+  test('adventure shows loading animation initially', async ({ page }) => {
+    await login(page);
+    await page.waitForSelector('#newAdventureBtn', { timeout: 10000 });
+    await page.click('#newAdventureBtn');
+    await page.waitForSelector('.create-screen', { timeout: 5000 });
+
+    await page.fill('#advName', 'Loading Test');
+    await page.fill('#charName', 'LoadHero');
+    await page.click('.create-form .stone-btn');
+
+    await expect(page.locator('.loading-narrative')).toBeVisible({ timeout: 15000 });
+  });
+
+  test('loading animation disappears after narrative starts', async ({ page }) => {
+    await login(page);
+    await createAdventure(page, 'Loading Test 2', 'LoadHero2', 'human', 'warrior');
+    await page.waitForSelector('.narrative-block:not(.loading-narrative)', { timeout: 30000 });
+    await expect(page.locator('.loading-narrative')).toHaveCount(0);
   });
 });
 

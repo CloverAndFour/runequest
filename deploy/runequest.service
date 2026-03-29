@@ -1,0 +1,17 @@
+[Unit]
+Description=RuneQuest D&D Adventure Chat
+After=network.target
+
+[Service]
+Type=simple
+User=quinten
+WorkingDirectory=/home/quinten/projects/runequest
+ExecStart=/home/quinten/projects/runequest/target/release/runequest serve --data-dir /home/quinten/projects/runequest/data
+EnvironmentFile=/home/quinten/projects/runequest/.env
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
