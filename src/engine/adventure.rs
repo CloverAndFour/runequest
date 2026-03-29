@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use super::abilities::{starting_abilities, Ability, SpellSlots};
 use super::character::{Character, Class, Race, Stats};
 use super::combat::CombatState;
-use super::inventory::{Inventory, Item, ItemType};
+use super::equipment::{get_item, Equipment};
+use super::inventory::Inventory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scene {
@@ -27,6 +28,7 @@ pub struct AdventureState {
     pub name: String,
     pub character: Character,
     pub inventory: Inventory,
+    pub equipment: Equipment,
     pub abilities: Vec<Ability>,
     pub spell_slots: SpellSlots,
     pub combat: CombatState,
@@ -48,107 +50,90 @@ impl AdventureState {
         let spell_slots = SpellSlots::for_class(&class, 1);
 
         let mut inventory = Inventory::new();
+        let mut equipment = Equipment::new();
 
-        // Starting equipment based on class
+        // Starting equipment based on class — equip from database items
         match &class {
             Class::Warrior => {
-                inventory.add(Item {
-                    name: "Longsword".to_string(),
-                    description: "A sturdy steel longsword.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d8+STR", "type": "slashing"}),
-                    weight: 3.0,
-                });
-                inventory.add(Item {
-                    name: "Chain Mail".to_string(),
-                    description: "Heavy armor made of interlocking metal rings.".to_string(),
-                    item_type: ItemType::Armor,
-                    properties: serde_json::json!({"ac": 16}),
-                    weight: 55.0,
-                });
+                if let Some(item) = get_item("longsword") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("chain_mail") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("shield") {
+                    let _ = equipment.equip(item);
+                }
             }
             Class::Mage => {
-                inventory.add(Item {
-                    name: "Quarterstaff".to_string(),
-                    description: "A wooden staff, useful for both walking and combat.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d6+STR", "type": "bludgeoning"}),
-                    weight: 4.0,
-                });
-                inventory.add(Item {
-                    name: "Spellbook".to_string(),
-                    description: "A leather-bound tome containing your arcane knowledge.".to_string(),
-                    item_type: ItemType::Misc,
-                    properties: serde_json::json!({}),
-                    weight: 3.0,
-                });
+                if let Some(item) = get_item("quarterstaff") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("leather_armor") {
+                    let _ = equipment.equip(item);
+                }
+                // Spellbook goes in inventory (backpack)
+                if let Some(item) = get_item("spellbook") {
+                    inventory.add(item);
+                }
             }
             Class::Rogue => {
-                inventory.add(Item {
-                    name: "Shortsword".to_string(),
-                    description: "A light, quick blade favored by rogues.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d6+DEX", "type": "piercing", "finesse": true}),
-                    weight: 2.0,
-                });
-                inventory.add(Item {
-                    name: "Thieves' Tools".to_string(),
-                    description: "A set of lockpicks, a small mirror, scissors, and a pair of pliers.".to_string(),
-                    item_type: ItemType::Misc,
-                    properties: serde_json::json!({}),
-                    weight: 1.0,
-                });
+                if let Some(item) = get_item("shortsword") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("studded_leather") {
+                    let _ = equipment.equip(item);
+                }
+                // Thieves' tools in inventory
+                if let Some(item) = get_item("thieves_tools") {
+                    inventory.add(item);
+                }
             }
             Class::Cleric => {
-                inventory.add(Item {
-                    name: "Mace".to_string(),
-                    description: "A heavy mace blessed by your deity.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d6+STR", "type": "bludgeoning"}),
-                    weight: 4.0,
-                });
-                inventory.add(Item {
-                    name: "Shield".to_string(),
-                    description: "A wooden shield emblazoned with a holy symbol.".to_string(),
-                    item_type: ItemType::Armor,
-                    properties: serde_json::json!({"ac_bonus": 2}),
-                    weight: 6.0,
-                });
+                if let Some(item) = get_item("mace") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("scale_mail") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("shield") {
+                    let _ = equipment.equip(item);
+                }
             }
             Class::Ranger => {
-                inventory.add(Item {
-                    name: "Longbow".to_string(),
-                    description: "A tall bow crafted from yew wood.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d8+DEX", "type": "piercing", "range": "150/600"}),
-                    weight: 2.0,
-                });
-                inventory.add(Item {
-                    name: "Shortsword".to_string(),
-                    description: "A backup melee weapon.".to_string(),
-                    item_type: ItemType::Weapon,
-                    properties: serde_json::json!({"damage": "1d6+DEX", "type": "piercing", "finesse": true}),
-                    weight: 2.0,
-                });
+                if let Some(item) = get_item("longbow") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("chain_shirt") {
+                    let _ = equipment.equip(item);
+                }
+                // Backup shortsword in inventory
+                if let Some(item) = get_item("shortsword") {
+                    inventory.add(item);
+                }
             }
         }
 
-        // Everyone starts with a health potion
-        inventory.add(Item {
-            name: "Health Potion".to_string(),
-            description: "A vial of red liquid that restores 2d4+2 HP.".to_string(),
-            item_type: ItemType::Potion,
-            properties: serde_json::json!({"healing": "2d4+2"}),
-            weight: 0.5,
-        });
+        // Everyone starts with a health potion in their backpack
+        if let Some(item) = get_item("health_potion") {
+            inventory.add(item);
+        }
 
-        let character = Character::new(char_name, race, class, stats);
+        let mut character = Character::new(char_name, race, class, stats);
+
+        // Set AC from equipped gear
+        character.ac = character.calculate_ac(&equipment);
+
+        // Starting gold is set in Character::new (10 gp)
+        // Also set it on inventory for display convenience
+        inventory.gold = character.gold;
 
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name,
             character,
             inventory,
+            equipment,
             abilities,
             spell_slots,
             combat: CombatState::new(),

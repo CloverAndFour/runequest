@@ -17,10 +17,10 @@ use crate::llm::pricing::{SessionCost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
 use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
-use crate::storage::adventure_store::{AdventureStore, HistoryMessage};
+use crate::storage::adventure_store::{AdventureStore, DisplayEvent, HistoryMessage};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 use crate::engine::combat::CombatantId;
-use crate::web::protocol::{ActionInfo, ClientMsg, EnemyInfo, HistoryEntry, InitiativeInfo, ServerMsg};
+use crate::web::protocol::{ActionInfo, ClientMsg, EnemyInfo, InitiativeInfo, ServerMsg};
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -223,6 +223,7 @@ async fn handle_client_msg(
             let mut sess = session.lock().await;
             let adventure = sess.store.load_adventure(&adventure_id)?;
             let history = sess.store.load_history(&adventure_id)?;
+            let display_events = sess.store.load_display_history(&adventure_id)?;
 
             let system = ChatMessage::system(&build_system_prompt(&adventure));
             let mut messages = vec![system];
@@ -238,29 +239,24 @@ async fn handle_client_msg(
                 });
             }
 
-            // Build history entries for the frontend (assistant messages only)
-            let history_entries: Vec<HistoryEntry> = history
-                .iter()
-                .filter(|h| h.role == "assistant" && h.content.is_some() && h.tool_calls.is_none())
-                .map(|h| HistoryEntry {
-                    role: h.role.clone(),
-                    content: h.content.clone().unwrap_or_default(),
-                })
-                .collect();
-
             let state_json = serde_json::to_value(&adventure)?;
             let adv_id = adventure.id.clone();
+
+            // Check if last display event was choices or dice roll (can restore without LLM)
+            let last_event_type = display_events.last().map(|e| e.event_type.clone());
+            let needs_resume = !matches!(last_event_type.as_deref(), Some("choices") | Some("dice_roll_request"));
+
             sess.adventure = Some(adventure);
             sess.messages = messages;
             drop(sess);
 
             send_msg(sender, &ServerMsg::AdventureLoaded { state: state_json }).await;
-            if !history_entries.is_empty() {
-                send_msg(sender, &ServerMsg::ChatHistory { entries: history_entries }).await;
+            if !display_events.is_empty() {
+                send_msg(sender, &ServerMsg::ChatHistory { entries: display_events }).await;
             }
 
-            // Auto-resume: ask LLM to recap and present choices
-            {
+            // Only call LLM if the player wasn't mid-interaction
+            if needs_resume {
                 let mut sess = session.lock().await;
                 let resume_prompt = "The adventurer returns after a break. Briefly recap the current situation in 1-2 sentences, then present choices for what to do next. Include dice requirements in choices where relevant.";
                 sess.messages.push(ChatMessage::user(resume_prompt));
@@ -604,20 +600,25 @@ async fn continue_tool_loop(
                 sess.messages.push(ChatMessage::assistant_text(&text));
 
                 let adv_id = sess.adventure.as_ref().map(|a| a.id.clone());
-                if let Some(id) = adv_id {
+                if let Some(ref id) = adv_id {
                     sess.store.append_message(
-                        &id,
+                        id,
                         &HistoryMessage {
                             role: "assistant".to_string(),
-                            content: Some(text),
+                            content: Some(text.clone()),
                             tool_calls: None,
                             tool_call_id: None,
                             timestamp: chrono::Utc::now(),
                         },
                     )?;
+                    // Save display event
+                    let _ = sess.store.append_display_event(id, &DisplayEvent {
+                        event_type: "narrative".to_string(),
+                        data: serde_json::json!({"text": text}),
+                        timestamp: chrono::Utc::now(),
+                    });
                 }
 
-                // Send cost update
                 send_cost_update(sender, &sess).await;
 
                 if let Some(ref adv) = sess.adventure {
@@ -771,6 +772,15 @@ async fn continue_tool_loop(
                             allow_custom_input,
                             prompt,
                         }) => {
+                            // Save display event before moving data
+                            if let Some(ref id) = adv_id {
+                                let _ = sess.store.append_display_event(id, &DisplayEvent {
+                                    event_type: "choices".to_string(),
+                                    data: serde_json::json!({"choices": &choices, "prompt": &prompt, "allow_custom_input": allow_custom_input}),
+                                    timestamp: chrono::Utc::now(),
+                                });
+                            }
+
                             send_msg(
                                 sender,
                                 &ServerMsg::PresentChoices {
@@ -873,7 +883,7 @@ async fn handle_combat_turn_start(
         let combatant = adventure.combat.current_combatant().cloned();
         match combatant {
             Some(CombatantId::Player) => {
-                let has_weapon = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
+                let has_weapon = adventure.equipment.equipped_weapon().is_some();
                 let has_potion = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
                 let actions = adventure.combat.available_actions(&adventure.character, has_weapon, has_potion);
                 let enemies: Vec<EnemyInfo> = adventure.combat.enemies.iter().map(|e| EnemyInfo {
@@ -970,23 +980,26 @@ async fn handle_combat_action(
             adventure.combat.action_economy.actions -= 1;
 
             let target_name = target.unwrap_or("enemy");
-            // Find weapon
-            let weapon = adventure.inventory.items.iter().find(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
-            let (weapon_name, damage_dice, stat_mod) = if let Some(w) = weapon {
-                let finesse = w.properties.get("finesse").and_then(|v| v.as_bool()).unwrap_or(false);
-                let damage = w.properties.get("damage").and_then(|v| v.as_str()).unwrap_or("1d4");
-                let mod_val = if finesse {
-                    adventure.character.stats.modifier_for("dex").unwrap_or(0)
+            // Find weapon from equipment
+            let weapon = adventure.equipment.equipped_weapon();
+            let (weapon_name, damage_dice, stat_mod, weapon_attack_bonus) = if let Some(w) = weapon {
+                let stat_name = w.stats.damage_modifier_stat.as_deref().unwrap_or("str");
+                let mod_val = if w.stats.is_finesse {
+                    let str_mod = adventure.character.stats.modifier_for("str").unwrap_or(0);
+                    let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+                    std::cmp::max(str_mod, dex_mod)
                 } else {
-                    adventure.character.stats.modifier_for("str").unwrap_or(0)
+                    adventure.character.stats.modifier_for(stat_name).unwrap_or(0)
                 };
-                (w.name.clone(), damage.replace("+STR", "").replace("+DEX", ""), mod_val)
+                let dice = w.stats.damage_dice.as_deref().unwrap_or("1d4").to_string();
+                (w.display_name(), dice, mod_val, w.stats.attack_bonus)
             } else {
-                ("Unarmed".to_string(), "1d4".to_string(), adventure.character.stats.modifier_for("str").unwrap_or(0))
+                ("Unarmed".to_string(), "1d4".to_string(), adventure.character.stats.modifier_for("str").unwrap_or(0), 0)
             };
 
             let prof = adventure.character.proficiency_bonus();
-            let attack = DiceRoller::roll("d20", 1, stat_mod + prof);
+            let equip_atk_bonus = adventure.equipment.stat_bonuses().attack_bonus;
+            let attack = DiceRoller::roll("d20", 1, stat_mod + prof + weapon_attack_bonus + equip_atk_bonus);
 
             let target_ac = adventure.combat.find_enemy_mut(target_name).map(|e| e.ac).unwrap_or(10);
             let hit = attack.total >= target_ac;
@@ -1038,7 +1051,7 @@ async fn handle_combat_action(
             send_msg(sender, &ServerMsg::StateUpdate { state }).await;
 
             // Send updated actions
-            let has_weapon = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
+            let has_weapon = adventure.equipment.equipped_weapon().is_some();
             let has_potion = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
             let actions = adventure.combat.available_actions(&adventure.character, has_weapon, has_potion);
             let enemies: Vec<EnemyInfo> = adventure.combat.enemies.iter().map(|e| EnemyInfo {
@@ -1097,10 +1110,17 @@ async fn handle_combat_action(
             let potion_idx = adventure.inventory.items.iter().position(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
             if let Some(idx) = potion_idx {
                 adventure.combat.action_economy.actions -= 1;
-                let potion = adventure.inventory.items.remove(idx);
+                let potion_name = adventure.inventory.items[idx].name.clone();
+                // Decrement quantity or remove
+                if adventure.inventory.items[idx].quantity > 1 {
+                    adventure.inventory.items[idx].quantity -= 1;
+                } else {
+                    adventure.inventory.items.remove(idx);
+                }
+                let potion = potion_name;
                 let healing = DiceRoller::roll("d4", 2, 2);
                 adventure.character.hp = std::cmp::min(adventure.character.hp + healing.total, adventure.character.max_hp);
-                let desc = format!("{} drinks {}! Healed {} HP (now {}/{})", adventure.character.name, potion.name, healing.total, adventure.character.hp, adventure.character.max_hp);
+                let desc = format!("{} drinks {}! Healed {} HP (now {}/{})", adventure.character.name, potion, healing.total, adventure.character.hp, adventure.character.max_hp);
                 adventure.combat.combat_log.push(desc.clone());
                 send_msg(sender, &ServerMsg::CombatActionResult {
                     actor: adventure.character.name.clone(), action: "Use Item".to_string(),

@@ -5,6 +5,7 @@ use serde_json::Value;
 use super::adventure::AdventureState;
 use super::combat::{Enemy, EnemyAttack};
 use super::dice::DiceRoller;
+use super::equipment::{get_item, EquipSlot};
 use super::inventory::{Item, ItemType};
 use crate::error::{RunequestError, Result};
 
@@ -92,26 +93,34 @@ pub fn execute_tool_call(
         }
 
         "attack_roll" => {
-            let weapon_name = args["weapon"].as_str().unwrap_or("unarmed");
             let target = args["target"].as_str().unwrap_or("enemy");
 
-            // Look up weapon in inventory for damage info
-            let weapon = state.inventory.find(weapon_name);
-            let (damage_dice, stat_mod) = if let Some(w) = weapon {
-                let finesse = w.properties.get("finesse").and_then(|v| v.as_bool()).unwrap_or(false);
-                let damage = w.properties.get("damage").and_then(|v| v.as_str()).unwrap_or("1d4");
-                let mod_val = if finesse || damage.contains("DEX") {
-                    state.character.stats.modifier_for("dex").unwrap_or(0)
+            // Use equipped weapon from main hand
+            let weapon = state.equipment.equipped_weapon();
+            let (damage_dice, stat_mod, weapon_attack_bonus, weapon_name) = if let Some(w) = weapon {
+                let stat_name = w.stats.damage_modifier_stat.as_deref().unwrap_or("str");
+                let use_finesse = w.stats.is_finesse;
+                let mod_val = if use_finesse {
+                    // Finesse: use higher of STR or DEX
+                    let str_mod = state.character.stats.modifier_for("str").unwrap_or(0);
+                    let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
+                    std::cmp::max(str_mod, dex_mod)
                 } else {
-                    state.character.stats.modifier_for("str").unwrap_or(0)
+                    state.character.stats.modifier_for(stat_name).unwrap_or(0)
                 };
-                (damage.replace("+STR", "").replace("+DEX", ""), mod_val)
+                let dice = w.stats.damage_dice.as_deref().unwrap_or("1d4").to_string();
+                let atk_bonus = w.stats.attack_bonus;
+                let name = w.display_name();
+                (dice, mod_val, atk_bonus, name)
             } else {
-                ("1d4".to_string(), state.character.stats.modifier_for("str").unwrap_or(0))
+                // Unarmed strike
+                ("1d4".to_string(), state.character.stats.modifier_for("str").unwrap_or(0), 0, "Unarmed".to_string())
             };
 
             let prof = state.character.proficiency_bonus();
-            let attack = DiceRoller::roll("d20", 1, stat_mod + prof);
+            let equip_bonuses = state.equipment.stat_bonuses();
+            let total_attack_mod = stat_mod + prof + weapon_attack_bonus + equip_bonuses.attack_bonus;
+            let attack = DiceRoller::roll("d20", 1, total_attack_mod);
 
             // Check against enemy AC if in combat
             let target_ac = state
@@ -144,6 +153,14 @@ pub fn execute_tool_call(
         }
 
         "get_character_sheet" => {
+            let equipped: Vec<Value> = state.equipment.all_equipped().iter().map(|item| {
+                serde_json::json!({
+                    "name": item.display_name(),
+                    "slot": item.slot,
+                    "item_type": item.item_type,
+                })
+            }).collect();
+
             Ok(ToolExecResult::Immediate(serde_json::json!({
                 "name": state.character.name,
                 "race": state.character.race,
@@ -154,9 +171,11 @@ pub fn execute_tool_call(
                 "hp": state.character.hp,
                 "max_hp": state.character.max_hp,
                 "ac": state.character.ac,
+                "gold": state.character.gold,
                 "stats": state.character.stats,
                 "conditions": state.character.conditions,
                 "proficiency_bonus": state.character.proficiency_bonus(),
+                "equipped": equipped,
             })))
         }
 
@@ -176,7 +195,6 @@ pub fn execute_tool_call(
             let name = args["name"].as_str().unwrap_or("Unknown Item").to_string();
             let description = args["description"].as_str().unwrap_or("").to_string();
             let item_type_str = args["item_type"].as_str().unwrap_or("misc");
-            let properties = args.get("properties").cloned().unwrap_or(serde_json::json!({}));
             let weight = args["weight"].as_f64().unwrap_or(1.0) as f32;
 
             let item_type = match item_type_str {
@@ -188,11 +206,17 @@ pub fn execute_tool_call(
             };
 
             state.inventory.add(Item {
+                id: name.to_lowercase().replace(' ', "_"),
                 name: name.clone(),
                 description,
                 item_type,
-                properties,
+                slot: None,
+                rarity: super::equipment::Rarity::Common,
                 weight,
+                value_gp: 0,
+                stats: Default::default(),
+                enchantment: None,
+                quantity: 1,
             });
 
             Ok(ToolExecResult::Immediate(serde_json::json!({
@@ -208,6 +232,125 @@ pub fn execute_tool_call(
                 "removed": removed.is_some(),
                 "item": name,
             })))
+        }
+
+        "give_item" => {
+            let item_id = args["item_id"].as_str().unwrap_or("");
+            let quantity = args["quantity"].as_u64().unwrap_or(1) as u32;
+
+            if let Some(mut item) = get_item(item_id) {
+                item.quantity = quantity;
+                let name = item.display_name();
+                state.inventory.add(item);
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": true,
+                    "item": name,
+                    "quantity": quantity,
+                    "total_items": state.inventory.items.len(),
+                })))
+            } else {
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "reason": format!("Item '{}' not found in database", item_id),
+                })))
+            }
+        }
+
+        "give_gold" => {
+            let amount = args["amount"].as_u64().unwrap_or(0) as u32;
+            let reason = args["reason"].as_str().unwrap_or("unknown");
+            state.character.gold += amount;
+            state.inventory.gold = state.character.gold;
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "gold_added": amount,
+                "total_gold": state.character.gold,
+                "reason": reason,
+            })))
+        }
+
+        "equip_item" => {
+            let item_name = args["item_name"].as_str().unwrap_or("");
+
+            // Find the item in inventory
+            let item = state.inventory.remove(item_name);
+            if let Some(item) = item {
+                if item.slot.is_none() {
+                    // Can't equip — put it back
+                    let name = item.name.clone();
+                    state.inventory.add(item);
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": false,
+                        "reason": format!("'{}' cannot be equipped (no equipment slot).", name),
+                    })));
+                }
+                let item_display = item.display_name();
+                let slot_name = item.slot.unwrap().display_name().to_string();
+                match state.equipment.equip(item) {
+                    Ok(displaced) => {
+                        // Put displaced item back in inventory
+                        if let Some(old_item) = displaced {
+                            let old_name = old_item.display_name();
+                            state.inventory.add(old_item);
+                            // Recalculate AC
+                            state.character.ac = state.character.calculate_ac(&state.equipment);
+                            Ok(ToolExecResult::Immediate(serde_json::json!({
+                                "success": true,
+                                "equipped": item_display,
+                                "slot": slot_name,
+                                "displaced": old_name,
+                                "new_ac": state.character.ac,
+                            })))
+                        } else {
+                            state.character.ac = state.character.calculate_ac(&state.equipment);
+                            Ok(ToolExecResult::Immediate(serde_json::json!({
+                                "success": true,
+                                "equipped": item_display,
+                                "slot": slot_name,
+                                "new_ac": state.character.ac,
+                            })))
+                        }
+                    }
+                    Err(msg) => {
+                        // Equip failed — this shouldn't normally happen since we checked slot
+                        Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "success": false,
+                            "reason": msg,
+                        })))
+                    }
+                }
+            } else {
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "reason": format!("Item '{}' not found in inventory.", item_name),
+                })))
+            }
+        }
+
+        "unequip_slot" => {
+            let slot_str = args["slot"].as_str().unwrap_or("");
+            if let Some(slot) = EquipSlot::from_str(slot_str) {
+                if let Some(item) = state.equipment.unequip(&slot) {
+                    let name = item.display_name();
+                    state.inventory.add(item);
+                    state.character.ac = state.character.calculate_ac(&state.equipment);
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": true,
+                        "unequipped": name,
+                        "slot": slot.display_name(),
+                        "new_ac": state.character.ac,
+                    })))
+                } else {
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": false,
+                        "reason": format!("No item equipped in {} slot.", slot.display_name()),
+                    })))
+                }
+            } else {
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "reason": format!("Unknown equipment slot: '{}'", slot_str),
+                })))
+            }
         }
 
         "use_ability" => {

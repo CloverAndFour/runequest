@@ -203,27 +203,60 @@ function renderSlotRow(label, total, used) {
 }
 
 function renderInventory(el, state) {
-    const inv = state.inventory || { items: [] };
-    if (inv.items.length === 0) {
-        el.innerHTML = '<div class="empty-state">Your pack is empty.</div>';
-        return;
-    }
-
+    const eq = state.equipment || {};
+    const inv = state.inventory || { items: [], gold: 0 };
     const typeIcons = { weapon: '\u2694', armor: '\u{1F6E1}', potion: '\u{1F9EA}', scroll: '\u{1F4DC}', misc: '\u{1F4E6}' };
 
-    let html = '<ul class="item-list">';
-    inv.items.forEach(item => {
-        const icon = typeIcons[item.item_type] || '\u{1F4E6}';
-        html += `<li class="item-entry" title="${escapeAttr(item.description || '')}">
-            <span class="item-icon">${icon}</span>
-            <span class="item-name">${escapeHtml(item.name)}</span>
-            <span class="item-type">${item.item_type || 'misc'}</span>
-        </li>`;
-    });
-    html += '</ul>';
+    const SLOT_LABELS = [
+        ['head', 'Head'], ['amulet', 'Amulet'], ['main_hand', 'Main Hand'],
+        ['off_hand', 'Off Hand'], ['chest', 'Chest'], ['hands', 'Hands'],
+        ['ring1', 'Ring 1'], ['ring2', 'Ring 2'], ['legs', 'Legs'],
+        ['feet', 'Feet'], ['back', 'Back'],
+    ];
 
-    const totalWeight = inv.items.reduce((sum, i) => sum + (i.weight || 0), 0);
-    html += `<div style="text-align:center; font-size:11px; color:var(--text-muted); margin-top:8px;">Total weight: ${totalWeight.toFixed(1)} lbs</div>`;
+    let html = '<div class="section-title">Equipped</div>';
+    html += '<div class="equip-slots">';
+    SLOT_LABELS.forEach(([key, label]) => {
+        const item = eq[key];
+        if (item) {
+            const name = item.enchantment ? `${item.enchantment.name_prefix} ${item.name}` : item.name;
+            const rarityClass = (item.rarity || 'common').toLowerCase();
+            html += `<div class="equip-slot filled" title="${escapeAttr(item.description || '')}">
+                <span class="slot-label">${label}</span>
+                <span class="slot-item rarity-${rarityClass}">${escapeHtml(name)}</span>
+            </div>`;
+        } else {
+            html += `<div class="equip-slot empty">
+                <span class="slot-label">${label}</span>
+                <span class="slot-item empty-slot">Empty</span>
+            </div>`;
+        }
+    });
+    html += '</div>';
+
+    // Gold
+    const gold = state.character?.gold || inv.gold || 0;
+    html += `<div class="gold-display">\u{1FA99} ${gold} Gold</div>`;
+
+    // Backpack
+    html += '<div class="section-title" style="margin-top:12px;">Backpack</div>';
+    if (!inv.items || inv.items.length === 0) {
+        html += '<div class="empty-state" style="padding:8px;">Empty</div>';
+    } else {
+        html += '<ul class="item-list">';
+        inv.items.forEach(item => {
+            const icon = typeIcons[item.item_type] || '\u{1F4E6}';
+            const qty = item.quantity > 1 ? ` (x${item.quantity})` : '';
+            const name = item.enchantment ? `${item.enchantment.name_prefix} ${item.name}` : item.name;
+            const rarityClass = (item.rarity || 'common').toLowerCase();
+            html += `<li class="item-entry" title="${escapeAttr(item.description || '')}">
+                <span class="item-icon">${icon}</span>
+                <span class="item-name rarity-${rarityClass}">${escapeHtml(name)}${qty}</span>
+                <span class="item-type">${item.item_type || 'misc'}</span>
+            </li>`;
+        });
+        html += '</ul>';
+    }
 
     el.innerHTML = html;
 }

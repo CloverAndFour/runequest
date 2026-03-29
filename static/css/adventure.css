@@ -745,6 +745,56 @@
     padding: 2px 0;
 }
 
+/* ===== EQUIPMENT ===== */
+
+.equip-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.equip-slot {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.2);
+}
+
+.slot-label {
+    width: 75px;
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.slot-item {
+    flex: 1;
+    color: var(--text-light);
+}
+
+.empty-slot {
+    color: var(--border-dark);
+    font-style: italic;
+}
+
+.rarity-common { color: var(--text-light); }
+.rarity-uncommon { color: #44cc44; }
+.rarity-rare { color: #4488ff; }
+.rarity-epic { color: #cc44cc; }
+.rarity-legendary { color: #ffaa00; }
+
+.gold-display {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-gold);
+    padding: 8px 0;
+    border-top: 1px solid rgba(74, 58, 42, 0.3);
+    border-bottom: 1px solid rgba(74, 58, 42, 0.3);
+    margin-top: 8px;
+}
+
 /* ===== COMBAT UI ===== */
 
 .initiative-bar {

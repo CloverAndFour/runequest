@@ -19,6 +19,14 @@ pub struct HistoryMessage {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+/// A display event — what the player actually saw in the story panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisplayEvent {
+    pub event_type: String,
+    pub data: serde_json::Value,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdventureSummary {
     pub id: String,
@@ -148,5 +156,32 @@ impl AdventureStore {
             .filter_map(|l| serde_json::from_str(l).ok())
             .collect();
         Ok(messages)
+    }
+
+    pub fn append_display_event(&self, adventure_id: &str, event: &DisplayEvent) -> Result<()> {
+        let dir = self.adventure_dir(adventure_id);
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("display_history.jsonl");
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        let line = serde_json::to_string(event)?;
+        writeln!(file, "{}", line)?;
+        Ok(())
+    }
+
+    pub fn load_display_history(&self, adventure_id: &str) -> Result<Vec<DisplayEvent>> {
+        let path = self.adventure_dir(adventure_id).join("display_history.jsonl");
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        let data = std::fs::read_to_string(&path)?;
+        let events: Vec<DisplayEvent> = data
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .filter_map(|l| serde_json::from_str(l).ok())
+            .collect();
+        Ok(events)
     }
 }

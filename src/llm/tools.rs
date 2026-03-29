@@ -42,15 +42,14 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["stat", "dc"]
         })),
-        tool("attack_roll", "Make an attack roll with a weapon against a target.", serde_json::json!({
+        tool("attack_roll", "Make an attack roll with the equipped main-hand weapon against a target. Uses the weapon currently in the Main Hand slot.", serde_json::json!({
             "type": "object",
             "properties": {
-                "weapon": {"type": "string", "description": "Name of weapon in inventory"},
                 "target": {"type": "string", "description": "Name of enemy target"}
             },
-            "required": ["weapon", "target"]
+            "required": ["target"]
         })),
-        tool("get_character_sheet", "Get the player's full character sheet including stats, HP, level, etc.", serde_json::json!({
+        tool("get_character_sheet", "Get the player's full character sheet including stats, HP, level, equipment, and gold.", serde_json::json!({
             "type": "object",
             "properties": {}
         })),
@@ -62,16 +61,45 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["delta", "reason"]
         })),
-        tool("add_item", "Add an item to the player's inventory.", serde_json::json!({
+        tool("add_item", "Add a custom item to the player's inventory (backpack). For standard items, prefer give_item with an item_id from the database.", serde_json::json!({
             "type": "object",
             "properties": {
                 "name": {"type": "string", "description": "Item name"},
                 "description": {"type": "string", "description": "Item description"},
                 "item_type": {"type": "string", "enum": ["weapon", "armor", "potion", "scroll", "misc"]},
-                "properties": {"type": "object", "description": "Item-specific properties (damage, ac_bonus, etc.)"},
                 "weight": {"type": "number", "description": "Weight in pounds", "default": 1.0}
             },
             "required": ["name", "description", "item_type"]
+        })),
+        tool("give_item", "Give the player a standard item from the item database by ID. The item goes into their inventory (backpack). Use equip_item afterwards if the player should equip it. Standard IDs include: longsword, shortsword, dagger, mace, quarterstaff, battleaxe, rapier, greatsword, greataxe, longbow, shortbow, light_crossbow, heavy_crossbow, leather_armor, studded_leather, chain_shirt, chain_mail, scale_mail, plate_armor, shield, health_potion, greater_health_potion, ring_of_protection, cloak_of_protection, boots_of_speed, gauntlets_of_ogre_power, amulet_of_health, flametongue_longsword, frostbrand_greatsword, vorpal_longsword, etc.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "string", "description": "Item ID from the standard database (e.g. 'longsword', 'health_potion', 'ring_of_protection')"},
+                "quantity": {"type": "integer", "description": "Number of items to give (for stackable items like potions)", "default": 1}
+            },
+            "required": ["item_id"]
+        })),
+        tool("give_gold", "Award gold pieces to the player.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "amount": {"type": "integer", "description": "Number of gold pieces to give"},
+                "reason": {"type": "string", "description": "Reason for gold award (e.g. 'loot from goblin', 'quest reward')"}
+            },
+            "required": ["amount"]
+        })),
+        tool("equip_item", "Equip an item from the player's inventory to the appropriate equipment slot. If the slot is already occupied, the old item is swapped back to inventory. Recalculates AC automatically.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "item_name": {"type": "string", "description": "Name of the item in inventory to equip"}
+            },
+            "required": ["item_name"]
+        })),
+        tool("unequip_slot", "Remove the item from an equipment slot and place it in inventory. Recalculates AC automatically.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "slot": {"type": "string", "enum": ["head", "amulet", "main_hand", "off_hand", "chest", "hands", "ring", "legs", "feet", "back"], "description": "Equipment slot to unequip"}
+            },
+            "required": ["slot"]
         })),
         tool("remove_item", "Remove an item from the player's inventory.", serde_json::json!({
             "type": "object",

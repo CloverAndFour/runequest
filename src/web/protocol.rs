@@ -111,7 +111,7 @@ pub enum ServerMsg {
         effects: Vec<String>,
     },
     ChatHistory {
-        entries: Vec<HistoryEntry>,
+        entries: Vec<crate::storage::adventure_store::DisplayEvent>,
     },
     ModelInfo {
         model: String,

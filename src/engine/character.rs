@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::equipment::Equipment;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Race {
@@ -88,6 +90,7 @@ pub struct Character {
     pub hp: i32,
     pub max_hp: i32,
     pub ac: i32,
+    pub gold: u32,
     pub stats: Stats,
     pub conditions: Vec<String>,
 }
@@ -109,14 +112,15 @@ const XP_THRESHOLDS: &[u32] = &[
 impl Character {
     pub fn new(name: String, race: Race, class: Class, stats: Stats) -> Self {
         let con_mod = Stats::modifier(stats.constitution);
-        let (base_hp, base_ac) = match class {
-            Class::Warrior => (10 + con_mod, 16), // Heavy armor
-            Class::Mage => (6 + con_mod, 10 + Stats::modifier(stats.dexterity)),
-            Class::Rogue => (8 + con_mod, 12 + Stats::modifier(stats.dexterity)),
-            Class::Cleric => (8 + con_mod, 14), // Medium armor + shield
-            Class::Ranger => (10 + con_mod, 13 + std::cmp::min(Stats::modifier(stats.dexterity), 2)),
+        let base_hp = match class {
+            Class::Warrior => 10 + con_mod,
+            Class::Mage => 6 + con_mod,
+            Class::Rogue => 8 + con_mod,
+            Class::Cleric => 8 + con_mod,
+            Class::Ranger => 10 + con_mod,
         };
 
+        // AC starts at 10 (unarmored) — will be recalculated after equipping gear
         Self {
             name,
             race,
@@ -125,10 +129,46 @@ impl Character {
             xp: 0,
             hp: base_hp,
             max_hp: base_hp,
-            ac: base_ac,
+            ac: 10,
+            gold: 10, // Starting gold for all classes
             stats,
             conditions: Vec::new(),
         }
+    }
+
+    /// Calculate AC based on equipped gear and stats.
+    ///
+    /// Rules:
+    /// - If chest armor has `ac_base`, that becomes the base AC.
+    /// - Light armor (no special tag): base + full DEX modifier
+    /// - Medium armor ("dex_cap_2"): base + min(DEX modifier, 2)
+    /// - Heavy armor ("no_dex"): base only (no DEX)
+    /// - No armor: 10 + DEX modifier
+    /// - Add AC bonuses from all other equipment slots (shield, rings, cloaks, etc.)
+    pub fn calculate_ac(&self, equipment: &Equipment) -> i32 {
+        let dex_mod = Stats::modifier(self.stats.dexterity);
+
+        let base_ac = if let Some(ref chest) = equipment.chest {
+            if let Some(base) = chest.stats.ac_base {
+                let special = chest.stats.special.as_deref().unwrap_or("");
+                if special == "no_dex" {
+                    base
+                } else if special == "dex_cap_2" {
+                    base + std::cmp::min(dex_mod, 2)
+                } else {
+                    // Light armor: full DEX
+                    base + dex_mod
+                }
+            } else {
+                // Armor with no ac_base (shouldn't happen for chest, but fallback)
+                10 + dex_mod
+            }
+        } else {
+            // Unarmored
+            10 + dex_mod
+        };
+
+        base_ac + equipment.total_ac_bonus()
     }
 
     pub fn xp_for_next_level(&self) -> u32 {

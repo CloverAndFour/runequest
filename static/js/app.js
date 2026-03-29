@@ -297,21 +297,56 @@ function renderChatHistory(entries) {
     const storyContent = document.querySelector('.story-content');
     if (!storyContent || !entries || entries.length === 0) return;
 
-    // Remove loading placeholder
     const loadingEl = storyContent.querySelector('.loading-narrative');
     if (loadingEl) loadingEl.remove();
 
-    // Render each history entry as a narrative block
+    // Render each display event by type
     entries.forEach(entry => {
-        if (entry.content) {
-            const div = document.createElement('div');
-            div.className = 'narrative-block history';
-            div.textContent = entry.content;
-            storyContent.appendChild(div);
+        const div = document.createElement('div');
+        switch (entry.event_type) {
+            case 'narrative':
+                div.className = 'narrative-block history';
+                div.textContent = entry.data.text || entry.data.content || '';
+                if (div.textContent) storyContent.appendChild(div);
+                break;
+            case 'dice_result':
+                div.className = `dice-result history ${entry.data.success ? 'success' : 'failure'}`;
+                div.innerHTML = `Rolled: ${entry.data.total} vs DC ${entry.data.dc} — ${entry.data.success ? 'SUCCESS' : 'FAILURE'}`;
+                storyContent.appendChild(div);
+                break;
+            case 'choices':
+                // Show the choices that were presented (but don't make them clickable — they're history)
+                div.className = 'choices-container history';
+                div.innerHTML = `<div class="choices-prompt" style="opacity:0.6">${escapeHtml(entry.data.prompt || 'What do you do?')}</div>`;
+                storyContent.appendChild(div);
+                break;
+            case 'choice_selected':
+                div.className = 'narrative-block history';
+                div.style.color = 'var(--text-gold)';
+                div.textContent = `> ${entry.data.text || ''}`;
+                if (div.textContent.length > 2) storyContent.appendChild(div);
+                break;
+            case 'combat_action':
+                div.className = `combat-action-log history ${entry.data.hit === true ? 'hit' : entry.data.hit === false ? 'miss' : 'neutral'}`;
+                div.textContent = entry.data.description || '';
+                if (div.textContent) storyContent.appendChild(div);
+                break;
+            case 'combat_enemy':
+                div.className = `combat-action-log history enemy ${entry.data.hit ? 'hit' : 'miss'}`;
+                div.textContent = entry.data.description || `${entry.data.enemy_name} attacks — ${entry.data.hit ? 'HIT' : 'MISS'}`;
+                storyContent.appendChild(div);
+                break;
+            default:
+                // For unknown types or plain text, show as narrative
+                if (entry.data && (entry.data.text || entry.data.content)) {
+                    div.className = 'narrative-block history';
+                    div.textContent = entry.data.text || entry.data.content;
+                    storyContent.appendChild(div);
+                }
+                break;
         }
     });
 
-    // Add separator before new content
     const sep = document.createElement('div');
     sep.className = 'history-separator';
     sep.textContent = '— continuing —';
