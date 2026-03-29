@@ -75,16 +75,21 @@ impl AdventureStore {
                 let state_path = entry.path().join("state.json");
                 if state_path.exists() {
                     if let Ok(data) = std::fs::read_to_string(&state_path) {
-                        if let Ok(state) = serde_json::from_str::<AdventureState>(&data) {
-                            summaries.push(AdventureSummary {
-                                id: state.id.clone(),
-                                name: state.name.clone(),
-                                character_name: state.character.name.clone(),
-                                race: state.character.race.to_string(),
-                                class: state.character.class.to_string(),
-                                level: state.character.level,
-                                updated_at: state.updated_at.to_rfc3339(),
-                            });
+                        match serde_json::from_str::<AdventureState>(&data) {
+                            Ok(state) => {
+                                summaries.push(AdventureSummary {
+                                    id: state.id.clone(),
+                                    name: state.name.clone(),
+                                    character_name: state.character.name.clone(),
+                                    race: state.character.race.to_string(),
+                                    class: state.character.class.to_string(),
+                                    level: state.character.level,
+                                    updated_at: state.updated_at.to_rfc3339(),
+                                });
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to parse adventure {}: {}", state_path.display(), e);
+                            }
                         }
                     }
                 }

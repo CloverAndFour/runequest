@@ -77,6 +77,7 @@ impl Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct Inventory {
     pub items: Vec<Item>,
     pub gold: u32,
