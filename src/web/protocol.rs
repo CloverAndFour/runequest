@@ -102,6 +102,9 @@ pub enum ServerMsg {
     ConditionEffects {
         effects: Vec<String>,
     },
+    ChatHistory {
+        entries: Vec<HistoryEntry>,
+    },
     ModelInfo {
         model: String,
         available_models: Vec<String>,
@@ -111,3 +114,10 @@ pub enum ServerMsg {
         message: String,
     },
 }
+
+#[derive(Debug, Serialize)]
+pub struct HistoryEntry {
+    pub role: String,
+    pub content: String,
+}
+

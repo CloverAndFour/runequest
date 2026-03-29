@@ -744,3 +744,46 @@
     color: #cc8888;
     padding: 2px 0;
 }
+
+/* Chat history on load */
+.narrative-block.history {
+    opacity: 0.7;
+    border-left: 2px solid var(--border-dark);
+    padding-left: 12px;
+}
+
+.history-separator {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 8px 0;
+    font-style: italic;
+}
+
+/* Status effects in info panel */
+.conditions-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(74, 58, 42, 0.3);
+}
+
+.condition-entry {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.2);
+}
+
+.condition-name {
+    color: var(--accent-red);
+    font-family: var(--font-medieval);
+    font-size: 13px;
+}
+
+.condition-name.positive {
+    color: var(--accent-green);
+}
+
+.condition-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}

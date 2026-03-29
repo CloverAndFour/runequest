@@ -58,6 +58,9 @@ function handleServerMsg(msg) {
             if (msg.state) gameState = msg.state;
             showAdventureScreen();
             break;
+        case 'chat_history':
+            renderChatHistory(msg.entries);
+            break;
         case 'narrative_chunk':
             appendNarrativeChunk(msg.text);
             break;
@@ -270,6 +273,33 @@ function updateCostDisplay(data) {
     const cost = data.session_cost_usd || 0;
     el.textContent = fmt(cost);
     el.title = `Session: ${fmt(cost)}\nToday: ${fmt(data.today_cost_usd || 0)}\nThis week: ${fmt(data.week_cost_usd || 0)}\nThis month: ${fmt(data.month_cost_usd || 0)}\nAll time: ${fmt(data.total_cost_usd || 0)}\n${data.prompt_tokens || 0} input + ${data.completion_tokens || 0} output tokens`;
+}
+
+function renderChatHistory(entries) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent || !entries || entries.length === 0) return;
+
+    // Remove loading placeholder
+    const loadingEl = storyContent.querySelector('.loading-narrative');
+    if (loadingEl) loadingEl.remove();
+
+    // Render each history entry as a narrative block
+    entries.forEach(entry => {
+        if (entry.content) {
+            const div = document.createElement('div');
+            div.className = 'narrative-block history';
+            div.textContent = entry.content;
+            storyContent.appendChild(div);
+        }
+    });
+
+    // Add separator before new content
+    const sep = document.createElement('div');
+    sep.className = 'history-separator';
+    sep.textContent = '— continuing —';
+    storyContent.appendChild(sep);
+
+    storyContent.scrollTop = storyContent.scrollHeight;
 }
 
 function showConditionEffects(effects) {

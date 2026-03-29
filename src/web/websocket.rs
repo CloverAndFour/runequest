@@ -19,7 +19,7 @@ use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, HistoryMessage};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
-use crate::web::protocol::{ClientMsg, ServerMsg};
+use crate::web::protocol::{ClientMsg, HistoryEntry, ServerMsg};
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -237,6 +237,16 @@ async fn handle_client_msg(
                 });
             }
 
+            // Build history entries for the frontend (assistant messages only)
+            let history_entries: Vec<HistoryEntry> = history
+                .iter()
+                .filter(|h| h.role == "assistant" && h.content.is_some() && h.tool_calls.is_none())
+                .map(|h| HistoryEntry {
+                    role: h.role.clone(),
+                    content: h.content.clone().unwrap_or_default(),
+                })
+                .collect();
+
             let state_json = serde_json::to_value(&adventure)?;
             let adv_id = adventure.id.clone();
             sess.adventure = Some(adventure);
@@ -244,6 +254,9 @@ async fn handle_client_msg(
             drop(sess);
 
             send_msg(sender, &ServerMsg::AdventureLoaded { state: state_json }).await;
+            if !history_entries.is_empty() {
+                send_msg(sender, &ServerMsg::ChatHistory { entries: history_entries }).await;
+            }
 
             // Auto-resume: ask LLM to recap and present choices
             {

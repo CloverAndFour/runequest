@@ -121,11 +121,7 @@ function renderStatus(el, state) {
             ${renderStatBox('CHA', s.charisma)}
         </div>
 
-        ${c.conditions && c.conditions.length > 0 ? `
-            <div style="margin-top:12px; font-size:12px; color:var(--accent-red);">
-                Conditions: ${c.conditions.join(', ')}
-            </div>
-        ` : ''}
+        ${renderConditions(c.conditions)}
     `;
 
     // Abilities section (merged from Skills tab)
@@ -157,6 +153,33 @@ function renderStatus(el, state) {
     html += '</div>';
 
     el.innerHTML = html;
+}
+
+const CONDITION_DESCRIPTIONS = {
+    'poisoned': 'Disadvantage on attacks & ability checks. 1d4 poison damage/turn.',
+    'burning': '1d6 fire damage at the start of each turn until extinguished.',
+    'on fire': '1d6 fire damage at the start of each turn until extinguished.',
+    'bleeding': '1d4 damage at the start of each turn until healed.',
+    'blinded': "Can't see. Disadvantage on attack rolls.",
+    'frightened': 'Disadvantage on ability checks and attacks while source is visible.',
+    'stunned': "Can't move or act. Fails STR/DEX saves.",
+    'paralyzed': "Can't move or act. Auto-fail STR/DEX saves. Melee hits are crits.",
+    'exhaustion': 'Disadvantage on ability checks. Speed halved.',
+};
+
+function renderConditions(conditions) {
+    if (!conditions || conditions.length === 0) return '';
+
+    let html = '<div class="conditions-section"><div class="section-title">Status Effects</div>';
+    conditions.forEach(c => {
+        const desc = CONDITION_DESCRIPTIONS[c.toLowerCase()] || 'Active status effect.';
+        html += `<div class="condition-entry">
+            <div class="condition-name">${escapeHtml(c)}</div>
+            <div class="condition-desc">${escapeHtml(desc)}</div>
+        </div>`;
+    });
+    html += '</div>';
+    return html;
 }
 
 function renderStatBox(name, value) {
