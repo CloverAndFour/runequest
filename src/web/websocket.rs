@@ -242,12 +242,13 @@ async fn handle_client_msg(
             let state_json = serde_json::to_value(&adventure)?;
             let adv_id = adventure.id.clone();
 
-            // If no display_history.jsonl exists (old adventure), build from LLM history
-            let display_events = if display_events.is_empty() {
+            // Build narrative events from LLM history
+            let has_narratives = display_events.iter().any(|e| e.event_type == "narrative");
+            let display_events = if display_events.is_empty() || !has_narratives {
+                // No display history or missing narratives — rebuild from LLM history
                 history
                     .iter()
                     .filter_map(|h| {
-                        // Include: assistant messages with content (narrative text)
                         if h.role == "assistant" {
                             if let Some(ref content) = h.content {
                                 if !content.is_empty() {
@@ -259,7 +260,6 @@ async fn handle_client_msg(
                                 }
                             }
                         }
-                        // Include: tool results that look like player choices
                         if h.role == "tool" {
                             if let Some(ref content) = h.content {
                                 if content.starts_with("Player chose:") {
