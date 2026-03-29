@@ -257,7 +257,7 @@ function displayDiceResult(data) {
         const div = document.createElement('div');
         div.className = `dice-result ${data.success ? 'success' : 'failure'}`;
         div.innerHTML = `
-            <div>Rolled: ${data.rolls.join(' + ')} = <strong>${data.total}</strong> vs DC ${data.dc}</div>
+            <div>Rolled: ${data.rolls.length > 1 ? data.rolls.join(' + ') + ' = ' : ''}<strong>${data.total}</strong> vs DC ${data.dc}</div>
             <div>${data.success ? 'SUCCESS!' : 'FAILURE'}</div>
         `;
         storyContent.appendChild(div);
