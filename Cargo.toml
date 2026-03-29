@@ -29,7 +29,7 @@ bytes = "1.0"
 
 # Web Server
 axum = { version = "0.7", features = ["ws"] }
-tower-http = { version = "0.5", features = ["trace", "fs", "set-header"] }
+tower-http = { version = "0.5", features = ["trace", "fs", "set-header", "cors"] }
 
 # Auth
 argon2 = "0.5"

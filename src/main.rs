@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use runequest::auth::{UserRole, UserStore};
+use runequest::auth::{AuthMode, JwtManager, UserRole, UserStore};
+use runequest::llm::client::XaiClient;
 
 #[derive(Parser)]
 #[command(name = "runequest")]
@@ -19,6 +21,9 @@ enum Commands {
     Serve {
         #[arg(long, short, default_value = "2999", env = "RUNEQUEST_PORT")]
         port: u16,
+
+        #[arg(long, default_value = "2998", env = "RUNEQUEST_API_PORT")]
+        api_port: u16,
 
         #[arg(long, default_value = "0.0.0.0", env = "RUNEQUEST_BIND_ADDR")]
         bind_address: String,
@@ -61,12 +66,76 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Serve {
             port,
+            api_port,
             bind_address,
             data_dir,
             require_auth,
         } => {
             let base_path = resolve_data_dir(data_dir.as_deref())?;
-            runequest::web::run_server(port, &bind_address, base_path, require_auth).await?;
+
+            // Shared resources created once
+            let api_key = std::env::var("XAI_API_KEY").map_err(|_| {
+                anyhow::anyhow!(
+                    "XAI_API_KEY not set. Create a .env file with XAI_API_KEY=your_key"
+                )
+            })?;
+            let model =
+                std::env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4-1-fast-reasoning".to_string());
+            let xai_client = Arc::new(XaiClient::new(&api_key, &model));
+
+            let user_store = Arc::new(UserStore::new(&base_path));
+            let jwt_manager = Arc::new(JwtManager::new(&base_path)?);
+
+            let auth_mode = if require_auth || user_store.has_users() {
+                AuthMode::Enabled
+            } else {
+                AuthMode::Disabled
+            };
+
+            let bind_addr_web = bind_address.clone();
+            let bind_addr_api = bind_address.clone();
+            let data_dir_web = base_path.clone();
+            let data_dir_api = base_path.clone();
+            let xai_api = xai_client.clone();
+            let user_store_api = user_store.clone();
+            let jwt_api = jwt_manager.clone();
+            let model_api = model.clone();
+            let auth_mode_api = auth_mode.clone();
+
+            let web_handle = tokio::spawn(async move {
+                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth).await
+            });
+
+            let api_handle = tokio::spawn(async move {
+                runequest::web::api_server::run_api_server(
+                    api_port,
+                    &bind_addr_api,
+                    data_dir_api,
+                    xai_api,
+                    model_api,
+                    auth_mode_api,
+                    user_store_api,
+                    jwt_api,
+                )
+                .await
+            });
+
+            tokio::select! {
+                result = web_handle => {
+                    match result {
+                        Ok(Ok(())) => eprintln!("Web server exited"),
+                        Ok(Err(e)) => eprintln!("Web server error: {}", e),
+                        Err(e) => eprintln!("Web server task error: {}", e),
+                    }
+                }
+                result = api_handle => {
+                    match result {
+                        Ok(Ok(())) => eprintln!("API server exited"),
+                        Ok(Err(e)) => eprintln!("API server error: {}", e),
+                        Err(e) => eprintln!("API server task error: {}", e),
+                    }
+                }
+            }
         }
 
         Commands::User { data_dir, action } => {
