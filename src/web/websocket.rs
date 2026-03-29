@@ -278,7 +278,9 @@ async fn handle_client_msg(
                 display_events
             };
 
-            // Check if last display event was choices or dice roll (can restore without LLM)
+            let is_dead = adventure.character.dead || adventure.character.hp <= 0;
+            let in_combat = adventure.combat.active;
+
             let last_event_type = display_events.last().map(|e| e.event_type.clone());
             let needs_resume = !matches!(last_event_type.as_deref(), Some("choices") | Some("dice_roll_request"));
 
@@ -291,7 +293,20 @@ async fn handle_client_msg(
                 send_msg(sender, &ServerMsg::ChatHistory { entries: display_events }).await;
             }
 
-            // Only call LLM if the player wasn't mid-interaction
+            // If character is dead, don't resume — send death message
+            if is_dead {
+                send_msg(sender, &ServerMsg::NarrativeChunk {
+                    text: "Your character has fallen. This adventure is over.".to_string(),
+                }).await;
+                send_msg(sender, &ServerMsg::NarrativeEnd).await;
+            }
+            // If in combat, resume the combat turn instead of LLM resume
+            else if in_combat {
+                handle_combat_turn_start(session, sender).await?;
+            }
+            else {
+
+            // Normal resume: call LLM
             if needs_resume {
                 let mut sess = session.lock().await;
                 let resume_prompt = "The adventurer returns after a break. Briefly recap the current situation in 1-2 sentences, then present choices for what to do next. Include dice requirements in choices where relevant.";
@@ -308,6 +323,7 @@ async fn handle_client_msg(
                 )?;
             }
             continue_tool_loop(session, xai_client, sender).await?;
+            } // end else (normal resume)
         }
 
         ClientMsg::DeleteAdventure { adventure_id } => {
@@ -979,6 +995,7 @@ async fn handle_combat_turn_start(
                     send_msg(sender, &ServerMsg::StateUpdate { state }).await;
 
                     if adventure.character.hp <= 0 {
+                        adventure.character.dead = true;
                         adventure.combat.end();
                         sess.store.save_adventure(&adventure)?;
                         sess.adventure = Some(adventure);
@@ -1247,9 +1264,11 @@ async fn handle_combat_action(
         }
     }
 
-    // Save state after action
+    // Save state and send update after action
     if action_id != "end_turn" {
         sess.store.save_adventure(&adventure)?;
+        let state = serde_json::to_value(&adventure)?;
+        send_msg(sender, &ServerMsg::StateUpdate { state }).await;
     }
     sess.adventure = Some(adventure);
 

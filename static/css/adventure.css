@@ -1308,3 +1308,108 @@
     color: var(--text-muted);
     margin-top: 2px;
 }
+
+/* ===== MOBILE RESPONSIVE ===== */
+
+@media (max-width: 768px) {
+    .adventure-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        height: 100vh;
+    }
+
+    .story-panel {
+        border-right: none;
+    }
+
+    .info-panel {
+        max-height: 35vh;
+        border-top: 2px solid var(--border-dark);
+        overflow-y: auto;
+    }
+
+    .story-header {
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .story-header h2 {
+        font-size: 16px;
+    }
+
+    .scene-location { font-size: 10px; }
+    .cost-display { font-size: 9px; }
+
+    .choices-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .combat-action-bar {
+        padding: 8px;
+    }
+
+    .action-buttons {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .combat-btn {
+        min-width: 55px;
+        padding: 6px 8px;
+    }
+
+    .combat-btn-icon { font-size: 14px; }
+    .combat-btn-label { font-size: 9px; }
+
+    .select-screen {
+        padding: 20px;
+    }
+
+    .select-screen h1 {
+        font-size: 28px;
+    }
+
+    .scenario-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-allocator {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .create-screen {
+        padding: 20px;
+        max-width: 100%;
+    }
+
+    .adventures-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dungeon-grid {
+        max-height: 180px;
+    }
+
+    .world-map-container {
+        height: 160px;
+    }
+
+    .world-node .node-label {
+        font-size: 6px;
+        max-width: 40px;
+    }
+
+    .equip-slots .slot-label {
+        width: 55px;
+        font-size: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .story-header h2 { font-size: 14px; }
+    .narrative-block { font-size: 13px; }
+    .info-tab { font-size: 9px; padding: 8px 0; }
+    .stat-box .stat-value { font-size: 18px; }
+    .stat-allocator { grid-template-columns: 1fr; }
+}

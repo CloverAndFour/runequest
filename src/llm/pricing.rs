@@ -39,9 +39,12 @@ pub fn model_cost(model: &str, usage: &TokenUsage) -> f64 {
 
 fn model_pricing(model: &str) -> (f64, f64) {
     // (input per million, output per million) in USD
+    // Grok 4.1 Fast (both reasoning and non-reasoning): $0.20 / $0.50
+    // Grok 4 (full, non-fast): $3.00 / $15.00
     match model {
-        m if m.contains("non-reasoning") => (1.0, 4.0),
-        m if m.contains("reasoning") => (3.0, 15.0),
-        _ => (3.0, 15.0),
+        m if m.contains("grok-4-1-fast") => (0.20, 0.50),
+        m if m.contains("non-reasoning") => (0.20, 0.50),
+        m if m.contains("reasoning") => (3.0, 15.0), // Full Grok 4
+        _ => (0.20, 0.50), // Default to cheap rate
     }
 }

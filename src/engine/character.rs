@@ -94,6 +94,8 @@ pub struct Character {
     pub gold: u32,
     pub stats: Stats,
     pub conditions: Vec<String>,
+    #[serde(default)]
+    pub dead: bool,
 }
 
 /// XP thresholds per level (index = level, value = XP needed for that level).
@@ -134,6 +136,7 @@ impl Character {
             gold: 10, // Starting gold for all classes
             stats,
             conditions: Vec::new(),
+            dead: false,
         }
     }
 

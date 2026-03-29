@@ -181,28 +181,28 @@ impl CombatState {
     /// Advance to the next combatant's turn. Returns the new combatant.
     /// If we wrap around, increment the round.
     pub fn next_turn(&mut self) -> CombatantId {
-        self.current_turn_index += 1;
-        if self.current_turn_index >= self.initiative.len() {
-            self.current_turn_index = 0;
-            self.round += 1;
-            self.combat_log.push(format!("Round {} begins.", self.round));
-        }
-
-        // Reset action economy for new turn
-        self.action_economy = ActionEconomy::new_turn();
-        self.player_dodging = false;
-
-        // Remove dead enemies from initiative
-        // (they stay in the enemies vec for reference but skip their turn)
-        let combatant = self.initiative[self.current_turn_index].combatant.clone();
-        if let CombatantId::Enemy(idx) = &combatant {
-            if *idx < self.enemies.len() && self.enemies[*idx].hp <= 0 {
-                // Dead enemy, skip to next
-                return self.next_turn();
+        // Bounded loop to skip dead enemies (prevents infinite recursion)
+        for _ in 0..self.initiative.len() + 1 {
+            self.current_turn_index += 1;
+            if self.current_turn_index >= self.initiative.len() {
+                self.current_turn_index = 0;
+                self.round += 1;
+                self.combat_log.push(format!("Round {} begins.", self.round));
             }
-        }
 
-        combatant
+            self.action_economy = ActionEconomy::new_turn();
+            self.player_dodging = false;
+
+            let combatant = self.initiative[self.current_turn_index].combatant.clone();
+            if let CombatantId::Enemy(idx) = &combatant {
+                if *idx < self.enemies.len() && self.enemies[*idx].hp <= 0 {
+                    continue; // Skip dead enemy
+                }
+            }
+            return combatant;
+        }
+        // Fallback: all enemies dead, return to player
+        CombatantId::Player
     }
 
     /// Execute an enemy's turn using deterministic AI. Returns the result.
