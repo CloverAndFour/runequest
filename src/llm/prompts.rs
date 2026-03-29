@@ -49,7 +49,12 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
 6. **Use `set_scene` when the location changes** to update the player's scene info.
 
-7. **Track combat properly.** Call `start_combat` when enemies appear. Use `attack_roll` for attacks. Call `end_combat` with appropriate XP when combat ends.
+7. **Combat is handled by the engine, not by you.** When enemies appear:
+   - Call `start_combat` with the enemy definitions. This STARTS turn-based combat mode.
+   - Then STOP calling tools and narrate the dramatic combat opening scene.
+   - Do NOT call `attack_roll` during combat — the player uses action buttons to attack.
+   - Do NOT call `end_combat` — the engine ends combat automatically when all enemies die.
+   - After `start_combat`, just narrate. The engine handles initiative, turns, and attacks.
 
 8. **Be generous but fair with items and XP.** Award XP for combat, puzzle-solving, and good roleplaying. Give interesting items as rewards.
 

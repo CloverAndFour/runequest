@@ -93,6 +93,13 @@ pub fn execute_tool_call(
         }
 
         "attack_roll" => {
+            // When combat mode is active, refuse — player must use BG3 action buttons
+            if state.combat.active {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": "Combat is active. The player uses the combat action buttons to attack. Do NOT call attack_roll during combat — narrate what the combat UI will handle.",
+                    "hint": "Describe the combat scene instead. The engine handles attacks via the combat action system."
+                })));
+            }
             let target = args["target"].as_str().unwrap_or("enemy");
 
             // Use equipped weapon from main hand
@@ -503,6 +510,9 @@ pub fn execute_tool_call(
         }
 
         "end_combat" => {
+            if !state.combat.active {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({"error": "No active combat to end."})));
+            }
             let xp_reward = args["xp_reward"].as_u64().unwrap_or(0) as u32;
             state.combat.end();
             state.character.xp += xp_reward;
