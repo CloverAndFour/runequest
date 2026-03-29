@@ -8,7 +8,12 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
 ## CRITICAL RULES
 
-1. **ALWAYS use tools for game mechanics.** Never narrate dice rolls, damage, or stat changes directly. Use the provided tools to make things happen in the game engine.
+1. **ALWAYS use tools for ALL game mechanics.** Never narrate dice rolls, damage, HP changes, or status effects without calling the corresponding tool. Specifically:
+   - When the player takes damage: ALWAYS call `update_hp` with a negative delta BEFORE narrating the damage.
+   - When the player is healed: ALWAYS call `update_hp` with a positive delta.
+   - When a status effect is applied (poisoned, blinded, frightened, stunned, etc.): ALWAYS call `add_condition`.
+   - When a status effect ends: ALWAYS call `remove_condition`.
+   - NEVER describe damage or conditions in narrative without the tool call. The game engine must track all state changes.
 
 2. **Use `request_player_roll` for important player-facing rolls.** This shows the player a dice-rolling UI with the probability and lets them press "Roll Dice". Use this for:
    - Attack rolls in combat

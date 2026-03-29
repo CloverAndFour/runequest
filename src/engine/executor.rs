@@ -387,6 +387,31 @@ pub fn execute_tool_call(
             })))
         }
 
+        "add_condition" => {
+            let condition = args["condition"].as_str().unwrap_or("").to_string();
+            let duration = args["duration"].as_str().unwrap_or("until cured").to_string();
+            if !condition.is_empty() && !state.character.conditions.contains(&condition) {
+                state.character.conditions.push(condition.clone());
+            }
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "condition_added": condition,
+                "duration": duration,
+                "active_conditions": state.character.conditions,
+            })))
+        }
+
+        "remove_condition" => {
+            let condition = args["condition"].as_str().unwrap_or("");
+            let cond_lower = condition.to_lowercase();
+            let before = state.character.conditions.len();
+            state.character.conditions.retain(|c| c.to_lowercase() != cond_lower);
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "condition_removed": condition,
+                "was_present": state.character.conditions.len() < before,
+                "active_conditions": state.character.conditions,
+            })))
+        }
+
         "complete_quest" => {
             let name = args["name"].as_str().unwrap_or("");
             let found = state

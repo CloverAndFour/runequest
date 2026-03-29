@@ -158,6 +158,21 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["name"]
         })),
+        tool("add_condition", "Apply a status condition to the player (e.g., poisoned, blinded, frightened, stunned, paralyzed, exhaustion, burning, bleeding). ALWAYS use this when the player is affected by a status effect.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "condition": {"type": "string", "description": "Condition name (e.g., 'Poisoned', 'Blinded', 'Frightened')"},
+                "duration": {"type": "string", "description": "How long it lasts (e.g., '1 hour', '3 rounds', 'until cured')", "default": "until cured"}
+            },
+            "required": ["condition"]
+        })),
+        tool("remove_condition", "Remove a status condition from the player (e.g., when poison is cured, fear ends, etc.).", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "condition": {"type": "string", "description": "Condition name to remove"}
+            },
+            "required": ["condition"]
+        })),
     ]
 }
 
