@@ -323,9 +323,9 @@ async fn handle_client_msg(
                 sess.messages.push(tool_result);
 
                 let adv_id = sess.adventure.as_ref().map(|a| a.id.clone());
-                if let Some(id) = adv_id {
+                if let Some(ref id) = adv_id {
                     sess.store.append_message(
-                        &id,
+                        id,
                         &HistoryMessage {
                             role: "tool".to_string(),
                             content: Some(format!("Player chose: {}", text)),
@@ -334,6 +334,11 @@ async fn handle_client_msg(
                             timestamp: chrono::Utc::now(),
                         },
                     )?;
+                    let _ = sess.store.append_display_event(id, &DisplayEvent {
+                        event_type: "choice_selected".to_string(),
+                        data: serde_json::json!({"text": text}),
+                        timestamp: chrono::Utc::now(),
+                    });
                 }
                 drop(sess);
                 continue_tool_loop(session, xai_client, sender).await?;
@@ -383,6 +388,15 @@ async fn handle_client_msg(
                             timestamp: chrono::Utc::now(),
                         },
                     )?;
+                    let _ = sess.store.append_display_event(id, &DisplayEvent {
+                        event_type: "dice_result".to_string(),
+                        data: serde_json::json!({
+                            "rolls": result.rolls, "total": result.total,
+                            "dc": pending.dc, "success": success,
+                            "description": pending.description,
+                        }),
+                        timestamp: chrono::Utc::now(),
+                    });
                 }
 
                 // Check precomputed branches
@@ -419,17 +433,22 @@ async fn handle_client_msg(
                     sess.messages.push(ChatMessage::assistant_text(&text));
 
                     let adv_id = sess.adventure.as_ref().map(|a| a.id.clone());
-                    if let Some(id) = &adv_id {
+                    if let Some(ref id) = adv_id {
                         sess.store.append_message(
                             id,
                             &HistoryMessage {
                                 role: "assistant".to_string(),
-                                content: Some(text),
+                                content: Some(text.clone()),
                                 tool_calls: None,
                                 tool_call_id: None,
                                 timestamp: chrono::Utc::now(),
                             },
                         )?;
+                        let _ = sess.store.append_display_event(id, &DisplayEvent {
+                            event_type: "narrative".to_string(),
+                            data: serde_json::json!({"text": text}),
+                            timestamp: chrono::Utc::now(),
+                        });
                     }
 
                     // Send cost + state

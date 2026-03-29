@@ -195,8 +195,25 @@ function showDiceRollUI(data) {
 
     const handler = () => {
         ws.send({ type: 'roll_dice' });
-        div.querySelector('.btn-roll-dice').disabled = true;
-        div.querySelector('.btn-roll-dice').textContent = 'Rolling...';
+        const btn = div.querySelector('.btn-roll-dice');
+        btn.disabled = true;
+        // Replace button with rolling animation
+        div.innerHTML = `
+            <div class="dice-description">${escapeHtml(data.description)}</div>
+            <div class="dice-rolling-animation">
+                <div class="rolling-dice">
+                    <span class="dice-face"></span>
+                </div>
+                <div class="rolling-text">Rolling...</div>
+            </div>
+        `;
+        // Animate random numbers on the dice face
+        const face = div.querySelector('.dice-face');
+        const animInterval = setInterval(() => {
+            face.textContent = Math.floor(Math.random() * 20) + 1;
+        }, 80);
+        // Store interval so we can clear it when result arrives
+        div.dataset.animInterval = animInterval;
         document.removeEventListener('roll-dice', handler);
     };
     document.addEventListener('roll-dice', handler);
@@ -206,8 +223,12 @@ function showDiceResult(data) {
     const storyContent = document.querySelector('.story-content');
     if (!storyContent) return;
 
-    const rollBtn = storyContent.querySelector('.btn-roll-dice');
-    if (rollBtn) rollBtn.closest('.dice-roll-ui')?.remove();
+    // Clear rolling animation
+    const rollUI = storyContent.querySelector('.dice-roll-ui');
+    if (rollUI) {
+        if (rollUI.dataset.animInterval) clearInterval(parseInt(rollUI.dataset.animInterval));
+        rollUI.remove();
+    }
 
     const div = document.createElement('div');
     div.className = `dice-result ${data.success ? 'success' : 'failure'}`;

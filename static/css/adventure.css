@@ -127,6 +127,48 @@
     75% { transform: scale(1.05) rotate(5deg); }
 }
 
+/* Dice rolling animation */
+.dice-rolling-animation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+}
+
+.rolling-dice {
+    width: 64px;
+    height: 64px;
+    border: 3px solid var(--text-gold);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3a2a1a, #2a1a0a);
+    animation: dice-tumble 0.4s ease-in-out infinite;
+}
+
+@keyframes dice-tumble {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-15deg) scale(1.05); }
+    50% { transform: rotate(0deg) scale(1); }
+    75% { transform: rotate(15deg) scale(1.05); }
+    100% { transform: rotate(0deg) scale(1); }
+}
+
+.dice-face {
+    font-size: 28px;
+    font-family: var(--font-medieval);
+    color: var(--text-gold-bright);
+    font-weight: bold;
+}
+
+.rolling-text {
+    font-size: 14px;
+    color: var(--text-muted);
+    animation: loading-pulse 1s ease-in-out infinite;
+}
+
 /* Dice result */
 .dice-result {
     padding: 16px;
