@@ -1,10 +1,10 @@
 //! Axum server setup and routing.
 
 use axum::{
-    extract::{Path, State, WebSocketUpgrade},
+    extract::{State, WebSocketUpgrade},
     http::StatusCode,
     middleware as axum_mw,
-    response::{Html, IntoResponse, Redirect},
+    response::{Html, IntoResponse},
     routing::{get, post},
     Extension, Json, Router,
 };
@@ -87,17 +87,17 @@ pub async fn run_server(
     // Static file directories
     let static_dir = std::env::current_dir()?.join("static");
 
-    // Public routes
+    // Public routes (HTML pages served to everyone — SPA handles auth client-side)
     let public_routes = Router::new()
+        .route("/", get(index_page))
+        .route("/adventure/{id}", get(index_page))
         .route("/login", get(login_page))
         .route("/api/auth/login", post(login_handler))
         .route("/health", get(|| async { "ok" }))
         .route("/favicon.svg", get(favicon));
 
-    // Protected routes
+    // Protected routes (API + WebSocket only)
     let protected_routes = Router::new()
-        .route("/", get(index_page))
-        .route("/adventure/{id}", get(index_page))
         .route("/api/auth/me", get(me_handler))
         .route("/ws", get(ws_handler))
         .layer(axum_mw::from_fn_with_state(

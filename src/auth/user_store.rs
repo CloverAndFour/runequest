@@ -114,7 +114,7 @@ impl UserStore {
         let salt = SaltString::generate(&mut OsRng);
         let hash = Argon2::default()
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| RunequestError::AuthenticationFailed)?
+            .map_err(|_| RunequestError::AuthenticationFailed)?
             .to_string();
 
         let user = User {

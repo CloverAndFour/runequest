@@ -141,6 +141,7 @@ async fn handle_client_msg(
 
             let adventure = AdventureState::new(name, character_name, race, class, stats);
             let adventure_id = adventure.id.clone();
+            let state_json = serde_json::to_value(&adventure)?;
 
             {
                 let mut sess = session.lock().await;
@@ -149,7 +150,7 @@ async fn handle_client_msg(
                 sess.messages.clear();
             }
 
-            send_msg(sender, &ServerMsg::AdventureCreated { adventure_id }).await;
+            send_msg(sender, &ServerMsg::AdventureCreated { adventure_id, state: state_json }).await;
             start_adventure(session, xai_client, sender).await?;
         }
 

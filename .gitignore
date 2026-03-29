@@ -4,3 +4,5 @@ data/
 *.swp
 *.swo
 *~
+node_modules/
+test-results/

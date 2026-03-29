@@ -56,6 +56,7 @@ pub enum ServerMsg {
     },
     AdventureCreated {
         adventure_id: String,
+        state: serde_json::Value,
     },
     NarrativeChunk {
         text: String,
