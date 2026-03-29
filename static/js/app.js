@@ -194,6 +194,7 @@ function showDiceRollUI(data) {
     storyContent.scrollTop = storyContent.scrollHeight;
 
     const handler = () => {
+        diceRollStartTime = Date.now();
         ws.send({ type: 'roll_dice' });
         const btn = div.querySelector('.btn-roll-dice');
         btn.disabled = true;
@@ -219,24 +220,50 @@ function showDiceRollUI(data) {
     document.addEventListener('roll-dice', handler);
 }
 
+// Queue dice results to show after minimum animation time
+let pendingDiceResult = null;
+let diceRollStartTime = 0;
+const DICE_ANIM_MIN_MS = 2000;
+
 function showDiceResult(data) {
+    const elapsed = Date.now() - diceRollStartTime;
+    const remaining = Math.max(0, DICE_ANIM_MIN_MS - elapsed);
+
+    if (remaining > 0) {
+        // Wait for animation to finish, then show
+        pendingDiceResult = data;
+        setTimeout(() => displayDiceResult(pendingDiceResult), remaining);
+        return;
+    }
+    displayDiceResult(data);
+}
+
+function displayDiceResult(data) {
+    pendingDiceResult = null;
     const storyContent = document.querySelector('.story-content');
     if (!storyContent) return;
 
-    // Clear rolling animation
+    // Clear rolling animation — show final number briefly
     const rollUI = storyContent.querySelector('.dice-roll-ui');
     if (rollUI) {
+        const face = rollUI.querySelector('.dice-face');
+        if (face) face.textContent = data.rolls[0] || data.total;
         if (rollUI.dataset.animInterval) clearInterval(parseInt(rollUI.dataset.animInterval));
-        rollUI.remove();
+        // Brief pause showing the final number
+        setTimeout(() => rollUI.remove(), 300);
     }
 
-    const div = document.createElement('div');
-    div.className = `dice-result ${data.success ? 'success' : 'failure'}`;
-    div.innerHTML = `
-        <div>Rolled: ${data.rolls.join(' + ')} = <strong>${data.total}</strong> vs DC ${data.dc}</div>
-        <div>${data.success ? 'SUCCESS!' : 'FAILURE'}</div>
-    `;
-    storyContent.appendChild(div);
+    setTimeout(() => {
+        const div = document.createElement('div');
+        div.className = `dice-result ${data.success ? 'success' : 'failure'}`;
+        div.innerHTML = `
+            <div>Rolled: ${data.rolls.join(' + ')} = <strong>${data.total}</strong> vs DC ${data.dc}</div>
+            <div>${data.success ? 'SUCCESS!' : 'FAILURE'}</div>
+        `;
+        storyContent.appendChild(div);
+        storyContent.scrollTop = storyContent.scrollHeight;
+    }, 400);
+}
     storyContent.scrollTop = storyContent.scrollHeight;
 }
 

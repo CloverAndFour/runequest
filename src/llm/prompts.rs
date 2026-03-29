@@ -9,12 +9,17 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
 ## CRITICAL RULES
 
-1. **ALWAYS use tools for ALL game mechanics.** Never narrate dice rolls, damage, HP changes, or status effects without calling the corresponding tool. Specifically:
-   - When the player takes damage: ALWAYS call `update_hp` with a negative delta BEFORE narrating the damage.
-   - When the player is healed: ALWAYS call `update_hp` with a positive delta.
-   - When a status effect is applied (poisoned, blinded, frightened, stunned, etc.): ALWAYS call `add_condition`.
-   - When a status effect ends: ALWAYS call `remove_condition`.
-   - NEVER describe damage or conditions in narrative without the tool call. The game engine must track all state changes.
+1. **ALWAYS use tools for ALL game mechanics — NO EXCEPTIONS.** The game engine is the single source of truth. You MUST call the appropriate tool BEFORE narrating any mechanical effect:
+   - Damage dealt to player → call `update_hp` with negative delta FIRST
+   - Player healed (potion, rest, spell) → call `update_hp` with positive delta FIRST
+   - Status effect applied → call `add_condition` FIRST
+   - Status effect removed → call `remove_condition` FIRST
+   - Player uses consumable item → call `remove_item` to consume it, then `update_hp` for healing
+   - Player wants to drink a potion → check inventory with `get_character_sheet`, then `remove_item` + `update_hp`
+   - NEVER say "HP is now X" or "you heal X HP" without calling `update_hp` — the engine tracks HP, not you
+   - NEVER say "you have no potions" without checking — use `get_character_sheet` to verify inventory
+   - NEVER invent item effects — check the item's actual properties
+   - If you narrate an HP change without a tool call, the game state will be WRONG
 
 2. **Use `request_player_roll` for important player-facing rolls.** This shows the player a dice-rolling UI with the probability and lets them press "Roll Dice". Use this for:
    - Attack rolls in combat
@@ -53,10 +58,12 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 ## CURRENT GAME STATE
 
 Character: {char_name} the {race} {class} (Level {level})
-HP: {hp}/{max_hp} | AC: {ac} | XP: {xp}/{xp_next}
+HP: {hp}/{max_hp} | AC: {ac} | XP: {xp}/{xp_next} | Gold: {gold}
 Location: {location}
 Combat: {combat_status}
 Active Conditions: {conditions}
+Inventory: {inventory}
+Equipped: {equipped}
 Active Quests: {quests}
 
 ## STYLE
@@ -79,7 +86,23 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         } else {
             "None".to_string()
         },
+        gold = state.character.gold,
         conditions = conditions_summary(&state.character.conditions),
+        inventory = if state.inventory.items.is_empty() {
+            "Empty".to_string()
+        } else {
+            state.inventory.items.iter().map(|i| {
+                let qty = if i.quantity > 1 { format!(" (x{})", i.quantity) } else { String::new() };
+                format!("{}{}", i.display_name(), qty)
+            }).collect::<Vec<_>>().join(", ")
+        },
+        equipped = {
+            let mut parts = Vec::new();
+            if let Some(ref w) = state.equipment.main_hand { parts.push(format!("MainHand: {}", w.display_name())); }
+            if let Some(ref w) = state.equipment.off_hand { parts.push(format!("OffHand: {}", w.display_name())); }
+            if let Some(ref a) = state.equipment.chest { parts.push(format!("Chest: {}", a.display_name())); }
+            if parts.is_empty() { "Nothing".to_string() } else { parts.join(", ") }
+        },
         quests = if state.quest_log.iter().any(|q| !q.completed) {
             state.quest_log.iter().filter(|q| !q.completed).map(|q| q.name.as_str()).collect::<Vec<_>>().join(", ")
         } else {

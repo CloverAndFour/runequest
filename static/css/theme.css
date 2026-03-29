@@ -34,6 +34,11 @@ body {
     overflow: hidden;
 }
 
+#app {
+    height: 100vh;
+    overflow-y: auto;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
