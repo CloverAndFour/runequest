@@ -31,6 +31,12 @@ impl SessionCost {
     }
 }
 
+pub fn model_cost(model: &str, usage: &TokenUsage) -> f64 {
+    let (input_per_m, output_per_m) = model_pricing(model);
+    (usage.prompt_tokens as f64 / 1_000_000.0) * input_per_m
+        + (usage.completion_tokens as f64 / 1_000_000.0) * output_per_m
+}
+
 fn model_pricing(model: &str) -> (f64, f64) {
     // (input per million, output per million) in USD
     match model {

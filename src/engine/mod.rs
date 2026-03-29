@@ -2,6 +2,7 @@ pub mod abilities;
 pub mod adventure;
 pub mod character;
 pub mod combat;
+pub mod conditions;
 pub mod dice;
 pub mod executor;
 pub mod inventory;

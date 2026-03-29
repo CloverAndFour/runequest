@@ -730,3 +730,17 @@
     padding: 8px 0;
     border-bottom: 1px solid rgba(74, 58, 42, 0.3);
 }
+
+/* Condition effects notification */
+.condition-effects {
+    background: rgba(170, 42, 42, 0.15);
+    border-left: 3px solid var(--accent-red);
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+.condition-effect-line {
+    color: #cc8888;
+    padding: 2px 0;
+}

@@ -9,14 +9,16 @@ use tokio::task::JoinHandle;
 use crate::auth::AuthUser;
 use crate::engine::adventure::AdventureState;
 use crate::engine::character::{Class, Race, Stats};
+use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::executor::{execute_tool_call, ToolExecResult};
 use crate::llm::client::XaiClient;
-use crate::llm::pricing::SessionCost;
+use crate::llm::pricing::{SessionCost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
 use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, HistoryMessage};
+use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 use crate::web::protocol::{ClientMsg, ServerMsg};
 
 const ALLOWED_MODELS: &[&str] = &[
@@ -25,7 +27,9 @@ const ALLOWED_MODELS: &[&str] = &[
 ];
 
 struct Session {
+    username: String,
     store: AdventureStore,
+    usage_logger: UsageLogger,
     adventure: Option<AdventureState>,
     messages: Vec<ChatMessage>,
     pending_roll: Option<PendingRoll>,
@@ -64,9 +68,12 @@ pub async fn handle_socket(
 ) {
     let (mut sender, mut receiver) = socket.split();
     let store = AdventureStore::new(&data_dir, &user.username);
+    let usage_logger = UsageLogger::new(&data_dir);
 
     let session = Arc::new(Mutex::new(Session {
+        username: user.username.clone(),
         store,
+        usage_logger,
         adventure: None,
         messages: Vec::new(),
         pending_roll: None,
@@ -133,6 +140,35 @@ async fn send_msg(
 ) {
     let json = serde_json::to_string(msg).unwrap();
     let _ = sender.send(Message::Text(json.into())).await;
+}
+
+async fn send_cost_update(
+    sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    sess: &Session,
+) {
+    let session_cost = sess.session_cost.cost_usd(&sess.model);
+    let stats = sess.usage_logger.aggregate();
+    send_msg(sender, &ServerMsg::CostUpdate {
+        session_cost_usd: session_cost,
+        prompt_tokens: sess.session_cost.total_prompt_tokens,
+        completion_tokens: sess.session_cost.total_completion_tokens,
+        today_cost_usd: stats.today.cost_usd,
+        week_cost_usd: stats.week.cost_usd,
+        month_cost_usd: stats.month.cost_usd,
+        total_cost_usd: stats.total.cost_usd,
+    }).await;
+}
+
+fn log_usage(sess: &Session, usage: &TokenUsage) {
+    let cost_usd = crate::llm::pricing::model_cost(&sess.model, usage);
+    let _ = sess.usage_logger.log(&UsageEntry {
+        ts: chrono::Utc::now(),
+        model: sess.model.clone(),
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        cost_usd,
+        username: sess.username.clone(),
+    });
 }
 
 async fn handle_client_msg(
@@ -202,11 +238,30 @@ async fn handle_client_msg(
             }
 
             let state_json = serde_json::to_value(&adventure)?;
+            let adv_id = adventure.id.clone();
             sess.adventure = Some(adventure);
             sess.messages = messages;
             drop(sess);
 
             send_msg(sender, &ServerMsg::AdventureLoaded { state: state_json }).await;
+
+            // Auto-resume: ask LLM to recap and present choices
+            {
+                let mut sess = session.lock().await;
+                let resume_prompt = "The adventurer returns after a break. Briefly recap the current situation in 1-2 sentences, then present choices for what to do next. Include dice requirements in choices where relevant.";
+                sess.messages.push(ChatMessage::user(resume_prompt));
+                sess.store.append_message(
+                    &adv_id,
+                    &HistoryMessage {
+                        role: "user".to_string(),
+                        content: Some(resume_prompt.to_string()),
+                        tool_calls: None,
+                        tool_call_id: None,
+                        timestamp: chrono::Utc::now(),
+                    },
+                )?;
+            }
+            continue_tool_loop(session, xai_client, sender).await?;
         }
 
         ClientMsg::DeleteAdventure { adventure_id } => {
@@ -353,12 +408,7 @@ async fn handle_client_msg(
                     }
 
                     // Send cost + state
-                    let cost_usd = sess.session_cost.cost_usd(&sess.model);
-                    send_msg(sender, &ServerMsg::CostUpdate {
-                        cost_usd,
-                        prompt_tokens: sess.session_cost.total_prompt_tokens,
-                        completion_tokens: sess.session_cost.total_completion_tokens,
-                    }).await;
+                    send_cost_update(sender, &sess).await;
 
                     if let Some(ref adv) = sess.adventure {
                         let state = serde_json::to_value(adv)?;
@@ -442,6 +492,31 @@ async fn run_game_turn(
     {
         let mut sess = session.lock().await;
 
+        // Apply condition effects at start of turn
+        let condition_effects = {
+            if let Some(ref mut adventure) = sess.adventure {
+                let effects = apply_turn_effects(adventure);
+                if !effects.is_empty() {
+                    Some((effects, serde_json::to_value(&*adventure)?))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        if let Some((effects, state)) = condition_effects {
+            send_msg(sender, &ServerMsg::ConditionEffects {
+                effects: effects.clone(),
+            }).await;
+            let effects_text = format!(
+                "[SYSTEM: Start-of-turn condition effects applied: {}]",
+                effects.join("; ")
+            );
+            sess.messages.push(ChatMessage::system(&effects_text));
+            send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+        }
+
         let system_prompt = match &sess.adventure {
             Some(adv) => Some(build_system_prompt(adv)),
             None => None,
@@ -493,6 +568,7 @@ async fn continue_tool_loop(
         if let Some(ref u) = usage {
             let mut sess = session.lock().await;
             sess.session_cost.add(u);
+            log_usage(&sess, u);
         }
 
         match response {
@@ -524,12 +600,7 @@ async fn continue_tool_loop(
                 }
 
                 // Send cost update
-                let cost_usd = sess.session_cost.cost_usd(&sess.model);
-                send_msg(sender, &ServerMsg::CostUpdate {
-                    cost_usd,
-                    prompt_tokens: sess.session_cost.total_prompt_tokens,
-                    completion_tokens: sess.session_cost.total_completion_tokens,
-                }).await;
+                send_cost_update(sender, &sess).await;
 
                 if let Some(ref adv) = sess.adventure {
                     let state = serde_json::to_value(adv)?;
@@ -672,13 +743,7 @@ async fn continue_tool_loop(
                                 failure_handle: f_handle,
                             });
 
-                            // Send cost update
-                            let cost_usd = sess.session_cost.cost_usd(&sess.model);
-                            send_msg(sender, &ServerMsg::CostUpdate {
-                                cost_usd,
-                                prompt_tokens: sess.session_cost.total_prompt_tokens,
-                                completion_tokens: sess.session_cost.total_completion_tokens,
-                            }).await;
+                            send_cost_update(sender, &sess).await;
 
                             return Ok(());
                         }
@@ -704,13 +769,7 @@ async fn continue_tool_loop(
                             });
                             sess.adventure = Some(adventure);
 
-                            // Send cost update
-                            let cost_usd = sess.session_cost.cost_usd(&sess.model);
-                            send_msg(sender, &ServerMsg::CostUpdate {
-                                cost_usd,
-                                prompt_tokens: sess.session_cost.total_prompt_tokens,
-                                completion_tokens: sess.session_cost.total_completion_tokens,
-                            }).await;
+                            send_cost_update(sender, &sess).await;
 
                             return Ok(());
                         }

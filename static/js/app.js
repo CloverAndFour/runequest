@@ -80,6 +80,9 @@ function handleServerMsg(msg) {
         case 'cost_update':
             updateCostDisplay(msg);
             break;
+        case 'condition_effects':
+            showConditionEffects(msg.effects);
+            break;
         case 'model_info':
             currentModel = msg.model;
             break;
@@ -258,12 +261,26 @@ function updateInfoPanel() {
 function updateCostDisplay(data) {
     const el = document.getElementById('costDisplay');
     if (!el) return;
-    const cost = data.cost_usd || 0;
-    if (cost < 0.001) el.textContent = `$${(cost * 1000).toFixed(2)}m`;
-    else if (cost < 0.01) el.textContent = `$${cost.toFixed(4)}`;
-    else if (cost < 1) el.textContent = `$${cost.toFixed(3)}`;
-    else el.textContent = `$${cost.toFixed(2)}`;
-    el.title = `${data.prompt_tokens || 0} input + ${data.completion_tokens || 0} output tokens`;
+    const fmt = (n) => {
+        if (n < 0.001) return `$${(n * 1000).toFixed(2)}m`;
+        if (n < 0.01) return `$${n.toFixed(4)}`;
+        if (n < 1) return `$${n.toFixed(3)}`;
+        return `$${n.toFixed(2)}`;
+    };
+    const cost = data.session_cost_usd || 0;
+    el.textContent = fmt(cost);
+    el.title = `Session: ${fmt(cost)}\nToday: ${fmt(data.today_cost_usd || 0)}\nThis week: ${fmt(data.week_cost_usd || 0)}\nThis month: ${fmt(data.month_cost_usd || 0)}\nAll time: ${fmt(data.total_cost_usd || 0)}\n${data.prompt_tokens || 0} input + ${data.completion_tokens || 0} output tokens`;
+}
+
+function showConditionEffects(effects) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent || !effects || effects.length === 0) return;
+
+    const div = document.createElement('div');
+    div.className = 'condition-effects';
+    div.innerHTML = effects.map(e => `<div class="condition-effect-line">${escapeHtml(e)}</div>`).join('');
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
 }
 
 function showOptionsModal() {

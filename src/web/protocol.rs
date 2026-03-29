@@ -91,9 +91,16 @@ pub enum ServerMsg {
         state: serde_json::Value,
     },
     CostUpdate {
-        cost_usd: f64,
+        session_cost_usd: f64,
         prompt_tokens: u64,
         completion_tokens: u64,
+        today_cost_usd: f64,
+        week_cost_usd: f64,
+        month_cost_usd: f64,
+        total_cost_usd: f64,
+    },
+    ConditionEffects {
+        effects: Vec<String>,
     },
     ModelInfo {
         model: String,

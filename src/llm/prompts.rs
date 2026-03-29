@@ -1,6 +1,7 @@
 //! System prompts for the D&D Dungeon Master.
 
 use crate::engine::AdventureState;
+use crate::engine::conditions::conditions_summary;
 
 pub fn build_system_prompt(state: &AdventureState) -> String {
     format!(
@@ -41,6 +42,7 @@ Character: {char_name} the {race} {class} (Level {level})
 HP: {hp}/{max_hp} | AC: {ac} | XP: {xp}/{xp_next}
 Location: {location}
 Combat: {combat_status}
+Active Conditions: {conditions}
 Active Quests: {quests}
 
 ## STYLE
@@ -63,6 +65,7 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         } else {
             "None".to_string()
         },
+        conditions = conditions_summary(&state.character.conditions),
         quests = if state.quest_log.iter().any(|q| !q.completed) {
             state.quest_log.iter().filter(|q| !q.completed).map(|q| q.name.as_str()).collect::<Vec<_>>().join(", ")
         } else {
