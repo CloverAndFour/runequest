@@ -19,7 +19,8 @@ use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, HistoryMessage};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
-use crate::web::protocol::{ClientMsg, HistoryEntry, ServerMsg};
+use crate::engine::combat::CombatantId;
+use crate::web::protocol::{ActionInfo, ClientMsg, EnemyInfo, HistoryEntry, InitiativeInfo, ServerMsg};
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -442,6 +443,10 @@ async fn handle_client_msg(
             }
         }
 
+        ClientMsg::CombatAction { action_id, target, item_name } => {
+            handle_combat_action(session, xai_client, sender, &action_id, target.as_deref(), item_name.as_deref()).await?;
+        }
+
         ClientMsg::SetModel { model } => {
             let model_str = model.clone();
             if ALLOWED_MODELS.contains(&model_str.as_str()) {
@@ -787,6 +792,36 @@ async fn continue_tool_loop(
                             return Ok(());
                         }
 
+                        Ok(ToolExecResult::CombatStarted) => {
+                            sess.store.save_adventure(&adventure)?;
+
+                            // Send combat started message
+                            let init_order: Vec<InitiativeInfo> = adventure.combat.initiative.iter().map(|e| {
+                                InitiativeInfo {
+                                    name: e.name.clone(),
+                                    roll: e.roll,
+                                    is_player: e.combatant == CombatantId::Player,
+                                }
+                            }).collect();
+
+                            send_msg(sender, &ServerMsg::CombatStarted {
+                                initiative_order: init_order,
+                                round: adventure.combat.round,
+                            }).await;
+
+                            // Tell LLM combat started
+                            let combat_info = format!(
+                                "Combat has begun! Initiative order established. The engine will handle turn order and mechanics. Narrate the start of combat dramatically."
+                            );
+                            sess.messages.push(ChatMessage::tool_result(&tc.id, &combat_info));
+                            sess.adventure = Some(adventure);
+
+                            // Now handle the first turn
+                            drop(sess);
+                            handle_combat_turn_start(session, sender).await?;
+                            return Ok(());
+                        }
+
                         Err(e) => {
                             let err_msg = format!("Error: {}", e);
                             sess.messages.push(ChatMessage::tool_result(&tc.id, &err_msg));
@@ -814,6 +849,334 @@ async fn continue_tool_loop(
         },
     )
     .await;
+
+    Ok(())
+}
+
+/// Send the combat turn start message. Loops through enemy turns until it's the player's turn.
+async fn handle_combat_turn_start(
+    session: &Arc<Mutex<Session>>,
+    sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+) -> anyhow::Result<()> {
+    loop {
+        let mut sess = session.lock().await;
+        let mut adventure = match sess.adventure.take() {
+            Some(a) => a,
+            None => return Ok(()),
+        };
+
+        if !adventure.combat.active {
+            sess.adventure = Some(adventure);
+            return Ok(());
+        }
+
+        let combatant = adventure.combat.current_combatant().cloned();
+        match combatant {
+            Some(CombatantId::Player) => {
+                let has_weapon = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
+                let has_potion = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
+                let actions = adventure.combat.available_actions(&adventure.character, has_weapon, has_potion);
+                let enemies: Vec<EnemyInfo> = adventure.combat.enemies.iter().map(|e| EnemyInfo {
+                    name: e.name.clone(), hp: e.hp, max_hp: e.max_hp, ac: e.ac, alive: e.hp > 0,
+                }).collect();
+
+                send_msg(sender, &ServerMsg::CombatTurnStart {
+                    combatant: adventure.character.name.clone(),
+                    is_player: true,
+                    round: adventure.combat.round,
+                    actions: adventure.combat.action_economy.actions,
+                    bonus_actions: adventure.combat.action_economy.bonus_actions,
+                    movement: adventure.combat.action_economy.movement_remaining,
+                    available_actions: actions.into_iter().map(|a| ActionInfo {
+                        id: a.id, name: a.name, cost: a.cost, description: a.description, enabled: a.enabled,
+                    }).collect(),
+                    enemies,
+                }).await;
+
+                sess.adventure = Some(adventure);
+                return Ok(());
+            }
+            Some(CombatantId::Enemy(idx)) => {
+                let result = adventure.combat.execute_enemy_turn(idx, &mut adventure.character);
+                if let Some(result) = result {
+                    send_msg(sender, &ServerMsg::CombatEnemyTurn {
+                        enemy_name: result.enemy_name,
+                        attack_name: result.attack_name,
+                        attack_roll: result.attack_roll,
+                        target_ac: result.target_ac,
+                        hit: result.hit,
+                        damage: result.damage,
+                        player_hp: result.player_hp_after,
+                        player_max_hp: result.player_max_hp,
+                    }).await;
+
+                    let state = serde_json::to_value(&adventure)?;
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+
+                    if adventure.character.hp <= 0 {
+                        adventure.combat.end();
+                        sess.store.save_adventure(&adventure)?;
+                        sess.adventure = Some(adventure);
+                        send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false }).await;
+                        return Ok(());
+                    }
+                }
+
+                adventure.combat.next_turn();
+                sess.store.save_adventure(&adventure)?;
+                sess.adventure = Some(adventure);
+                drop(sess);
+                // Loop continues to handle next combatant
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // Pause between enemy turns for readability
+            }
+            None => {
+                sess.adventure = Some(adventure);
+                return Ok(());
+            }
+        }
+    }
+}
+
+/// Handle a player combat action.
+async fn handle_combat_action(
+    session: &Arc<Mutex<Session>>,
+    xai_client: &Arc<XaiClient>,
+    sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    action_id: &str,
+    target: Option<&str>,
+    _item_name: Option<&str>,
+) -> anyhow::Result<()> {
+    let mut sess = session.lock().await;
+    let mut adventure = match sess.adventure.take() {
+        Some(a) => a,
+        None => return Ok(()),
+    };
+
+    if !adventure.combat.active || !adventure.combat.is_player_turn() {
+        sess.adventure = Some(adventure);
+        send_msg(sender, &ServerMsg::Error {
+            code: "not_your_turn".to_string(),
+            message: "It's not your turn!".to_string(),
+        }).await;
+        return Ok(());
+    }
+
+    match action_id {
+        "attack" => {
+            if adventure.combat.action_economy.actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_action".to_string(), message: "No actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.actions -= 1;
+
+            let target_name = target.unwrap_or("enemy");
+            // Find weapon
+            let weapon = adventure.inventory.items.iter().find(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
+            let (weapon_name, damage_dice, stat_mod) = if let Some(w) = weapon {
+                let finesse = w.properties.get("finesse").and_then(|v| v.as_bool()).unwrap_or(false);
+                let damage = w.properties.get("damage").and_then(|v| v.as_str()).unwrap_or("1d4");
+                let mod_val = if finesse {
+                    adventure.character.stats.modifier_for("dex").unwrap_or(0)
+                } else {
+                    adventure.character.stats.modifier_for("str").unwrap_or(0)
+                };
+                (w.name.clone(), damage.replace("+STR", "").replace("+DEX", ""), mod_val)
+            } else {
+                ("Unarmed".to_string(), "1d4".to_string(), adventure.character.stats.modifier_for("str").unwrap_or(0))
+            };
+
+            let prof = adventure.character.proficiency_bonus();
+            let attack = DiceRoller::roll("d20", 1, stat_mod + prof);
+
+            let target_ac = adventure.combat.find_enemy_mut(target_name).map(|e| e.ac).unwrap_or(10);
+            let hit = attack.total >= target_ac;
+            let damage = if hit {
+                let d = DiceRoller::roll(&damage_dice, 1, stat_mod);
+                let dmg = std::cmp::max(d.total, 1);
+                if let Some(enemy) = adventure.combat.find_enemy_mut(target_name) {
+                    enemy.hp -= dmg;
+                }
+                dmg
+            } else { 0 };
+
+            let desc = if hit {
+                format!("{} attacks {} with {} (rolled {} vs AC {}): HIT for {} damage!", adventure.character.name, target_name, weapon_name, attack.total, target_ac, damage)
+            } else {
+                format!("{} attacks {} with {} (rolled {} vs AC {}): MISS!", adventure.character.name, target_name, weapon_name, attack.total, target_ac)
+            };
+            adventure.combat.combat_log.push(desc.clone());
+
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(),
+                action: "Attack".to_string(),
+                description: desc,
+                roll: Some(attack.total),
+                hit: Some(hit),
+                damage: if hit { Some(damage) } else { None },
+            }).await;
+
+            // Check if all enemies dead
+            if adventure.combat.all_enemies_dead() {
+                let xp = adventure.combat.enemies.len() as u32 * 50;
+                adventure.combat.end();
+                adventure.character.xp += xp;
+                adventure.character.check_level_up();
+                sess.store.save_adventure(&adventure)?;
+
+                let state = serde_json::to_value(&adventure)?;
+                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: xp, victory: true }).await;
+
+                sess.adventure = Some(adventure);
+                sess.messages.push(ChatMessage::user("Combat is over. All enemies defeated. Narrate the victory and present choices for what to do next."));
+                drop(sess);
+                continue_tool_loop(session, xai_client, sender).await?;
+                return Ok(());
+            }
+
+            let state = serde_json::to_value(&adventure)?;
+            send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+
+            // Send updated actions
+            let has_weapon = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Weapon);
+            let has_potion = adventure.inventory.items.iter().any(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
+            let actions = adventure.combat.available_actions(&adventure.character, has_weapon, has_potion);
+            let enemies: Vec<EnemyInfo> = adventure.combat.enemies.iter().map(|e| EnemyInfo {
+                name: e.name.clone(), hp: e.hp, max_hp: e.max_hp, ac: e.ac, alive: e.hp > 0,
+            }).collect();
+            send_msg(sender, &ServerMsg::CombatTurnStart {
+                combatant: adventure.character.name.clone(),
+                is_player: true,
+                round: adventure.combat.round,
+                actions: adventure.combat.action_economy.actions,
+                bonus_actions: adventure.combat.action_economy.bonus_actions,
+                movement: adventure.combat.action_economy.movement_remaining,
+                available_actions: actions.into_iter().map(|a| ActionInfo {
+                    id: a.id, name: a.name, cost: a.cost, description: a.description, enabled: a.enabled,
+                }).collect(),
+                enemies,
+            }).await;
+        }
+
+        "dodge" => {
+            if adventure.combat.action_economy.actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_action".to_string(), message: "No actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.actions -= 1;
+            adventure.combat.player_dodging = true;
+            let desc = format!("{} takes the Dodge action. Attacks against them have disadvantage.", adventure.character.name);
+            adventure.combat.combat_log.push(desc.clone());
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(), action: "Dodge".to_string(),
+                description: desc, roll: None, hit: None, damage: None,
+            }).await;
+        }
+
+        "dash" => {
+            if adventure.combat.action_economy.actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_action".to_string(), message: "No actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.actions -= 1;
+            adventure.combat.action_economy.movement_remaining += 30;
+            let desc = format!("{} dashes! Movement doubled this turn.", adventure.character.name);
+            adventure.combat.combat_log.push(desc.clone());
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(), action: "Dash".to_string(),
+                description: desc, roll: None, hit: None, damage: None,
+            }).await;
+        }
+
+        "use_item" => {
+            if adventure.combat.action_economy.actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_action".to_string(), message: "No actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            // Find and use a potion
+            let potion_idx = adventure.inventory.items.iter().position(|i| i.item_type == crate::engine::inventory::ItemType::Potion);
+            if let Some(idx) = potion_idx {
+                adventure.combat.action_economy.actions -= 1;
+                let potion = adventure.inventory.items.remove(idx);
+                let healing = DiceRoller::roll("d4", 2, 2);
+                adventure.character.hp = std::cmp::min(adventure.character.hp + healing.total, adventure.character.max_hp);
+                let desc = format!("{} drinks {}! Healed {} HP (now {}/{})", adventure.character.name, potion.name, healing.total, adventure.character.hp, adventure.character.max_hp);
+                adventure.combat.combat_log.push(desc.clone());
+                send_msg(sender, &ServerMsg::CombatActionResult {
+                    actor: adventure.character.name.clone(), action: "Use Item".to_string(),
+                    description: desc, roll: None, hit: None, damage: Some(healing.total),
+                }).await;
+            }
+        }
+
+        "second_wind" => {
+            if adventure.combat.action_economy.bonus_actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_bonus".to_string(), message: "No bonus actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.bonus_actions -= 1;
+            let healing = DiceRoller::roll("d10", 1, adventure.character.level as i32);
+            adventure.character.hp = std::cmp::min(adventure.character.hp + healing.total, adventure.character.max_hp);
+            let desc = format!("{} uses Second Wind! Healed {} HP (now {}/{})", adventure.character.name, healing.total, adventure.character.hp, adventure.character.max_hp);
+            adventure.combat.combat_log.push(desc.clone());
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(), action: "Second Wind".to_string(),
+                description: desc, roll: None, hit: None, damage: None,
+            }).await;
+        }
+
+        "cunning_hide" => {
+            if adventure.combat.action_economy.bonus_actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_bonus".to_string(), message: "No bonus actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.bonus_actions -= 1;
+            let desc = format!("{} hides in the shadows! Next attack has advantage.", adventure.character.name);
+            adventure.combat.combat_log.push(desc.clone());
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(), action: "Hide".to_string(),
+                description: desc, roll: None, hit: None, damage: None,
+            }).await;
+        }
+
+        "healing_word" => {
+            if adventure.combat.action_economy.bonus_actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_bonus".to_string(), message: "No bonus actions remaining".to_string() }).await;
+                return Ok(());
+            }
+            adventure.combat.action_economy.bonus_actions -= 1;
+            let wis_mod = adventure.character.stats.modifier_for("wis").unwrap_or(0);
+            let healing = DiceRoller::roll("d4", 1, wis_mod);
+            adventure.character.hp = std::cmp::min(adventure.character.hp + healing.total, adventure.character.max_hp);
+            let desc = format!("{} casts Healing Word! Healed {} HP (now {}/{})", adventure.character.name, healing.total, adventure.character.hp, adventure.character.max_hp);
+            adventure.combat.combat_log.push(desc.clone());
+            send_msg(sender, &ServerMsg::CombatActionResult {
+                actor: adventure.character.name.clone(), action: "Healing Word".to_string(),
+                description: desc, roll: None, hit: None, damage: None,
+            }).await;
+        }
+
+        "end_turn" => {
+            adventure.combat.next_turn();
+            sess.store.save_adventure(&adventure)?;
+            sess.adventure = Some(adventure);
+            drop(sess);
+            return handle_combat_turn_start(session, sender).await;
+        }
+
+        _ => {
+            send_msg(sender, &ServerMsg::Error {
+                code: "unknown_action".to_string(),
+                message: format!("Unknown combat action: {}", action_id),
+            }).await;
+        }
+    }
+
+    // Save state after action
+    if action_id != "end_turn" {
+        sess.store.save_adventure(&adventure)?;
+    }
+    sess.adventure = Some(adventure);
 
     Ok(())
 }

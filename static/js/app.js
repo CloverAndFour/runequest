@@ -4,6 +4,7 @@ import { getToken, getMe, getWsUrl, clearToken } from './api.js';
 import { WebSocketManager } from './ws.js';
 import { renderSelectScreen, renderCreateScreen } from './select.js';
 import { renderAdventure } from './adventure.js';
+import { renderCombatStarted, renderCombatTurnStart, renderCombatActionResult, renderEnemyTurn, renderCombatEnded } from './combat.js';
 
 const app = document.getElementById('app');
 let ws = null;
@@ -88,6 +89,23 @@ function handleServerMsg(msg) {
             break;
         case 'model_info':
             currentModel = msg.model;
+            break;
+        case 'combat_started':
+            renderCombatStarted(app, msg);
+            break;
+        case 'combat_turn_start':
+            renderCombatTurnStart(app, msg, (actionId, target) => {
+                ws.send({ type: 'combat_action', action_id: actionId, target: target || null });
+            });
+            break;
+        case 'combat_action_result':
+            renderCombatActionResult(app, msg);
+            break;
+        case 'combat_enemy_turn':
+            renderEnemyTurn(app, msg);
+            break;
+        case 'combat_ended':
+            renderCombatEnded(app, msg);
             break;
         case 'error':
             showToast(msg.message, true);

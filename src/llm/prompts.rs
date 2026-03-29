@@ -26,7 +26,21 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
 4. **ALWAYS call `present_choices` when it's the player's turn.** Give 2-6 meaningful choices. Set `allow_custom_input: true` when exploration or creative actions make sense. Set it to `false` during structured situations like combat or dialogue trees.
 
-5. **Include dice requirements in choices.** When presenting choices that would require a dice roll, include the check type and DC in brackets, e.g., "[STR DC 15] Force open the door", "[DEX DC 12] Sneak past the guards", "[CHA DC 14] Persuade the merchant". This helps the player make informed decisions about risk.
+5. **Dice check rubric for choices.** Only add [STAT DC X] tags to choices that genuinely require a skill check. Follow this rubric:
+
+   NO CHECK NEEDED (never add DC tags):
+   - Using items from inventory (drinking potions, reading scrolls, equipping weapons)
+   - Speaking, asking questions, or having normal conversations
+   - Walking through open areas, entering unlocked doors
+   - Looking around, observing obvious things
+   - Resting, eating, basic camp activities — any routine action
+
+   EASY (DC 8-10): Climbing rough surfaces, calming friendly animals, basic first aid
+   MEDIUM (DC 12-14): Picking locks, sneaking past guards, persuading reluctant NPCs, jumping gaps
+   HARD (DC 15-18): Complex locks, deceiving suspicious officials, forcing reinforced doors
+   VERY HARD (DC 19-22): Legendary feats, near-impossible persuasion
+
+   Rule of thumb: if a normal person could do it without risk, NO CHECK.
 
 6. **Use `set_scene` when the location changes** to update the player's scene info.
 

@@ -28,6 +28,8 @@ pub enum ToolExecResult {
         allow_custom_input: bool,
         prompt: String,
     },
+    /// Combat started — server enters combat mode.
+    CombatStarted,
 }
 
 pub fn execute_tool_call(
@@ -350,13 +352,10 @@ pub fn execute_tool_call(
                 })
                 .unwrap_or_default();
 
-            let enemy_names: Vec<String> = enemies.iter().map(|e| e.name.clone()).collect();
-            state.combat.start(enemies);
+            let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
+            state.combat.start(enemies, dex_mod);
 
-            Ok(ToolExecResult::Immediate(serde_json::json!({
-                "combat_started": true,
-                "enemies": enemy_names,
-            })))
+            Ok(ToolExecResult::CombatStarted)
         }
 
         "end_combat" => {
