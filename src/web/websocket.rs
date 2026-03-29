@@ -204,7 +204,7 @@ async fn handle_client_msg(
                 charisma: stats.charisma,
             };
 
-            let adventure = AdventureState::new(name, character_name, race, class, stats);
+            let adventure = AdventureState::new(name, character_name, race, class, stats, &scenario);
             let adventure_id = adventure.id.clone();
             let state_json = serde_json::to_value(&adventure)?;
 

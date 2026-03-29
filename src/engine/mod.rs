@@ -8,6 +8,7 @@ pub mod dungeon;
 pub mod equipment;
 pub mod executor;
 pub mod inventory;
+pub mod world;
 
 pub use adventure::AdventureState;
 pub use character::{Character, Class, Race, Stats};
@@ -17,3 +18,4 @@ pub use dungeon::{Dungeon, generate_dungeon};
 pub use equipment::{Equipment, EquipSlot, Rarity};
 pub use executor::execute_tool_call;
 pub use inventory::{Inventory, Item, ItemType};
+pub use world::WorldMap;

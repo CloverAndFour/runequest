@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 use super::abilities::{starting_abilities, Ability, SpellSlots};
 use super::character::{Character, Class, Race, Stats};
 use super::combat::CombatState;
-use super::dungeon::{self, Dungeon};
+use super::dungeon::Dungeon;
 use super::equipment::{get_item, Equipment};
 use super::inventory::Inventory;
+use super::world::{self, WorldMap};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scene {
@@ -38,6 +39,8 @@ pub struct AdventureState {
     pub quest_log: Vec<Quest>,
     #[serde(default)]
     pub dungeon: Option<Dungeon>,
+    #[serde(default)]
+    pub world: Option<WorldMap>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -49,6 +52,7 @@ impl AdventureState {
         race: Race,
         class: Class,
         stats: Stats,
+        scenario: &Option<String>,
     ) -> Self {
         let abilities = starting_abilities(&class);
         let spell_slots = SpellSlots::for_class(&class, 1);
@@ -132,19 +136,12 @@ impl AdventureState {
         // Also set it on inventory for display convenience
         inventory.gold = character.gold;
 
-        // Generate a dungeon for this adventure
-        let dungeon_seed: u64 = rand::random();
-        let dng = dungeon::generate_dungeon(dungeon_seed);
-        let scene = if let Some(room) = dng.current_room() {
-            Scene {
-                location: format!("{} — {}", dng.name, room.name),
-                description: room.description.clone(),
-            }
-        } else {
-            Scene {
-                location: dng.name.clone(),
-                description: "Your adventure is about to begin...".to_string(),
-            }
+        // Create the world map based on scenario
+        let world_map = world::create_world(scenario);
+        let start_loc = &world_map.locations[world_map.current_location];
+        let scene = Scene {
+            location: start_loc.name.clone(),
+            description: start_loc.description.clone(),
         };
 
         Self {
@@ -158,7 +155,8 @@ impl AdventureState {
             combat: CombatState::new(),
             current_scene: scene,
             quest_log: Vec::new(),
-            dungeon: Some(dng),
+            dungeon: None,
+            world: Some(world_map),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

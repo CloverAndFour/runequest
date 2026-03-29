@@ -266,9 +266,17 @@ function renderInventory(el, state) {
 }
 
 function renderMap(el, state) {
+    // Show world map if available and not in a dungeon
+    const world = state.world;
     const dungeon = state.dungeon;
+
+    if (world && !dungeon) {
+        renderWorldMap(el, world);
+        return;
+    }
+
     if (!dungeon) {
-        el.innerHTML = '<div class="empty-state">No dungeon in this adventure.</div>';
+        el.innerHTML = '<div class="empty-state">No map available.</div>';
         return;
     }
 
@@ -351,6 +359,59 @@ function renderMap(el, state) {
         <span><span class="legend-swatch combat"></span>Enemies</span>
         <span><span class="legend-swatch stairs"></span>Stairs</span>
         <span><span class="legend-swatch treasure"></span>Treasure</span>
+    </div>`;
+
+    el.innerHTML = html;
+}
+
+function renderWorldMap(el, world) {
+    const currentLoc = world.locations[world.current_location];
+
+    let html = `<div class="map-header">
+        <div class="dungeon-name">${escapeHtml(world.name)}</div>
+    </div>`;
+
+    // Current location
+    html += `<div class="current-room-info">
+        <span class="room-label">${escapeHtml(currentLoc.name)}</span>
+        <span class="room-type-badge">${currentLoc.location_type}</span>
+    </div>`;
+
+    // World map as positioned nodes
+    html += '<div class="world-map-container">';
+
+    // Draw connections first (as lines)
+    html += '<svg class="world-map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">';
+    world.connections.forEach(conn => {
+        if (!conn.discovered) return;
+        const from = world.locations[conn.from];
+        const to = world.locations[conn.to];
+        const dangerColor = conn.danger_level === 0 ? '#2a5a2a' : conn.danger_level === 1 ? '#5a5a2a' : conn.danger_level === 2 ? '#5a3a1a' : '#5a1a1a';
+        html += `<line x1="${from.x*100}" y1="${from.y*100}" x2="${to.x*100}" y2="${to.y*100}" stroke="${dangerColor}" stroke-width="0.4" opacity="0.6"/>`;
+    });
+    html += '</svg>';
+
+    // Draw location nodes
+    world.locations.forEach((loc, i) => {
+        if (!loc.discovered) return;
+        const isCurrent = i === world.current_location;
+        const typeClass = loc.location_type.toLowerCase ? loc.location_type.toLowerCase() : loc.location_type;
+        const icon = {town:'\u{1F3E0}', dungeon:'\u{1F480}', wilderness:'\u{1F332}', landmark:'\u2728', camp:'\u{26FA}', tower:'\u{1F3F0}'}[typeClass] || '\u25CF';
+        html += `<div class="world-node ${typeClass}${isCurrent ? ' current' : ''}" style="left:${loc.x*100}%;top:${loc.y*100}%" title="${escapeAttr(loc.description)}">
+            <span class="node-icon">${icon}</span>
+            <span class="node-label">${escapeHtml(loc.name)}</span>
+        </div>`;
+    });
+
+    html += '</div>';
+
+    // Legend
+    html += `<div class="map-legend" style="margin-top:4px;">
+        <span>\u{1F3E0} Town</span>
+        <span>\u{1F480} Dungeon</span>
+        <span>\u{1F332} Wild</span>
+        <span>\u{1F3F0} Tower</span>
+        <span>\u26FA Camp</span>
     </div>`;
 
     el.innerHTML = html;

@@ -932,6 +932,55 @@
 .legend-swatch.stairs { background: #1a3a5a; }
 .legend-swatch.treasure { background: #4a3a1a; }
 
+/* ===== WORLD MAP ===== */
+
+.world-map-container {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    background: #0a0804;
+    border: 1px solid var(--border-dark);
+    overflow: hidden;
+}
+
+.world-map-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.world-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-size: 8px;
+    z-index: 1;
+}
+
+.world-node .node-icon {
+    display: block;
+    font-size: 14px;
+}
+
+.world-node .node-label {
+    display: block;
+    color: var(--text-muted);
+    white-space: nowrap;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.world-node.current .node-label {
+    color: var(--text-gold);
+    font-weight: bold;
+}
+
+.world-node.current .node-icon {
+    filter: drop-shadow(0 0 4px rgba(200, 168, 78, 0.6));
+}
+
 /* ===== EQUIPMENT ===== */
 
 .equip-slots {

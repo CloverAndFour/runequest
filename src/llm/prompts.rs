@@ -115,7 +115,11 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         } else {
             "None".to_string()
         },
-        dungeon_section = build_dungeon_section(state),
+        dungeon_section = if state.world.is_some() {
+            build_world_section(state)
+        } else {
+            build_dungeon_section(state)
+        },
     )
 }
 
@@ -169,6 +173,89 @@ DUNGEON RULES:
         exits_list,
         cleared,
         searched,
+    )
+}
+
+fn build_world_section(state: &AdventureState) -> String {
+    let world = match &state.world {
+        Some(w) => w,
+        None => return String::new(),
+    };
+
+    use crate::engine::world::GameMode;
+
+    let loc = world.current_loc();
+    let mode_str = match &world.game_mode {
+        GameMode::WorldMap => "World Map (exploring)".to_string(),
+        GameMode::InTown { location_id } => {
+            format!("In Town: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
+        }
+        GameMode::InDungeon { location_id } => {
+            format!("In Dungeon at: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
+        }
+        GameMode::InTower { floor } => format!("In The Endless Tower, Floor {}", floor),
+        GameMode::Exploring { location_id } => {
+            format!("Exploring: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
+        }
+    };
+
+    // List reachable destinations
+    let destinations = world.reachable_locations();
+    let dest_list = if destinations.is_empty() {
+        "None (isolated location)".to_string()
+    } else {
+        destinations
+            .iter()
+            .map(|(name, path)| format!("  - {} via {}", name, path))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    // Shop info if in a town
+    let shop_section = match &world.game_mode {
+        GameMode::InTown { location_id } => {
+            let info = world.format_shop_info(*location_id);
+            if info.contains(":") { format!("\nSHOP:\n{}\n", info) } else { String::new() }
+        }
+        _ => String::new(),
+    };
+
+    // Dungeon section if in a dungeon or tower
+    let dungeon_context = match &world.game_mode {
+        GameMode::InDungeon { .. } | GameMode::InTower { .. } => {
+            build_dungeon_section(state)
+        }
+        _ => String::new(),
+    };
+
+    format!(
+        r#"## WORLD MAP STATE
+World: {}
+Current Location: {} ({})
+Description: {}
+Game Mode: {}
+
+Available Destinations:
+{}
+{}{}
+WORLD MAP RULES:
+- The player explores an open world with towns, dungeons, wilderness areas, and landmarks.
+- Use `travel_to` to move between connected locations. Travel may trigger random encounters.
+- In towns, players can visit shops (`view_shop`, `buy_item`, `sell_item`) and rest.
+- At dungeon locations, use `enter_dungeon` to explore. Use `exit_dungeon` to leave.
+- At The Endless Tower, use `enter_tower` to begin the infinite dungeon climb. Use `tower_ascend` to go up floors. Use `exit_tower` to leave.
+- When in a dungeon/tower, use `move_to_room` and `search_room` as normal for dungeon navigation.
+- Always present travel destinations as choices when the player is on the world map.
+- Describe locations atmospherically based on their type and description.
+- Warn players about danger levels when presenting travel options."#,
+        world.name,
+        loc.name,
+        format!("{:?}", loc.location_type),
+        loc.description,
+        mode_str,
+        dest_list,
+        shop_section,
+        dungeon_context,
     )
 }
 

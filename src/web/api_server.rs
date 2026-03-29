@@ -897,7 +897,7 @@ async fn create_adventure(
         charisma: req.stats.charisma,
     };
 
-    let adventure = AdventureState::new(req.name, req.character_name, race, class, stats);
+    let adventure = AdventureState::new(req.name, req.character_name, race, class, stats, &req.scenario);
     let store = make_store(&state, &user.username);
 
     if let Err(e) = store.create_adventure(adventure.clone()) {

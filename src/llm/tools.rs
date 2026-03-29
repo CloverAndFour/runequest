@@ -212,6 +212,54 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["condition"]
         })),
+        // -------------------------------------------------------------------
+        // World map tools
+        // -------------------------------------------------------------------
+        tool("travel_to", "Travel to a connected location on the world map. The player can only travel to locations connected to their current position. May trigger random encounters on dangerous paths.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "Location name (e.g. 'Thornwall Village') or numeric ID"}
+            },
+            "required": ["location"]
+        })),
+        tool("enter_dungeon", "Enter the dungeon at the player's current location. The location must be a Dungeon type. This generates the dungeon layout if it hasn't been visited before.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("exit_dungeon", "Exit the current dungeon and return to the world map at the dungeon's location.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("enter_tower", "Enter The Endless Tower. The player must be at The Endless Tower location. Each floor is a procedurally generated dungeon that gets harder as you ascend.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("tower_ascend", "Ascend to the next floor of The Endless Tower. Generates a new, harder dungeon floor.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("exit_tower", "Exit The Endless Tower and return to the world map. Progress is saved — the player can return later.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("view_shop", "View the shop inventory at the current town. Shows all available items, prices, and stock.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("buy_item", "Buy an item from the shop at the current town. Requires sufficient gold.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "string", "description": "Item ID to purchase (e.g. 'health_potion', 'longsword')"}
+            },
+            "required": ["item_id"]
+        })),
+        tool("sell_item", "Sell an item from inventory at the current town. Items sell for half their base value.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "item_name": {"type": "string", "description": "Name of the item in inventory to sell"}
+            },
+            "required": ["item_name"]
+        })),
     ]
 }
 

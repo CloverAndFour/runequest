@@ -866,6 +866,344 @@ pub fn execute_tool_call(
             })))
         }
 
+        // -----------------------------------------------------------------------
+        // World map tools
+        // -----------------------------------------------------------------------
+
+        "travel_to" => {
+            let location_str = args["location"].as_str().unwrap_or("");
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            let location_id = match world.find_location(location_str) {
+                Some(id) => id,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": format!("Location '{}' not found. Use view_map or check available destinations.", location_str),
+                    })));
+                }
+            };
+
+            match world.travel_to(location_id) {
+                Ok(result) => {
+                    state.current_scene.location = result.location_name.clone();
+                    state.current_scene.description = result.description.clone();
+
+                    if let Some(ref encounter) = result.encounter {
+                        if !encounter.enemies.is_empty() {
+                            let enemies: Vec<Enemy> = encounter.enemies.iter().map(|t| t.to_enemy()).collect();
+                            let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
+                            state.combat.start(enemies, dex_mod);
+
+                            return Ok(ToolExecResult::CombatStarted);
+                        }
+                    }
+
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "arrived": result.location_name,
+                        "location_type": result.location_type,
+                        "description": result.description,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": e,
+                }))),
+            }
+        }
+
+        "enter_dungeon" => {
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            let current_loc = world.current_location;
+            match world.enter_dungeon(current_loc) {
+                Ok(()) => {
+                    // Copy the dungeon reference into adventure.dungeon for the
+                    // existing dungeon navigation tools (move_to_room, search_room)
+                    let dng = world.current_dungeon().unwrap().clone();
+                    let loc_name = world.locations[current_loc].name.clone();
+
+                    let room_info = if let Some(room) = dng.current_room() {
+                        state.current_scene.location = format!("{} — {}", loc_name, room.name);
+                        state.current_scene.description = room.description.clone();
+                        serde_json::json!({
+                            "room": room.name,
+                            "description": room.description,
+                            "exits": room.exits.iter().map(|e| e.direction.clone()).collect::<Vec<_>>(),
+                        })
+                    } else {
+                        serde_json::json!({"room": "entrance"})
+                    };
+
+                    state.dungeon = Some(dng);
+
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "entered_dungeon": loc_name,
+                        "dungeon_name": state.dungeon.as_ref().unwrap().name,
+                        "current_room": room_info,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": e,
+                }))),
+            }
+        }
+
+        "exit_dungeon" => {
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            // Sync dungeon state back to world before exiting
+            if let super::world::GameMode::InDungeon { location_id } = world.game_mode {
+                if let Some(ref dng) = state.dungeon {
+                    world.dungeons.insert(location_id, dng.clone());
+                }
+            }
+
+            world.exit_dungeon();
+            state.dungeon = None;
+            let loc = world.current_loc();
+            state.current_scene.location = loc.name.clone();
+            state.current_scene.description = loc.description.clone();
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "exited_dungeon": true,
+                "location": loc.name,
+                "description": loc.description,
+            })))
+        }
+
+        "enter_tower" => {
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            match world.enter_tower() {
+                Ok(floor) => {
+                    let key = world.tower_dungeon_key().unwrap();
+                    let dng = world.dungeons.get(&key).unwrap().clone();
+
+                    let room_info = if let Some(room) = dng.current_room() {
+                        state.current_scene.location = format!("The Endless Tower — Floor {} — {}", floor, room.name);
+                        state.current_scene.description = room.description.clone();
+                        serde_json::json!({
+                            "room": room.name,
+                            "description": room.description,
+                            "exits": room.exits.iter().map(|e| e.direction.clone()).collect::<Vec<_>>(),
+                        })
+                    } else {
+                        serde_json::json!({"room": "entrance"})
+                    };
+
+                    state.dungeon = Some(dng);
+
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "entered_tower": true,
+                        "floor": floor,
+                        "current_room": room_info,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": e,
+                }))),
+            }
+        }
+
+        "tower_ascend" => {
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            // Sync current dungeon state back
+            if let Some(key) = world.tower_dungeon_key() {
+                if let Some(ref dng) = state.dungeon {
+                    world.dungeons.insert(key, dng.clone());
+                }
+            }
+
+            match world.tower_ascend() {
+                Ok(new_floor) => {
+                    let key = world.tower_dungeon_key().unwrap();
+                    let dng = world.dungeons.get(&key).unwrap().clone();
+
+                    let room_info = if let Some(room) = dng.current_room() {
+                        state.current_scene.location = format!("The Endless Tower — Floor {} — {}", new_floor, room.name);
+                        state.current_scene.description = room.description.clone();
+                        serde_json::json!({
+                            "room": room.name,
+                            "description": room.description,
+                            "exits": room.exits.iter().map(|e| e.direction.clone()).collect::<Vec<_>>(),
+                        })
+                    } else {
+                        serde_json::json!({"room": "entrance"})
+                    };
+
+                    state.dungeon = Some(dng);
+
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "ascended": true,
+                        "new_floor": new_floor,
+                        "current_room": room_info,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": e,
+                }))),
+            }
+        }
+
+        "exit_tower" => {
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            world.exit_tower();
+            state.dungeon = None;
+            let loc = world.current_loc();
+            state.current_scene.location = loc.name.clone();
+            state.current_scene.description = loc.description.clone();
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "exited_tower": true,
+                "location": loc.name,
+                "description": loc.description,
+            })))
+        }
+
+        "buy_item" => {
+            let item_id = args["item_id"].as_str().unwrap_or("");
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            let location_id = world.current_location;
+            match world.buy_item(
+                location_id,
+                item_id,
+                &mut state.character.gold,
+                &mut state.inventory,
+            ) {
+                Ok(msg) => {
+                    state.inventory.gold = state.character.gold;
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": true,
+                        "message": msg,
+                        "gold_remaining": state.character.gold,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "error": e,
+                }))),
+            }
+        }
+
+        "sell_item" => {
+            let item_name = args["item_name"].as_str().unwrap_or("");
+            let world = match &mut state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            match world.sell_item(
+                item_name,
+                &mut state.character.gold,
+                &mut state.inventory,
+            ) {
+                Ok(msg) => {
+                    state.inventory.gold = state.character.gold;
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": true,
+                        "message": msg,
+                        "gold_remaining": state.character.gold,
+                    })))
+                }
+                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "error": e,
+                }))),
+            }
+        }
+
+        "view_shop" => {
+            let world = match &state.world {
+                Some(w) => w,
+                None => {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No world map exists in this adventure."
+                    })));
+                }
+            };
+
+            let location_id = world.current_location;
+            let info = world.format_shop_info(location_id);
+            let shop = world.get_shop(location_id);
+            match shop {
+                Some(shop) => {
+                    let items: Vec<serde_json::Value> = shop.items.iter().filter_map(|si| {
+                        let item = super::equipment::get_item(&si.item_id)?;
+                        let price = (item.value_gp as f32 * si.price_multiplier).ceil() as u32;
+                        Some(serde_json::json!({
+                            "item_id": si.item_id,
+                            "name": item.name,
+                            "price": std::cmp::max(price, 1),
+                            "stock": si.stock,
+                        }))
+                    }).collect();
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "shop_name": shop.name,
+                        "location": world.locations[location_id].name,
+                        "items": items,
+                        "player_gold": state.character.gold,
+                        "display": info,
+                    })))
+                }
+                None => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": "No shop at this location.",
+                }))),
+            }
+        }
+
         _ => Err(RunequestError::InvalidToolCall(format!(
             "Unknown tool: {}",
             tool_name
