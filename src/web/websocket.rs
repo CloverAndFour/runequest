@@ -246,11 +246,32 @@ async fn handle_client_msg(
             let display_events = if display_events.is_empty() {
                 history
                     .iter()
-                    .filter(|h| h.role == "assistant" && h.content.is_some() && h.tool_calls.is_none())
-                    .map(|h| DisplayEvent {
-                        event_type: "narrative".to_string(),
-                        data: serde_json::json!({"text": h.content.as_deref().unwrap_or("")}),
-                        timestamp: h.timestamp,
+                    .filter_map(|h| {
+                        // Include: assistant messages with content (narrative text)
+                        if h.role == "assistant" {
+                            if let Some(ref content) = h.content {
+                                if !content.is_empty() {
+                                    return Some(DisplayEvent {
+                                        event_type: "narrative".to_string(),
+                                        data: serde_json::json!({"text": content}),
+                                        timestamp: h.timestamp,
+                                    });
+                                }
+                            }
+                        }
+                        // Include: tool results that look like player choices
+                        if h.role == "tool" {
+                            if let Some(ref content) = h.content {
+                                if content.starts_with("Player chose:") {
+                                    return Some(DisplayEvent {
+                                        event_type: "choice_selected".to_string(),
+                                        data: serde_json::json!({"text": content.trim_start_matches("Player chose: ")}),
+                                        timestamp: h.timestamp,
+                                    });
+                                }
+                            }
+                        }
+                        None
                     })
                     .collect::<Vec<_>>()
             } else {
