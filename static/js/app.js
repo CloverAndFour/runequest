@@ -796,7 +796,15 @@ function showGatherResult(msg) {
     div.className = 'narrative-block gather-result';
     div.innerHTML = '<p>\u{1FAB5} <strong>Gathering in ' + escapeHtml(biome) + ':</strong> You found ' + escapeHtml(items) + '.</p>' +
         '<p style="font-size:12px;color:var(--text-muted)">+' + xp + ' Survival XP</p>';
-    storyContent.appendChild(div);
+    // Insert before choice sections so they stay at the bottom
+    var choicesAnchor = storyContent.querySelector('.fixed-choices-section') ||
+                        storyContent.querySelector('.choices-separator') ||
+                        storyContent.querySelector('.llm-choices-section');
+    if (choicesAnchor) {
+        storyContent.insertBefore(div, choicesAnchor);
+    } else {
+        storyContent.appendChild(div);
+    }
     storyContent.scrollTop = storyContent.scrollHeight;
     renderFixedActions();
 }
