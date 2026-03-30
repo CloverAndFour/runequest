@@ -19,8 +19,8 @@
     --hp-yellow: #ccaa00;
     --hp-red: #cc2222;
     --xp-blue: #4488cc;
-    --font-medieval: 'MedievalSharp', cursive;
-    --font-body: 'Cinzel', Georgia, serif;
+    --font-medieval: 'IM Fell English', Georgia, serif;
+    --font-body: 'IM Fell English', Georgia, serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
