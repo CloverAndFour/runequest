@@ -17,7 +17,8 @@ use crate::auth::middleware::{require_auth, AuthMode, AuthState, AuthUser};
 use crate::auth::{JwtManager, UserStore};
 use crate::engine::adventure::AdventureState;
 use crate::engine::character::{Class, Race, Stats};
-use crate::engine::combat::{CombatantId, Enemy, EnemyAttack};
+use crate::engine::combat::{CombatantId, Enemy, EnemyAttack, EnemyType};
+use crate::engine::monsters::{generate_monster, generate_random_monster};
 use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::equipment;
@@ -248,7 +249,15 @@ struct SkillRequest {
 
 #[derive(Deserialize)]
 struct StartCombatRequest {
+    /// Legacy: full enemy stat blocks (still accepted for backward compat)
+    #[serde(default)]
     enemies: Vec<EnemyInput>,
+    /// Engine-controlled: enemy type (brute/skulker/mystic/undead/random)
+    #[serde(default)]
+    enemy_type: Option<String>,
+    /// Engine-controlled: number of enemies (1-6)
+    #[serde(default)]
+    count: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -1948,29 +1957,50 @@ async fn engine_combat(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
-    let enemies: Vec<Enemy> = req
-        .enemies
-        .into_iter()
-        .map(|e| Enemy {
-            name: e.name,
-            hp: e.hp,
-            max_hp: e.hp,
-            ac: e.ac,
-            attacks: e
-                .attacks
-                .into_iter()
-                .map(|a| EnemyAttack {
-                    name: a.name,
-                    damage_dice: a.damage_dice,
-                    damage_modifier: a.damage_modifier,
-                    to_hit_bonus: a.to_hit_bonus,
-                })
-                .collect(),
-        
-            enemy_type: None,
-            tier: None,
-        })
-        .collect();
+    // Engine-controlled enemy generation: get tier from world position or dungeon
+    let tier = if let Some(ref dungeon) = adventure.dungeon {
+        dungeon.tier
+    } else {
+        crate::engine::world_map::current_county(&adventure.world_position)
+            .map(|c| c.tier.round() as u32)
+            .unwrap_or(0)
+    };
+
+    let enemies: Vec<Enemy> = if req.enemy_type.is_some() || req.enemies.is_empty() {
+        // Engine-controlled path: generate balanced enemies from tier
+        let count = req.count.unwrap_or(1).clamp(1, 6) as usize;
+        let enemy_type_str = req.enemy_type.as_deref().unwrap_or("random");
+        (0..count).map(|_| {
+            match enemy_type_str.to_lowercase().as_str() {
+                "brute" => generate_monster(tier, EnemyType::Brute),
+                "skulker" => generate_monster(tier, EnemyType::Skulker),
+                "mystic" => generate_monster(tier, EnemyType::Mystic),
+                "undead" => generate_monster(tier, EnemyType::Undead),
+                _ => generate_random_monster(tier),
+            }
+        }).collect()
+    } else {
+        // Legacy path: accept stat blocks (for backward compat / testing)
+        req.enemies.into_iter().map(|e| {
+            let attacks: Vec<EnemyAttack> = if e.attacks.is_empty() {
+                vec![EnemyAttack {
+                    name: "Strike".to_string(),
+                    damage_dice: "1d6".to_string(),
+                    damage_modifier: (e.hp / 10).max(0),
+                    to_hit_bonus: (e.ac - 10).max(2),
+                }]
+            } else {
+                e.attacks.into_iter().map(|a| EnemyAttack {
+                    name: a.name, damage_dice: a.damage_dice,
+                    damage_modifier: a.damage_modifier, to_hit_bonus: a.to_hit_bonus,
+                }).collect()
+            };
+            Enemy {
+                name: e.name, hp: e.hp, max_hp: e.hp, ac: e.ac, attacks,
+                enemy_type: None, tier: Some(tier as u8),
+            }
+        }).collect()
+    };
 
     let dex_mod = adventure
         .character

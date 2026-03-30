@@ -3,7 +3,8 @@
 use serde_json::Value;
 
 use super::adventure::AdventureState;
-use super::combat::{Enemy, EnemyAttack};
+use super::combat::{Enemy, EnemyAttack, EnemyType};
+use super::monsters::{generate_monster, generate_random_monster};
 use super::crafting::{CRAFTING_GRAPH, material_to_item, equipment_to_item};
 use super::dice::DiceRoller;
 use super::equipment::{get_item, EquipSlot};
@@ -474,69 +475,36 @@ pub fn execute_tool_call_with_shop(
         }
 
         "start_combat" => {
-            let enemies: Vec<Enemy> = args
-                .get("enemies")
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| {
-                            let name = v["name"].as_str()?.to_string();
-                            let hp = v["hp"].as_i64()? as i32;
-                            let ac = v["ac"].as_i64().unwrap_or(10) as i32;
-                            let attacks: Vec<EnemyAttack> = v
-                                .get("attacks")
-                                .and_then(|a| a.as_array())
-                                .map(|attacks| {
-                                    attacks
-                                        .iter()
-                                        .filter_map(|a| {
-                                            Some(EnemyAttack {
-                                                name: a["name"].as_str()?.to_string(),
-                                                damage_dice: a["damage_dice"]
-                                                    .as_str()
-                                                    .unwrap_or("1d6")
-                                                    .to_string(),
-                                                damage_modifier: a["damage_modifier"]
-                                                    .as_i64()
-                                                    .unwrap_or(0)
-                                                    as i32,
-                                                to_hit_bonus: a["to_hit_bonus"]
-                                                    .as_i64()
-                                                    .unwrap_or(3)
-                                                    as i32,
-                                            })
-                                        })
-                                        .collect()
-                                })
-                                .unwrap_or_default();
-                            // Ensure every enemy has at least one attack so they can fight back.
-                            // The LLM may omit the attacks array; without this fallback the enemy
-                            // turn is silently skipped and the player never takes damage.
-                            let attacks = if attacks.is_empty() {
-                                vec![EnemyAttack {
-                                    name: "Strike".to_string(),
-                                    damage_dice: "1d6".to_string(),
-                                    damage_modifier: (hp / 10).max(0),
-                                    to_hit_bonus: (ac - 10).max(2),
-                                }]
-                            } else {
-                                attacks
-                            };
-                            Some(Enemy {
-                                name,
-                                hp,
-                                max_hp: hp,
-                                ac,
-                                attacks,
-                            
-                    enemy_type: None,
-                    tier: None,
-                            })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
+            // Engine-controlled enemy generation: LLM provides flavor, engine determines stats.
+            // Get tier from current county (world position) or dungeon tier.
+            let tier = if let Some(ref dungeon) = state.dungeon {
+                dungeon.tier
+            } else {
+                world_map::current_county(&state.world_position)
+                    .map(|c| c.tier.round() as u32)
+                    .unwrap_or(0)
+            };
 
+            let count = args.get("count")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1)
+                .clamp(1, 6) as usize;
+
+            let enemy_type_str = args.get("enemy_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("random");
+
+            let enemies: Vec<Enemy> = (0..count).map(|_| {
+                match enemy_type_str.to_lowercase().as_str() {
+                    "brute" => generate_monster(tier, EnemyType::Brute),
+                    "skulker" => generate_monster(tier, EnemyType::Skulker),
+                    "mystic" => generate_monster(tier, EnemyType::Mystic),
+                    "undead" => generate_monster(tier, EnemyType::Undead),
+                    _ => generate_random_monster(tier),
+                }
+            }).collect();
+
+            let enemy_names: Vec<String> = enemies.iter().map(|e| e.name.clone()).collect();
             let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
             state.combat.start(enemies, dex_mod);
 

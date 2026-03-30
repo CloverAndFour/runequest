@@ -127,29 +127,12 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["location", "description"]
         })),
-        tool("start_combat", "Start a combat encounter with enemies.", serde_json::json!({
+        tool("start_combat", "Start a combat encounter. The ENGINE generates tier-appropriate enemies — do NOT specify hp, ac, or attacks. Just say what type and how many.", serde_json::json!({
             "type": "object",
             "properties": {
-                "enemies": {"type": "array", "items": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string"},
-                        "hp": {"type": "integer"},
-                        "ac": {"type": "integer"},
-                        "attacks": {"type": "array", "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "damage_dice": {"type": "string"},
-                                "damage_modifier": {"type": "integer"},
-                                "to_hit_bonus": {"type": "integer"}
-                            }
-                        }}
-                    },
-                    "required": ["name", "hp"]
-                }}
-            },
-            "required": ["enemies"]
+                "enemy_type": {"type": "string", "enum": ["brute", "skulker", "mystic", "undead", "random"], "description": "Type of enemy. brute=tanky melee, skulker=evasive striker, mystic=magic user, undead=undead, random=engine picks."},
+                "count": {"type": "integer", "description": "Number of enemies (1-6). Default 1.", "minimum": 1, "maximum": 6}
+            }
         })),
         tool("end_combat", "End the current combat encounter.", serde_json::json!({
             "type": "object",
