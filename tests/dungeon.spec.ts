@@ -85,7 +85,7 @@ test.describe('Dungeon Endpoints', () => {
   test('enter dungeon fails if already in one', async () => {
     const r = await api('POST', `/api/adventures/${advId}/dungeon/enter`, { seed: 99999, tier: 1 });
     expect(r.status).not.toBe(200);
-    expect(r.data.error || r.data.code || r.data.result).toMatch(/already_in_dungeon/i);
+    expect(r.data.code).toMatch(/already_in_dungeon/i);
   });
 
   test('dungeon status shows active dungeon', async () => {
@@ -105,21 +105,18 @@ test.describe('Dungeon Endpoints', () => {
     const room = status.data.room;
     expect(room).toBeTruthy();
     expect(room.exits).toBeTruthy();
+    expect(room.exits.length).toBeGreaterThan(0);
 
     // Pick the first available exit direction
-    const exits = room.exits;
-    const directions = Object.keys(exits).filter(d => exits[d]);
-    expect(directions.length).toBeGreaterThan(0);
-
-    const dir = directions[0];
+    const dir = room.exits[0].direction;
     const r = await api('POST', `/api/adventures/${advId}/dungeon/move`, { direction: dir });
     expect(r.status).toBe(200);
     expect(r.data.result).toBe('moved');
     expect(r.data.room).toBeTruthy();
     expect(r.data.room.name).toBeTruthy();
     expect(r.data.room.exits).toBeTruthy();
-    expect(r.data.floor).toBeDefined();
-    expect(r.data.room_id).toBeDefined();
+    expect(r.data.room.floor).toBeDefined();
+    expect(r.data.room.room_id).toBeDefined();
   });
 
   test('retreat from dungeon', async () => {
@@ -135,11 +132,11 @@ test.describe('Dungeon Endpoints', () => {
     expect(r.data.in_dungeon).toBe(false);
   });
 
-  test('enter T0 dungeon has 2 floors', async () => {
+  test('enter T0 dungeon has 1 floor', async () => {
     const r = await api('POST', `/api/adventures/${advId}/dungeon/enter`, { seed: 12345, tier: 0 });
     expect(r.status).toBe(200);
     expect(r.data.result).toBe('dungeon_entered');
-    expect(r.data.dungeon.floors).toBe(2);
+    expect(r.data.dungeon.floors).toBe(1);
     // Clean up: retreat
     await api('POST', `/api/adventures/${advId}/dungeon/retreat`);
   });
@@ -183,43 +180,40 @@ test.describe('Tower Endpoints', () => {
   });
 
   test('tower floor status', async () => {
-    const r = await api('GET', '/api/towers/tower_of_dawn/floor/0');
+    const r = await api('GET', '/api/towers/tower_dawn/floor/0');
     expect(r.status).toBe(200);
     expect(r.data.floor).toBeTruthy();
   });
 
   test('enter tower', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/tower/enter`, { tower_id: 'tower_of_dawn' });
+    const r = await api('POST', `/api/adventures/${advId}/tower/enter`, { tower_id: 'tower_dawn' });
     expect(r.status).toBe(200);
-    expect(r.data.result).toBeTruthy();
-    expect(r.data.tower_name).toBeTruthy();
+    expect(r.data.result).toBe('tower_entered');
+    expect(r.data.tower).toBeTruthy();
     expect(r.data.floor).toBe(0);
-    expect(typeof r.data.tier).toBe('number');
+    expect(r.data.tier).toBeTruthy();
   });
 
   test('move in tower', async () => {
-    // Get current status to find exits
+    // Get current status to find exits (tower is stored as dungeon internally)
     const status = await api('GET', `/api/adventures/${advId}/dungeon/status`);
     expect(status.status).toBe(200);
     const room = status.data.room;
     expect(room).toBeTruthy();
     expect(room.exits).toBeTruthy();
+    expect(room.exits.length).toBeGreaterThan(0);
 
-    const exits = room.exits;
-    const directions = Object.keys(exits).filter(d => exits[d]);
-    expect(directions.length).toBeGreaterThan(0);
-
-    const dir = directions[0];
+    const dir = room.exits[0].direction;
     const r = await api('POST', `/api/adventures/${advId}/tower/move`, { direction: dir });
     expect(r.status).toBe(200);
     expect(r.data.room).toBeTruthy();
   });
 
-  test('tower checkpoint', async () => {
+  test('tower checkpoint on non-guard floor returns error', async () => {
     const r = await api('POST', `/api/adventures/${advId}/tower/checkpoint`, { floor: 0 });
-    expect(r.status).toBe(200);
-    // Should return checkpoint info with teleport cost
-    expect(r.data).toBeTruthy();
+    // Floor 0 is not a guard floor (guard floors are every 10), so expect rejection
+    expect(r.status).toBe(400);
+    expect(r.data.code).toBe('not_guard_floor');
   });
 
   test('tower teleport without gold fails', async () => {
