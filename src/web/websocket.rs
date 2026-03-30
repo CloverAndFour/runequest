@@ -307,6 +307,7 @@ fn client_msg_tag(msg: &ClientMsg) -> &'static str {
         ClientMsg::TowerEnter { .. } => "tower_enter",
         ClientMsg::TowerAscend => "tower_ascend",
         ClientMsg::TowerTeleport { .. } => "tower_teleport",
+        ClientMsg::Travel { .. } => "travel",
         _ => "read_only",
     }
 }
@@ -1841,6 +1842,97 @@ async fn handle_client_msg(
                     location: "Unknown".to_string(),
                     players: vec![],
                 }).await;
+            }
+        }
+
+        // Travel (fixed engine action — no LLM)
+        ClientMsg::Travel { direction } => {
+            let travel_result = {
+                let mut sess = session.lock().await;
+                if let Some(mut adv) = sess.adventure.take() {
+                    match crate::engine::world_map::travel(
+                        &mut adv.world_position,
+                        &mut adv.discovery,
+                        &direction,
+                    ) {
+                        Ok(result) => {
+                            adv.current_scene.location = result.county_name.clone();
+                            adv.current_scene.description = format!(
+                                "{} — {} (Tier {:.0})", result.region, result.biome, result.county_tier
+                            );
+
+                            let trigger_combat = if let Some(ref enemies) = result.encounter {
+                                if !enemies.is_empty() {
+                                    let dex_mod = adv.character.stats.modifier_for("dex").unwrap_or(0);
+                                    adv.combat.start(enemies.clone(), dex_mod);
+                                    true
+                                } else { false }
+                            } else { false };
+
+                            let init_order = if trigger_combat {
+                                Some(adv.combat.initiative.iter().map(|e| {
+                                    InitiativeInfo {
+                                        name: e.name.clone(),
+                                        roll: e.roll,
+                                        is_player: e.combatant == CombatantId::Player,
+                                    }
+                                }).collect::<Vec<_>>())
+                            } else { None };
+                            let round = adv.combat.round;
+
+                            sess.store.save_adventure(&adv).ok();
+                            let state = build_state_with_map(&adv);
+                            let loc_name = crate::engine::world_map::current_county(&adv.world_position)
+                                .map(|c| c.name.clone());
+                            let char_name = adv.character.name.clone();
+                            let char_class = format!("{:?}", adv.character.class);
+                            let username = sess.username.clone();
+                            sess.adventure = Some(adv);
+
+                            Some(Ok((result, trigger_combat, init_order, round, state, loc_name, char_name, char_class, username)))
+                        }
+                        Err(e) => {
+                            sess.adventure = Some(adv);
+                            Some(Err(e))
+                        }
+                    }
+                } else { None }
+            };
+
+            match travel_result {
+                Some(Ok((result, trigger_combat, init_order, round, state, loc_name, char_name, char_class, username))) => {
+                    send_msg(sender, &ServerMsg::TravelResult {
+                        county_name: result.county_name,
+                        county_tier: result.county_tier,
+                        biome: result.biome,
+                        region: result.region,
+                        encounter: trigger_combat,
+                    }).await;
+
+                    if let Some(init) = init_order {
+                        send_msg(sender, &ServerMsg::CombatStarted {
+                            initiative_order: init,
+                            round,
+                        }).await;
+                    }
+
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+
+                    if let Some(ref loc) = loc_name {
+                        presence.update_presence(&username, Some(char_name), Some(char_class), Some(loc.clone())).await;
+                    }
+
+                    if trigger_combat {
+                        handle_combat_turn_start(session, sender).await?;
+                    }
+                }
+                Some(Err(e)) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "travel_failed".to_string(),
+                        message: e,
+                    }).await;
+                }
+                None => {}
             }
         }
 

@@ -149,6 +149,9 @@ pub enum ClientMsg {
     SendLocationChat {
         text: String,
     },
+    Travel {
+        direction: String,
+    },
     GetLocationPlayers,
     // Display history pagination
     LoadOlderHistory {
@@ -290,6 +293,13 @@ pub enum ServerMsg {
     CombatEnded {
         xp_reward: u32,
         victory: bool,
+    },
+    TravelResult {
+        county_name: String,
+        county_tier: f32,
+        biome: String,
+        region: String,
+        encounter: bool,
     },
     CooldownState {
         llm_remaining_ms: u64,

@@ -270,6 +270,11 @@ struct CraftRequest {
 }
 
 #[derive(Deserialize)]
+struct TravelApiRequest {
+    direction: String,
+}
+
+#[derive(Deserialize)]
 struct SkillRequest {
     action: String,
     #[serde(default)]
@@ -490,6 +495,7 @@ pub async fn run_api_server(
         .route("/api/materials", get(list_materials))
         .route("/api/adventures/:id/craft", post(craft_item))
         .route("/api/adventures/:id/gather", post(gather_materials))
+        .route("/api/adventures/:id/travel", post(travel_handler))
         // Skills
         .route("/api/adventures/:id/engine/skill", post(engine_skill))
         // Shop
@@ -2441,6 +2447,61 @@ async fn gather_materials(
 // ---------------------------------------------------------------------------
 // Skill endpoint
 // ---------------------------------------------------------------------------
+
+async fn travel_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<TravelApiRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+    match crate::engine::world_map::travel(
+        &mut adventure.world_position,
+        &mut adventure.discovery,
+        &req.direction,
+    ) {
+        Ok(result) => {
+            adventure.current_scene.location = result.county_name.clone();
+            adventure.current_scene.description = format!(
+                "{} -- {} (Tier {:.0})", result.region, result.biome, result.county_tier
+            );
+
+            let encounter = if let Some(ref enemies) = result.encounter {
+                if !enemies.is_empty() {
+                    let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+                    adventure.combat.start(enemies.clone(), dex_mod);
+                    true
+                } else { false }
+            } else { false };
+
+            store.save_adventure(&adventure).ok();
+
+            let state_json = build_state_with_map(&adventure);
+            Json(serde_json::json!({
+                "county_name": result.county_name,
+                "county_tier": result.county_tier,
+                "biome": result.biome,
+                "region": result.region,
+                "encounter": encounter,
+                "state": state_json,
+            })).into_response()
+        }
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response()
+        }
+    }
+}
 
 async fn engine_skill(
     Extension(user): Extension<AuthUser>,

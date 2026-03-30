@@ -226,6 +226,14 @@ function handleServerMsg(msg) {
         case 'friend_chat_history':
             handleFriendChatHistory(msg);
             break;
+        case 'travel_result':
+            hideLoadingSpinner();
+            if (msg.encounter) {
+                // Combat will start via combat_started message
+            } else {
+                renderFixedActions();
+            }
+            break;
         case 'cooldown_state':
             handleCooldownState(msg);
             break;
@@ -1048,7 +1056,7 @@ function handleFixedAction(action, type) {
     if (type === 'travel') {
         var direction = action.replace('travel_dir:', '');
         showLoadingSpinner();
-        ws.send({ type: 'send_message', content: 'Travel ' + direction });
+        ws.send({ type: 'travel', direction: direction });
     } else if (type === 'shop') {
         ws.send({ type: 'view_shop' });
     } else if (type === 'dungeon') {
