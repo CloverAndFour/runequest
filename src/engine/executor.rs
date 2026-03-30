@@ -483,7 +483,7 @@ pub fn execute_tool_call_with_shop(
                             let name = v["name"].as_str()?.to_string();
                             let hp = v["hp"].as_i64()? as i32;
                             let ac = v["ac"].as_i64().unwrap_or(10) as i32;
-                            let attacks = v
+                            let attacks: Vec<EnemyAttack> = v
                                 .get("attacks")
                                 .and_then(|a| a.as_array())
                                 .map(|attacks| {
@@ -509,6 +509,19 @@ pub fn execute_tool_call_with_shop(
                                         .collect()
                                 })
                                 .unwrap_or_default();
+                            // Ensure every enemy has at least one attack so they can fight back.
+                            // The LLM may omit the attacks array; without this fallback the enemy
+                            // turn is silently skipped and the player never takes damage.
+                            let attacks = if attacks.is_empty() {
+                                vec![EnemyAttack {
+                                    name: "Strike".to_string(),
+                                    damage_dice: "1d6".to_string(),
+                                    damage_modifier: (hp / 10).max(0),
+                                    to_hit_bonus: (ac - 10).max(2),
+                                }]
+                            } else {
+                                attacks
+                            };
                             Some(Enemy {
                                 name,
                                 hp,

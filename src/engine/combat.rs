@@ -244,14 +244,29 @@ impl CombatState {
     /// Execute an enemy's turn using deterministic AI. Returns the result.
     pub fn execute_enemy_turn(&mut self, enemy_idx: usize, player: &mut Character) -> Option<EnemyTurnResult> {
         let enemy = self.enemies.get(enemy_idx)?;
-        if enemy.hp <= 0 || enemy.attacks.is_empty() {
+        if enemy.hp <= 0 {
             return None;
         }
 
-        // Pick best attack (highest to_hit_bonus)
-        let best_attack = enemy.attacks.iter()
-            .max_by_key(|a| a.to_hit_bonus)?
-            .clone();
+        // Pick best attack (highest to_hit_bonus), or use a default Strike if none defined
+        let best_attack = if enemy.attacks.is_empty() {
+            EnemyAttack {
+                name: "Strike".to_string(),
+                damage_dice: "1d6".to_string(),
+                damage_modifier: (enemy.max_hp / 10).max(0),
+                to_hit_bonus: (enemy.ac - 10).max(2),
+            }
+        } else {
+            enemy.attacks.iter()
+                .max_by_key(|a| a.to_hit_bonus)
+                .cloned()
+                .unwrap_or(EnemyAttack {
+                    name: "Strike".to_string(),
+                    damage_dice: "1d6".to_string(),
+                    damage_modifier: 0,
+                    to_hit_bonus: 3,
+                })
+        };
 
         // Roll to hit
         let mut rng = rand::thread_rng();
@@ -452,5 +467,121 @@ impl CombatState {
                 enrage_at
             ));
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::character::{Character, Class, Race, Stats};
+
+    fn test_character() -> Character {
+        Character {
+            name: "TestHero".to_string(),
+            race: Race::Human,
+            class: Class::Warrior,
+            level: 1,
+            hp: 20,
+            max_hp: 20,
+            ac: 15,
+            gold: 0,
+            xp: 0,
+            stats: Stats {
+                strength: 14,
+                dexterity: 12,
+                constitution: 14,
+                intelligence: 10,
+                wisdom: 10,
+                charisma: 10,
+            },
+            conditions: vec![],
+            dead: false,
+            background: None,
+            kill_count: 0,
+            murderer: false,
+        }
+    }
+
+    fn enemy_with_attacks() -> Enemy {
+        Enemy {
+            name: "Goblin".to_string(),
+            hp: 8,
+            max_hp: 8,
+            ac: 13,
+            attacks: vec![EnemyAttack {
+                name: "Scimitar".to_string(),
+                damage_dice: "1d6".to_string(),
+                damage_modifier: 1,
+                to_hit_bonus: 4,
+            }],
+            enemy_type: None,
+            tier: None,
+        }
+    }
+
+    fn enemy_without_attacks() -> Enemy {
+        Enemy {
+            name: "Goblin Scout".to_string(),
+            hp: 8,
+            max_hp: 8,
+            ac: 13,
+            attacks: vec![],
+            enemy_type: None,
+            tier: None,
+        }
+    }
+
+    #[test]
+    fn test_enemy_with_attacks_can_fight() {
+        let mut combat = CombatState::new();
+        combat.start(vec![enemy_with_attacks()], 0);
+        let mut player = test_character();
+        let result = combat.execute_enemy_turn(0, &mut player);
+        assert!(result.is_some(), "Enemy with attacks should return a turn result");
+        let r = result.unwrap();
+        assert_eq!(r.enemy_name, "Goblin");
+        assert_eq!(r.attack_name, "Scimitar");
+    }
+
+    #[test]
+    fn test_enemy_without_attacks_still_fights() {
+        let mut combat = CombatState::new();
+        combat.start(vec![enemy_without_attacks()], 0);
+        let mut player = test_character();
+        let result = combat.execute_enemy_turn(0, &mut player);
+        assert!(result.is_some(), "Enemy without attacks should still fight using default Strike");
+        let r = result.unwrap();
+        assert_eq!(r.enemy_name, "Goblin Scout");
+        assert_eq!(r.attack_name, "Strike");
+    }
+
+    #[test]
+    fn test_dead_enemy_cannot_fight() {
+        let mut combat = CombatState::new();
+        let mut dead_enemy = enemy_with_attacks();
+        dead_enemy.hp = 0;
+        combat.start(vec![dead_enemy], 0);
+        let mut player = test_character();
+        let result = combat.execute_enemy_turn(0, &mut player);
+        assert!(result.is_none(), "Dead enemy should not attack");
+    }
+
+    #[test]
+    fn test_damage_dice_in_range() {
+        let mut combat = CombatState::new();
+        combat.start(vec![enemy_with_attacks()], 0);
+        let mut max_damage = 0;
+        for _ in 0..200 {
+            combat.enemies[0].hp = 8;
+            let mut player = test_character();
+            if let Some(result) = combat.execute_enemy_turn(0, &mut player) {
+                if result.hit {
+                    max_damage = std::cmp::max(max_damage, result.damage);
+                }
+            }
+        }
+        // 1d6+1 max is 7; should never exceed that
+        assert!(max_damage <= 7, "Max damage {} exceeded 1d6+1 max of 7", max_damage);
     }
 }

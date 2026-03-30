@@ -52,7 +52,7 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 6. **Use `set_scene` when the location changes** to update the player's scene info.
 
 7. **Combat is handled by the engine, not by you.** When enemies appear:
-   - Call `start_combat` with the enemy definitions. This STARTS turn-based combat mode.
+   - Call `start_combat` with the enemy definitions. **Always include the `attacks` array for each enemy** with at least one attack containing `name`, `damage_dice`, `damage_modifier`, and `to_hit_bonus`. Without attacks, enemies cannot fight. This STARTS turn-based combat mode.
    - Then STOP calling tools and narrate the dramatic combat opening scene.
    - Do NOT call `attack_roll` during combat — the player uses action buttons to attack.
    - Do NOT call `end_combat` — the engine ends combat automatically when all enemies die.
