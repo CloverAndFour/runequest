@@ -160,16 +160,27 @@ impl AdventureState {
 
         // Create the world map based on scenario
         let world_map = world::create_world(scenario);
-        let start_loc = &world_map.locations[world_map.current_location];
-        let scene = Scene {
-            location: start_loc.name.clone(),
-            description: start_loc.description.clone(),
-        };
 
-        // Initialize world position and discovery
-        let world_position = PlayerPosition::default();
+        // Initialize world position from race-specific hex spawn
+        let world_position = PlayerPosition::from_coord(
+            super::world_map::race_spawn_position(&format!("{}", character.race))
+        );
         let mut discovery_state = DiscoveryState::default();
         discovery_state.discover(world_position.coord());
+
+        // Set starting scene from hex world county
+        let scene = if let Some(county) = super::world_map::current_county(&world_position) {
+            Scene {
+                location: county.name.clone(),
+                description: format!("{} — {}", county.region, county.biome),
+            }
+        } else {
+            let start_loc = &world_map.locations[world_map.current_location];
+            Scene {
+                location: start_loc.name.clone(),
+                description: start_loc.description.clone(),
+            }
+        };
 
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -243,17 +254,27 @@ impl AdventureState {
 
         // World
         let world_map = world::create_world(scenario);
-        let start_loc = &world_map.locations[world_map.current_location];
-        let scene = Scene {
-            location: start_loc.name.clone(),
-            description: start_loc.description.clone(),
-        };
 
+        // Initialize world position from race-specific hex spawn
         let world_position = PlayerPosition::from_coord(
             super::world_map::race_spawn_position(&format!("{}", character.race))
         );
         let mut discovery_state = DiscoveryState::default();
         discovery_state.discover(world_position.coord());
+
+        // Set starting scene from hex world county
+        let scene = if let Some(county) = super::world_map::current_county(&world_position) {
+            Scene {
+                location: county.name.clone(),
+                description: format!("{} — {}", county.region, county.biome),
+            }
+        } else {
+            let start_loc = &world_map.locations[world_map.current_location];
+            Scene {
+                location: start_loc.name.clone(),
+                description: start_loc.description.clone(),
+            }
+        };
 
         Self {
             id: uuid::Uuid::new_v4().to_string(),

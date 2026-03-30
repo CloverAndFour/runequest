@@ -1,12 +1,6 @@
 // Adventure screen renderer and info panel
 
 
-function equipWsCall(action, data) {
-    if (window.rqWs && window.rqWs.send) {
-        window.rqWs.send({ type: action, ...data });
-    }
-}
-
 export function renderAdventure(container, state, handlers) {
     if (!state) {
         container.innerHTML = '<div class="loading">Loading adventure</div>';
@@ -281,15 +275,15 @@ function renderInventory(el, state) {
     // Bind click handlers for equip/unequip (only outside combat)
     if (!inCombat && state.id) {
         el.querySelectorAll('.equip-slot.clickable').forEach(slot => {
-            slot.addEventListener('click', async () => {
+            slot.addEventListener('click', () => {
                 slot.classList.add('loading');
-                await equipApiCall(state.id, 'unequip', { slot: slot.dataset.slot });
+                if (window.rqWs) window.rqWs.send({ type: 'unequip_item', slot: slot.dataset.slot });
             });
         });
         el.querySelectorAll('.item-entry.clickable').forEach(entry => {
-            entry.addEventListener('click', async () => {
+            entry.addEventListener('click', () => {
                 entry.classList.add('loading');
-                await equipApiCall(state.id, 'equip', { item_name: entry.dataset.equipName });
+                if (window.rqWs) window.rqWs.send({ type: 'equip_item', item_name: entry.dataset.equipName });
             });
         });
     }

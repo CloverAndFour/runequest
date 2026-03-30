@@ -239,7 +239,15 @@ fn build_world_section(state: &AdventureState) -> String {
     };
 
     use crate::engine::world::GameMode;
+    use crate::engine::world_map;
 
+    // Use hex world county for location info, fall back to old world system
+    let (loc_name, loc_desc) = if let Some(county) = world_map::current_county(&state.world_position) {
+        (county.name.clone(), format!("{} — {} (Tier {:.0})", county.region, county.biome, county.tier))
+    } else {
+        let loc = world.current_loc();
+        (loc.name.clone(), loc.description.clone())
+    };
     let loc = world.current_loc();
     let mode_str = match &world.game_mode {
         GameMode::WorldMap => "World Map (exploring)".to_string(),
@@ -305,9 +313,9 @@ WORLD MAP RULES:
 - Describe locations atmospherically based on their type and description.
 - Warn players about danger levels when presenting travel options."#,
         world.name,
-        loc.name,
+        loc_name,
         format!("{:?}", loc.location_type),
-        loc.description,
+        loc_desc,
         mode_str,
         dest_list,
         shop_section,
