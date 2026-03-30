@@ -5,6 +5,8 @@ import { WebSocketManager } from './ws.js';
 import { renderSelectScreen, renderCreateScreen } from './select.js';
 import { renderAdventure } from './adventure.js';
 import { renderCombatStarted, renderCombatTurnStart, renderCombatActionResult, renderEnemyTurn, renderCombatEnded } from './combat.js';
+import { initFriendsPanel, handleFriendCode, handleFriendsList, handleFriendPresence, handleFriendRequestReceived, handleFriendRequestAccepted, handleFriendRequestSent, handleFriendChat, handleFriendChatSent, handleFriendChatHistory } from './friends.js';
+import { initLocationChat, handleLocationChat, handleLocationPresence, handleLocationChatHistory, onLocationChange } from './location-chat.js';
 
 const app = document.getElementById('app');
 let ws = null;
@@ -121,6 +123,48 @@ function handleServerMsg(msg) {
         case 'combat_ended':
             renderCombatEnded(app, msg);
             break;
+        case 'shop_inventory':
+            showShopPanel(msg);
+            break;
+        case 'shop_buy_result':
+            handleShopBuyResult(msg);
+            break;
+        case 'shop_sell_result':
+            handleShopSellResult(msg);
+            break;
+        case 'gather_result':
+            showGatherResult(msg);
+            break;
+        case 'skill_list':
+            document.dispatchEvent(new CustomEvent('skill-list-received', { detail: msg }));
+            break;
+        case 'friend_code':
+            handleFriendCode(msg);
+            break;
+        case 'friends_list':
+            handleFriendsList(msg);
+            break;
+        case 'friend_presence':
+            handleFriendPresence(msg);
+            break;
+        case 'friend_request_received':
+            handleFriendRequestReceived(msg);
+            break;
+        case 'friend_request_accepted':
+            handleFriendRequestAccepted(msg);
+            break;
+        case 'friend_request_sent':
+            handleFriendRequestSent(msg);
+            break;
+        case 'friend_chat':
+            handleFriendChat(msg);
+            break;
+        case 'friend_chat_sent':
+            handleFriendChatSent(msg);
+            break;
+        case 'friend_chat_history':
+            handleFriendChatHistory(msg);
+            break;
         case 'error':
             showToast(msg.message, true);
             break;
@@ -156,6 +200,19 @@ function showAdventureScreen() {
 
     // Listen for options button
     document.addEventListener('show-options', showOptionsModal);
+
+    // Initialize friends panel
+    setTimeout(() => {
+        const layout = app.querySelector('.adventure-layout');
+        if (layout) {
+            initFriendsPanel(layout, (msg) => ws?.send(msg));
+        }
+    }, 100);
+
+    // Initialize location chat
+    setTimeout(() => {
+        initLocationChat(app, (msg) => ws?.send(msg));
+    }, 150);
 }
 
 // Narrative streaming
@@ -181,7 +238,9 @@ function appendNarrativeChunk(text) {
 
 function endNarrative() {
     if (currentNarrativeEl) {
-        currentNarrativeEl.classList.remove('streaming');
+        currentNarrativeEl.classList.remove("streaming");
+        // Post-process: italicize dialogue
+        currentNarrativeEl.innerHTML = formatNarrative(currentNarrativeEl.textContent);
         const storyContent = document.querySelector('.story-content');
         if (storyContent) storyContent.scrollTop = storyContent.scrollHeight;
         currentNarrativeEl = null;
@@ -380,8 +439,8 @@ function renderChatHistory(entries) {
         switch (entry.event_type) {
             case 'narrative':
                 div.className = 'narrative-block history';
-                div.textContent = entry.data.text || entry.data.content || '';
-                if (div.textContent) storyContent.appendChild(div);
+                div.innerHTML = formatNarrative(entry.data.text || entry.data.content || '');
+                if (div.innerHTML) storyContent.appendChild(div);
                 break;
             case 'dice_result':
                 div.className = `dice-result history ${entry.data.success ? 'success' : 'failure'}`;
@@ -520,6 +579,178 @@ function showStateChanges(data) {
     storyContent.scrollTop = storyContent.scrollHeight;
 }
 
+// ============================================================================
+// SHOP PANEL
+// ============================================================================
+
+var shopState = null; // current shop data from server
+
+function showShopPanel(msg) {
+    // Remove loading spinner
+    var loadingEl = document.querySelector('.loading-narrative');
+    if (loadingEl) loadingEl.remove();
+
+    shopState = msg;
+    var existing = document.querySelector('.shop-modal');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.className = 'shop-modal';
+
+    var header = '<div class="shop-header">' +
+        '<h2>' + escapeHtml(msg.shop_name) + '</h2>' +
+        '<div class="shop-meta">' +
+            '<span class="shop-tier">Tier ' + msg.tier + '</span>' +
+            '<span class="shop-gold">\u{1FA99} ' + (msg.player_gold || 0) + ' gold</span>' +
+        '</div>' +
+        '<button class="shop-close">\u2715</button>' +
+    '</div>';
+
+    var tabs = '<div class="shop-tabs">' +
+        '<button class="shop-tab active" data-tab="buy">Buy</button>' +
+        '<button class="shop-tab" data-tab="sell">Sell</button>' +
+    '</div>';
+
+    var buyItems = (msg.items || []).sort(function(a, b) { return a.tier - b.tier || a.buy_price - b.buy_price; });
+    var buyRows = buyItems.map(function(item) {
+        var priceClass = item.price_category === 'above' ? 'price-high' :
+                         item.price_category === 'below' ? 'price-low' : 'price-normal';
+        var outOfStock = item.current_stock === 0;
+        return '<div class="shop-item' + (outOfStock ? ' out-of-stock' : '') + '">' +
+            '<div class="shop-item-info">' +
+                '<span class="shop-item-name">' + escapeHtml(item.name) + '</span>' +
+                '<span class="shop-item-desc">' + escapeHtml(item.description || '') + '</span>' +
+            '</div>' +
+            '<div class="shop-item-meta">' +
+                '<span class="shop-item-tier">T' + item.tier + '</span>' +
+                '<span class="shop-item-stock">' + item.current_stock + ' in stock</span>' +
+                '<span class="shop-item-price ' + priceClass + '">' + item.buy_price + ' gp</span>' +
+                '<button class="shop-buy-btn" data-item-id="' + escapeAttr(item.item_id) + '"' +
+                    (outOfStock ? ' disabled' : '') + '>Buy</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    // Build sell tab with player inventory
+    var invItems = (gameState && gameState.inventory && gameState.inventory.items) || [];
+    var sellRows = invItems.map(function(item) {
+        var sellPrice = Math.max(Math.floor((item.value_gp || 1) * 0.6), 1);
+        return '<div class="shop-item">' +
+            '<div class="shop-item-info">' +
+                '<span class="shop-item-name">' + escapeHtml(item.name) + '</span>' +
+                '<span class="shop-item-desc">' + escapeHtml(item.item_type || '') +
+                    (item.quantity > 1 ? ' (x' + item.quantity + ')' : '') + '</span>' +
+            '</div>' +
+            '<div class="shop-item-meta">' +
+                '<span class="shop-item-tier">T' + (item.tier || 0) + '</span>' +
+                '<span class="shop-item-price price-normal">~' + sellPrice + ' gp</span>' +
+                '<button class="shop-sell-btn" data-item-name="' + escapeAttr(item.name) + '">Sell</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    if (sellRows === '') {
+        sellRows = '<div class="shop-empty">No items to sell.</div>';
+    }
+
+    var body = '<div class="shop-body">' +
+        '<div class="shop-tab-content active" data-content="buy">' + buyRows + '</div>' +
+        '<div class="shop-tab-content" data-content="sell">' + sellRows + '</div>' +
+    '</div>';
+
+    modal.innerHTML = '<div class="shop-panel">' + header + tabs + body + '</div>';
+    document.body.appendChild(modal);
+
+    // Event: close
+    modal.querySelector('.shop-close').addEventListener('click', closeShopPanel);
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeShopPanel(); });
+
+    // Event: tab switching
+    modal.querySelectorAll('.shop-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            modal.querySelectorAll('.shop-tab').forEach(function(t) { t.classList.remove('active'); });
+            modal.querySelectorAll('.shop-tab-content').forEach(function(c) { c.classList.remove('active'); });
+            tab.classList.add('active');
+            modal.querySelector('.shop-tab-content[data-content="' + tab.dataset.tab + '"]').classList.add('active');
+        });
+    });
+
+    // Event: buy buttons
+    modal.querySelectorAll('.shop-buy-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btn.disabled = true;
+            btn.textContent = '...';
+            ws.send({ type: 'shop_buy', item_id: btn.dataset.itemId, quantity: 1 });
+        });
+    });
+
+    // Event: sell buttons
+    modal.querySelectorAll('.shop-sell-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btn.disabled = true;
+            btn.textContent = '...';
+            ws.send({ type: 'shop_sell', item_name: btn.dataset.itemName });
+        });
+    });
+}
+
+function closeShopPanel() {
+    var modal = document.querySelector('.shop-modal');
+    if (modal) modal.remove();
+    shopState = null;
+}
+
+function handleShopBuyResult(msg) {
+    if (msg.success) {
+        showToast('Bought ' + msg.item_name + ' for ' + msg.price + ' gp');
+        if (gameState) gameState.character.gold = msg.gold_remaining;
+        // Refresh shop to see updated stock/prices
+        ws.send({ type: 'view_shop' });
+    } else {
+        showToast(msg.error || 'Purchase failed', true);
+        // Re-enable buy buttons
+        document.querySelectorAll('.shop-buy-btn').forEach(function(btn) {
+            btn.disabled = false;
+            btn.textContent = 'Buy';
+        });
+    }
+}
+
+function handleShopSellResult(msg) {
+    if (msg.success) {
+        showToast('Sold ' + msg.item_name + ' for ' + msg.gold_earned + ' gp');
+        if (gameState) gameState.character.gold = msg.gold_remaining;
+        // Refresh shop to see updated inventory
+        ws.send({ type: 'view_shop' });
+    } else {
+        showToast(msg.error || 'Sale failed', true);
+        // Re-enable sell buttons
+        document.querySelectorAll('.shop-sell-btn').forEach(function(btn) {
+            btn.disabled = false;
+            btn.textContent = 'Sell';
+        });
+    }
+}
+
+function showGatherResult(msg) {
+    var storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+    var loadingEl = storyContent.querySelector('.loading-narrative');
+    if (loadingEl) loadingEl.remove();
+
+    var items = (msg.gathered || []).map(function(g) { return g.name || g.id; }).join(', ');
+    var biome = msg.biome || 'the wilderness';
+    var xp = msg.survival_xp || 0;
+
+    var div = document.createElement('div');
+    div.className = 'narrative-block gather-result';
+    div.innerHTML = '<p>\u{1FAB5} <strong>Gathering in ' + escapeHtml(biome) + ':</strong> You found ' + escapeHtml(items) + '.</p>' +
+        '<p style="font-size:12px;color:var(--text-muted)">+' + xp + ' Survival XP</p>';
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+    renderFixedActions();
+}
+
 function renderFixedActions() {
     var storyContent = document.querySelector('.story-content');
     if (!storyContent) return;
@@ -552,6 +783,8 @@ function renderFixedActions() {
             if (current.has_tower) buttons.push({ label: 'Enter ' + (current.tower_name || 'Tower'), icon: '\u{1F3F0}', action: 'tower', type: 'tower' });
             if (current.has_exchange) buttons.push({ label: 'Exchange', icon: '\u{1FA99}', action: 'exchange', type: 'exchange' });
             if (current.has_guild_hall) buttons.push({ label: 'Guild Hall', icon: '\u2694', action: 'guild_hall', type: 'guild_hall' });
+            // Gather is always available — every biome has resources
+            buttons.push({ label: 'Gather Resources', icon: '\u{1FAB5}', action: 'gather', type: 'gather' });
         }
     }
 
@@ -601,8 +834,7 @@ function handleFixedAction(action, type) {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Travel ' + direction });
     } else if (type === 'shop') {
-        showLoadingSpinner();
-        ws.send({ type: 'send_message', content: 'I want to visit the shop' });
+        ws.send({ type: 'view_shop' });
     } else if (type === 'dungeon') {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Enter the dungeon' });
@@ -612,6 +844,9 @@ function handleFixedAction(action, type) {
     } else if (type === 'exchange') {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Visit the exchange' });
+    } else if (type === 'gather') {
+        showLoadingSpinner();
+        ws.send({ type: 'gather' });
     } else if (type === 'guild_hall') {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Visit the guild hall' });
@@ -623,3 +858,10 @@ function handleFixedAction(action, type) {
 }
 
 init();
+
+// Format narrative text: italicize dialogue (quoted speech)
+function formatNarrative(text) {
+    const escaped = escapeHtml(text);
+    // Wrap text in double quotes or curly quotes in <em> tags
+    return escaped.replace(/(\u201c[^\u201d]*\u201d|"[^"]*")/g, '<em class="dialogue">$1</em>');
+}

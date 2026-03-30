@@ -456,6 +456,9 @@ pub async fn run_api_server(
         .route("/api/friends/remove", post(api_remove_friend))
         .route("/api/friends/chat", post(api_send_friend_chat))
         .route("/api/friends/chat/:username", get(api_get_friend_chat))
+        // Location chat
+        .route("/api/location/chat", post(api_send_location_chat))
+        .route("/api/location/players", get(api_get_location_players))
         .layer(axum_mw::from_fn_with_state(
             auth_state.clone(),
             require_auth,
@@ -3230,3 +3233,97 @@ async fn api_get_friend_chat(
     Json(ApiChatHistoryResponse { friend: username, messages: msgs }).into_response()
 }
 
+// ---------------------------------------------------------------------------
+// Location chat endpoints
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct LocationChatRequest {
+    text: String,
+}
+
+async fn api_send_location_chat(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<LocationChatRequest>,
+) -> impl IntoResponse {
+    let store = crate::storage::adventure_store::AdventureStore::new(&state.data_dir, &user.username);
+    let adventures = match store.list_adventures() {
+        Ok(a) => a,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
+    let adventure = if let Some(summary) = adventures.first() {
+        match store.load_adventure(&summary.id) {
+            Ok(a) => a,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        }
+    } else {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "No active adventure"}))).into_response();
+    };
+
+    let loc_name = match crate::engine::world_map::current_county(&adventure.world_position) {
+        Some(c) => c.name.clone(),
+        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Unknown location"}))).into_response(),
+    };
+
+    let char_name = adventure.character.name.clone();
+
+    let msg = state.presence.append_location_chat(&loc_name, user.username.clone(), char_name.clone(), req.text.clone()).await;
+
+    let event = crate::web::presence::FriendEvent::LocationChat {
+        from: user.username.clone(),
+        character_name: char_name,
+        text: req.text,
+        ts: msg.ts.clone(),
+        location: loc_name.clone(),
+    };
+    state.presence.broadcast_to_location(&loc_name, event, None).await;
+
+    Json(serde_json::json!({
+        "ok": true,
+        "from": user.username,
+        "ts": msg.ts,
+        "location": loc_name,
+    })).into_response()
+}
+
+async fn api_get_location_players(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    let store = crate::storage::adventure_store::AdventureStore::new(&state.data_dir, &user.username);
+    let adventures = match store.list_adventures() {
+        Ok(a) => a,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
+    let adventure = if let Some(summary) = adventures.first() {
+        match store.load_adventure(&summary.id) {
+            Ok(a) => a,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        }
+    } else {
+        return Json(serde_json::json!({"location": "Unknown", "players": []})).into_response();
+    };
+
+    let loc_name = match crate::engine::world_map::current_county(&adventure.world_position) {
+        Some(c) => c.name.clone(),
+        None => return Json(serde_json::json!({"location": "Unknown", "players": []})).into_response(),
+    };
+
+    let entries = state.presence.get_users_at_location(&loc_name).await;
+    let players: Vec<serde_json::Value> = entries.iter()
+        .filter(|e| e.username != user.username)
+        .map(|e| serde_json::json!({
+            "username": e.username,
+            "character_name": e.character_name.clone().unwrap_or_default(),
+            "level": e.character_level.unwrap_or(1),
+        }))
+        .collect();
+
+    Json(serde_json::json!({
+        "location": loc_name,
+        "players": players,
+    })).into_response()
+}

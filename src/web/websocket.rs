@@ -24,7 +24,7 @@ use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, DisplayEvent, HistoryMessage};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 use crate::engine::combat::CombatantId;
-use crate::web::protocol::{ActionInfo, ChatMessageInfo, ClientMsg, EnemyInfo, FriendInfoMsg, FriendRequestInfo, InitiativeInfo, ServerMsg};
+use crate::web::protocol::{ActionInfo, ChatMessageInfo, ClientMsg, EnemyInfo, FriendInfoMsg, FriendRequestInfo, InitiativeInfo, LocationChatMessageInfo, LocationPlayerInfo, ServerMsg};
 use crate::web::presence::{FriendEvent, PresenceRegistry};
 use crate::storage::friends_store::FriendsStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
@@ -194,7 +194,12 @@ pub async fn handle_socket(
                         FriendEvent::FriendRequestAccepted { username, friend_code } => {
                             ServerMsg::FriendRequestAccepted { username, friend_code }
                         }
-                        _ => continue,
+                        FriendEvent::LocationChat { from, character_name, text, ts, location: _ } => {
+                            ServerMsg::LocationChatMessage { from, character_name, text, ts }
+                        }
+                        FriendEvent::LocationPresenceUpdate { location, players } => {
+                            ServerMsg::LocationPlayers { location, players }
+                        }
                     };
                     send_msg(&mut sender, &server_msg).await;
                 }
@@ -821,6 +826,58 @@ async fn handle_client_msg(
             }
 
             send_msg(sender, &ServerMsg::AdventureCreated { adventure_id, state: state_json }).await;
+
+            // Update presence with character info and location
+            {
+                let sess = session.lock().await;
+                if let Some(ref adv) = sess.adventure {
+                    let loc_name = crate::engine::world_map::current_county(&adv.world_position)
+                        .map(|c| c.name.clone());
+                    let char_class = format!("{:?}", adv.character.class);
+                    presence.update_presence(
+                        &sess.username,
+                        Some(adv.character.name.clone()),
+                        Some(char_class),
+                        loc_name.clone(),
+                    ).await;
+                    presence.update_adventure_info(
+                        &sess.username,
+                        Some(adv.id.clone()),
+                        Some(adv.character.level),
+                    ).await;
+
+                    // Send location chat history
+                    if let Some(ref loc) = loc_name {
+                        let recent = presence.get_location_chat_recent(loc, 300).await;
+                        let msgs: Vec<LocationChatMessageInfo> = recent.into_iter().map(|m| LocationChatMessageInfo {
+                            from: m.from,
+                            character_name: m.character_name,
+                            text: m.text,
+                            ts: m.ts,
+                        }).collect();
+                        send_msg(sender, &ServerMsg::LocationChatHistory {
+                            location: loc.clone(),
+                            messages: msgs,
+                        }).await;
+
+                        // Send location players
+                        let entries = presence.get_users_at_location(loc).await;
+                        let players: Vec<LocationPlayerInfo> = entries.iter()
+                            .filter(|e| e.username != sess.username)
+                            .map(|e| LocationPlayerInfo {
+                                username: e.username.clone(),
+                                character_name: e.character_name.clone().unwrap_or_default(),
+                                level: e.character_level.unwrap_or(1),
+                            })
+                            .collect();
+                        send_msg(sender, &ServerMsg::LocationPlayers {
+                            location: loc.clone(),
+                            players,
+                        }).await;
+                    }
+                }
+            }
+
             start_adventure(session, xai_client, sender, &scenario, shop_store).await?;
         }
 
@@ -891,9 +948,59 @@ async fn handle_client_msg(
 
             sess.adventure = Some(adventure);
             sess.messages = messages;
+
+            // Update presence with character info and location
+            let loc_name = sess.adventure.as_ref().and_then(|adv|
+                crate::engine::world_map::current_county(&adv.world_position)
+                    .map(|c| c.name.clone())
+            );
+            if let Some(ref adv) = sess.adventure {
+                let char_class = format!("{:?}", adv.character.class);
+                presence.update_presence(
+                    &sess.username,
+                    Some(adv.character.name.clone()),
+                    Some(char_class),
+                    loc_name.clone(),
+                ).await;
+                presence.update_adventure_info(
+                    &sess.username,
+                    Some(adv.id.clone()),
+                    Some(adv.character.level),
+                ).await;
+            }
             drop(sess);
 
             send_msg(sender, &ServerMsg::AdventureLoaded { state: state_json }).await;
+
+            // Send location chat history and players
+            if let Some(ref loc) = loc_name {
+                let recent = presence.get_location_chat_recent(loc, 300).await;
+                let msgs: Vec<LocationChatMessageInfo> = recent.into_iter().map(|m| LocationChatMessageInfo {
+                    from: m.from,
+                    character_name: m.character_name,
+                    text: m.text,
+                    ts: m.ts,
+                }).collect();
+                send_msg(sender, &ServerMsg::LocationChatHistory {
+                    location: loc.clone(),
+                    messages: msgs,
+                }).await;
+
+                let username = session.lock().await.username.clone();
+                let entries = presence.get_users_at_location(loc).await;
+                let players: Vec<LocationPlayerInfo> = entries.iter()
+                    .filter(|e| e.username != username)
+                    .map(|e| LocationPlayerInfo {
+                        username: e.username.clone(),
+                        character_name: e.character_name.clone().unwrap_or_default(),
+                        level: e.character_level.unwrap_or(1),
+                    })
+                    .collect();
+                send_msg(sender, &ServerMsg::LocationPlayers {
+                    location: loc.clone(),
+                    players,
+                }).await;
+            }
             if !display_events.is_empty() {
                 send_msg(sender, &ServerMsg::ChatHistory { entries: display_events }).await;
             }
@@ -1550,6 +1657,70 @@ async fn handle_client_msg(
             }).collect();
 
             send_msg(sender, &ServerMsg::FriendChatHistory { friend, messages: msgs }).await;
+        }
+
+        ClientMsg::SendLocationChat { text } => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            let (char_name, loc_name) = if let Some(ref adv) = sess.adventure {
+                let loc = crate::engine::world_map::current_county(&adv.world_position)
+                    .map(|c| c.name.clone());
+                (adv.character.name.clone(), loc)
+            } else {
+                (username.clone(), None)
+            };
+            drop(sess);
+
+            if let Some(ref loc) = loc_name {
+                // Append to location chat buffer
+                let msg = presence.append_location_chat(loc, username.clone(), char_name.clone(), text.clone()).await;
+
+                // Broadcast to all players at the location (including sender)
+                let event = FriendEvent::LocationChat {
+                    from: username,
+                    character_name: char_name,
+                    text,
+                    ts: msg.ts,
+                    location: loc.clone(),
+                };
+                presence.broadcast_to_location(loc, event, None).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "no_location".to_string(),
+                    message: "You must be in an adventure to use location chat.".to_string(),
+                }).await;
+            }
+        }
+
+        ClientMsg::GetLocationPlayers => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            let loc_name = sess.adventure.as_ref().and_then(|adv|
+                crate::engine::world_map::current_county(&adv.world_position)
+                    .map(|c| c.name.clone())
+            );
+            drop(sess);
+
+            if let Some(ref loc) = loc_name {
+                let entries = presence.get_users_at_location(loc).await;
+                let players: Vec<LocationPlayerInfo> = entries.iter()
+                    .filter(|e| e.username != username)
+                    .map(|e| LocationPlayerInfo {
+                        username: e.username.clone(),
+                        character_name: e.character_name.clone().unwrap_or_default(),
+                        level: e.character_level.unwrap_or(1),
+                    })
+                    .collect();
+                send_msg(sender, &ServerMsg::LocationPlayers {
+                    location: loc.clone(),
+                    players,
+                }).await;
+            } else {
+                send_msg(sender, &ServerMsg::LocationPlayers {
+                    location: "Unknown".to_string(),
+                    players: vec![],
+                }).await;
+            }
         }
     }
 

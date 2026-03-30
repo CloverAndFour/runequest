@@ -145,6 +145,11 @@ pub enum ClientMsg {
         #[serde(default = "default_chat_limit")]
         limit: usize,
     },
+    // Location chat
+    SendLocationChat {
+        text: String,
+    },
+    GetLocationPlayers,
 }
 
 #[derive(Debug, Deserialize)]
@@ -438,6 +443,21 @@ pub enum ServerMsg {
     FriendRemoved {
         username: String,
     },
+    // Location chat
+    LocationChatMessage {
+        from: String,
+        character_name: String,
+        text: String,
+        ts: String,
+    },
+    LocationPlayers {
+        location: String,
+        players: Vec<LocationPlayerInfo>,
+    },
+    LocationChatHistory {
+        location: String,
+        messages: Vec<LocationChatMessageInfo>,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -515,4 +535,12 @@ pub struct LocationPlayerInfo {
     pub username: String,
     pub character_name: String,
     pub level: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocationChatMessageInfo {
+    pub from: String,
+    pub character_name: String,
+    pub text: String,
+    pub ts: String,
 }
