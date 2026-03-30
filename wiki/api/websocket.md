@@ -52,9 +52,9 @@ All messages are JSON with a `type` field (snake_case).
 
 | Type | Fields | Description |
 |---|---|---|
-| `view_shop` | -- | Request shop inventory at current location |
-| `shop_buy` | `item_id, quantity` | Buy from shop |
-| `shop_sell` | `item_name, quantity` | Sell to shop |
+| `view_shop` | — | Request shop inventory at current location |
+| `shop_buy` | `item_id` (string), `quantity` (u32, default 1) | Buy from shop |
+| `shop_sell` | `item_name` (string) | Sell item from inventory |
 
 ### Friends
 
@@ -202,9 +202,11 @@ All messages are JSON with a `type` field (snake_case).
 
 | Type | Fields | Description |
 |---|---|---|
-| `shop_inventory` | `shop_name, tier, items[], player_gold, player_inventory[]` | Full shop view |
-| `shop_buy_result` | `success, message, item_name?, price_paid?, gold_remaining?` | Buy outcome |
-| `shop_sell_result` | `success, message, item_name?, gold_earned?, gold_remaining?` | Sell outcome |
+| `shop_inventory` | `shop_name`, `tier`, `items[]` (ShopItemInfo), `player_gold` | Full shop view |
+| `shop_buy_result` | `success`, `item_name`, `price`, `gold_remaining`, `error?` | Buy outcome |
+| `shop_sell_result` | `success`, `item_name`, `gold_earned`, `gold_remaining`, `error?` | Sell outcome |
+
+On successful buy/sell, the server also sends a `state_update` with the full updated adventure state.
 
 ### Friends
 

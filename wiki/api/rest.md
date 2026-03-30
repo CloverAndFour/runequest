@@ -116,9 +116,11 @@ Craft result: `{crafted, output, quantity, skill_progress}` on success, or `{err
 
 | Method | Path | Auth | Request Body | Response |
 |---|---|---|---|---|
-| GET | `/api/shop?adventure_id=X` | Yes | -- | `{shop_name, tier, items[], player_gold, player_inventory[]}` |
-| POST | `/api/shop/buy` | Yes | `{adventure_id, item_id, quantity}` | `{success, message, item_name?, price_paid?, gold_remaining?}` |
-| POST | `/api/shop/sell` | Yes | `{adventure_id, item_name, quantity}` | `{success, message, item_name?, gold_earned?, gold_remaining?}` |
+| GET | `/api/adventures/:id/shop` | Yes | — | `{shop_name, tier, items[], player_gold}` |
+| POST | `/api/adventures/:id/shop/buy` | Yes | `{item_id, quantity?}` | `{success, message, gold_remaining}` |
+| POST | `/api/adventures/:id/shop/sell` | Yes | `{item_name}` | `{success, message, sell_price, gold_remaining}` |
+
+See [Shop API Reference](shop.md) for full request/response schemas and examples.
 
 ## Friends
 

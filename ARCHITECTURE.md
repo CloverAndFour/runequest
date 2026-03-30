@@ -1405,19 +1405,26 @@ Four locations have guild halls (`has_guild_hall: true`):
 
 ### Overview
 
-Each town in the hex world has its own persistent shop with tier-based inventory, dynamic pricing, and shared stock across all players. Shops are accessed through a fixed UI panel (no LLM involvement). LLM tools `buy_item`, `sell_item`, and `view_shop` have been removed.
+Each town in the hex world has its own persistent shop with tier-based inventory, dynamic pricing, and shared stock across all players. Shops are accessible through three interfaces:
+
+1. **REST API** — Three endpoints for AI agents and external clients
+2. **WebSocket** — Three client message types for the browser UI
+3. **LLM tools** — `buy_item`, `sell_item`, `view_shop` route through `execute_tool_call_with_shop` so the LLM can buy/sell on the player's behalf
+
+All three interfaces use the same `ShopStore` backend. **The engine controls all prices** — the LLM cannot set or influence prices. When the LLM calls `buy_item` or `sell_item`, the executor looks up the current price from ShopStore and charges/pays exactly that.
 
 ### Dynamic Pricing
 
 ```
-buy_price = base_price * clamp(1.0 + (base_stock - current_stock) * sensitivity, 0.25, 3.0)
-sell_price = buy_price * 60%
+buy_price = base_price × clamp(1.0 + (base_stock - current_stock) × sensitivity, 0.25, 3.0)
+sell_price = buy_price × 60%   (minimum 1 gold)
 ```
 
-- `sensitivity` = 0.03 (same-tier items) or 0.05 (above-tier items)
+- `sensitivity` = 0.03 (same-tier items) or 0.05 (above-tier items), 0.04 default for player-sold
 - Prices rise when stock is depleted (players bought items)
 - Prices drop when stock has surplus (players sold items)
 - Floor: 25% of base price. Ceiling: 300% of base price
+- `price_category`: `"above"` (stock depleted), `"normal"` (near base), `"below"` (surplus)
 
 ### Shared Inventory
 
@@ -1435,34 +1442,57 @@ Restocking is calculated on access (no background timer):
 - `data/shops.json` — All shop states, keyed by hex coordinates `"q_r"`
 - `ShopStore` with `Arc<RwLock>` in-memory caching for concurrent access
 - Shops are created lazily on first visit from county tier
+- `ShopStore` is created in `main.rs` and threaded to both web server and API server
 
 ### REST API Endpoints
 
+All endpoints require `Authorization: Bearer <JWT>`. The adventure ID is in the URL path.
+
 | Method | Path | Auth | Request Body | Response |
 |--------|------|------|-------------|----------|
-| `GET` | `/api/shop?adventure_id=X` | Yes | -- | `{shop_name, tier, items[], player_gold, player_inventory[]}` |
-| `POST` | `/api/shop/buy` | Yes | `{adventure_id, item_id, quantity}` | `{success, message, item_name?, price_paid?, gold_remaining?}` |
-| `POST` | `/api/shop/sell` | Yes | `{adventure_id, item_name, quantity}` | `{success, message, item_name?, gold_earned?, gold_remaining?}` |
+| `GET` | `/api/adventures/:id/shop` | Yes | -- | `{shop_name, tier, items[], player_gold}` |
+| `POST` | `/api/adventures/:id/shop/buy` | Yes | `{item_id, quantity?}` | `{success, message, gold_remaining}` |
+| `POST` | `/api/adventures/:id/shop/sell` | Yes | `{item_name}` | `{success, message, sell_price, gold_remaining}` |
+
+**View Shop response `items[]` element:**
+```json
+{
+  "item_id": "longsword",
+  "name": "Longsword",
+  "description": "A double-edged blade...",
+  "buy_price": 28,
+  "sell_price": 16,
+  "current_stock": 3,
+  "price_category": "above",
+  "tier": 2
+}
+```
+
+**Buy request:** `quantity` defaults to 1 if omitted.
+
+**Error responses:** `{"error": "No shop at this location."}`, `{"error": "Not enough gold..."}`, `{"error": "Not enough stock..."}`, `{"error": "Adventure not found"}` (404).
 
 ### WebSocket Protocol
 
-**Client -> Server:**
+**Client → Server:**
 | Type | Fields | Description |
 |------|--------|-------------|
-| `view_shop` | -- | Request shop inventory at current location |
-| `shop_buy` | `item_id, quantity` | Buy from shop |
-| `shop_sell` | `item_name, quantity` | Sell to shop |
+| `view_shop` | — | Request shop inventory at current location |
+| `shop_buy` | `item_id`, `quantity` (default 1) | Buy from shop |
+| `shop_sell` | `item_name` | Sell item from inventory |
 
-**Server -> Client:**
+**Server → Client:**
 | Type | Fields | Description |
 |------|--------|-------------|
-| `shop_inventory` | `shop_name, tier, items[], player_gold, player_inventory[]` | Full shop view |
-| `shop_buy_result` | `success, message, item_name?, price_paid?, gold_remaining?` | Buy outcome |
-| `shop_sell_result` | `success, message, item_name?, gold_earned?, gold_remaining?` | Sell outcome |
+| `shop_inventory` | `shop_name`, `tier`, `items[]` (ShopItemInfo), `player_gold` | Full shop view |
+| `shop_buy_result` | `success`, `item_name`, `price`, `gold_remaining`, `error?` | Buy outcome |
+| `shop_sell_result` | `success`, `item_name`, `gold_earned`, `gold_remaining`, `error?` | Sell outcome |
 
-### UI: Shop
+On successful buy/sell, the server also sends a `state_update` message with the full updated adventure state.
 
-Modal overlay with Buy/Sell tabs. Items show image thumbnails, price (color-coded: red=scarce, green=surplus, gold=normal), stock count, and buy/sell buttons. Player-sold items are labeled.
+### LLM Tool Integration
+
+The executor's `buy_item`, `sell_item`, and `view_shop` tools route through `execute_tool_call_with_shop()` which receives an `Option<&ShopStore>`. The `ShopStore` is threaded from `main.rs` → `server.rs` (`AppState`) → `websocket.rs` (`handle_socket` → `handle_client_msg` → `continue_tool_loop` / `run_game_turn` / `start_adventure` / `handle_combat_action`).
 
 ### Key Files
 
@@ -1470,9 +1500,10 @@ Modal overlay with Buy/Sell tabs. Items show image thumbnails, price (color-code
 |------|---------|
 | `src/engine/shop.rs` | Shop data model, pricing, restock, buy/sell logic |
 | `src/storage/shop_store.rs` | JSON persistence with RwLock caching |
-| `static/js/adventure.js` | Shop panel (renderShopPanel), Skills panel (renderSkills), Crafting panel (renderCraftingPanel), Equipment comparison (renderItemComparison) |
-| `static/js/app.js` | RecipeList/CraftResult WebSocket handlers, crafting button in fixed actions, switchToCraftingTab |
-| `static/css/adventure.css` | Shop, skills, crafting, and equipment comparison styles |
+| `src/engine/executor.rs` | `execute_tool_call_with_shop()` — LLM tool routing with ShopStore |
+| `src/web/api_server.rs` | REST endpoints: `shop_view`, `shop_buy`, `shop_sell` |
+| `src/web/websocket.rs` | WS handlers: ViewShop, ShopBuy, ShopSell |
+| `src/web/protocol.rs` | Message type definitions: ShopItemInfo, ShopInventory, ShopBuyResult, ShopSellResult |
 
 ### UI: Skills Tab
 
