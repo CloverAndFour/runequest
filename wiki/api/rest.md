@@ -112,6 +112,57 @@ Query params for `/api/recipes`: `skill` (filter by skill ID), `tier` (filter by
 
 Craft result: `{crafted, output, quantity, skill_progress}` on success, or `{error}` on failure.
 
+## Dungeon
+
+| Method | Path | Auth | Request Body | Response |
+|---|---|---|---|---|
+| POST | `/api/adventures/:id/dungeon/enter` | Yes | `{seed?, tier?}` | `{result, dungeon, state}` |
+| POST | `/api/adventures/:id/dungeon/move` | Yes | `{direction}` | `{result, room, floor, room_id, state}` |
+| POST | `/api/adventures/:id/dungeon/skill-check` | Yes | `{direction, skill_id}` | `{result, skill, roll, dc, success}` |
+| POST | `/api/adventures/:id/dungeon/activate-point` | Yes | `{puzzle_id, room_id}` | `{result, puzzle_id, activated_count, required_count, solved}` |
+| POST | `/api/adventures/:id/dungeon/retreat` | Yes | -- | `{result, message, state}` |
+| GET | `/api/adventures/:id/dungeon/status` | Yes | -- | `{in_dungeon, name?, tier?, ...}` |
+
+`direction` values: `"North"`, `"South"`, `"East"`, `"West"`, `"Descend"`, `"Ascend"`
+
+**dungeon/enter:** Generates a dungeon at the player's current county (must have `has_dungeon: true`). Optional `seed` overrides the dungeon seed; optional `tier` overrides the county's dungeon tier.
+
+**dungeon/move:** Move in a cardinal direction or descend/ascend stairs. Returns the new room contents.
+
+**dungeon/skill-check:** Attempt to pass a skill gate blocking a direction. Rolls the player's skill rank against the gate DC. On success the path opens.
+
+**dungeon/activate-point:** Activate a puzzle activation point. Returns how many points are active and whether the puzzle is solved.
+
+**dungeon/retreat:** Leave the dungeon and return to the world map.
+
+**dungeon/status:** Returns current dungeon state: whether the player is in a dungeon, dungeon name, tier, current floor, room, and room contents.
+
+## Tower
+
+| Method | Path | Auth | Request Body | Response |
+|---|---|---|---|---|
+| GET | `/api/towers` | Yes | -- | `{towers: [{id, name, base_tier, ...}]}` |
+| GET | `/api/towers/:tower_id/floor/:floor_num` | Yes | -- | `{floor: FloorSummary}` |
+| POST | `/api/adventures/:id/tower/enter` | Yes | `{tower_id}` | `{result, tower_name, floor, tier, state}` |
+| POST | `/api/adventures/:id/tower/move` | Yes | `{direction}` | Same as dungeon/move |
+| POST | `/api/adventures/:id/tower/ascend` | Yes | -- | Same as dungeon/move (uses "Descend" direction internally) |
+| POST | `/api/adventures/:id/tower/checkpoint` | Yes | `{floor}` | `{checkpoint_attuned, floor, teleport_cost}` |
+| POST | `/api/adventures/:id/tower/teleport` | Yes | `{target_floor}` | `{teleport_available, target_floor, cost}` or error if insufficient gold |
+
+**towers (list):** Returns all 10 towers with their ID, name, base tier, and location county.
+
+**towers/:tower_id/floor/:floor_num:** Returns a summary of a specific floor (room count, cleared status, boss presence, etc.). Does not require the player to be in the tower.
+
+**tower/enter:** Enter a tower. The player must be at a county with `has_tower: true` and the `tower_id` must match. Places the player on floor 0, room (0,0).
+
+**tower/move:** Move within the current tower floor. Same direction values as dungeon/move.
+
+**tower/ascend:** Ascend to the next floor. The player must be at the stairs room.
+
+**tower/checkpoint:** Attune to a checkpoint on the current floor. Only available on safe floors (every 10th). Attuning is free; records the checkpoint for later teleportation.
+
+**tower/teleport:** Teleport to a previously attuned checkpoint floor. Costs `floor_number * 10` gold. Returns an error if the player lacks sufficient gold or has not attuned to the target floor.
+
 ## Shop
 
 | Method | Path | Auth | Request Body | Response |

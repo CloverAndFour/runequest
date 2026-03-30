@@ -82,6 +82,45 @@ pub enum ClientMsg {
     ShopSell {
         item_name: String,
     },
+    // Dungeon
+    DungeonEnter {
+        #[serde(default)]
+        seed: Option<u64>,
+        #[serde(default)]
+        tier: Option<u32>,
+    },
+    DungeonMove {
+        direction: String,
+    },
+    DungeonSkillCheck {
+        direction: String,
+        skill_id: String,
+    },
+    DungeonActivatePoint {
+        puzzle_id: String,
+        room_id: usize,
+    },
+    DungeonRetreat,
+    DungeonStatus,
+    // Tower
+    TowerList,
+    TowerEnter {
+        tower_id: String,
+    },
+    TowerMove {
+        direction: String,
+    },
+    TowerAscend,
+    TowerCheckpoint {
+        floor: u32,
+    },
+    TowerTeleport {
+        target_floor: u32,
+    },
+    TowerFloorStatus {
+        tower_id: String,
+        floor: u32,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -244,6 +283,73 @@ pub enum ServerMsg {
         gold_remaining: u32,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+    },
+
+    // Dungeon messages
+    DungeonEntered {
+        name: String,
+        tier: u32,
+        floors: usize,
+        room: serde_json::Value,
+    },
+    DungeonRoomChanged {
+        room: serde_json::Value,
+        floor: usize,
+        room_id: usize,
+    },
+    DungeonSkillGateResult {
+        skill: String,
+        roll: i32,
+        dc: i32,
+        success: bool,
+    },
+    DungeonPuzzleActivation {
+        puzzle_id: String,
+        activated_count: usize,
+        required_count: u32,
+        solved: bool,
+    },
+    DungeonRetreated {
+        message: String,
+    },
+    DungeonStatus {
+        status: serde_json::Value,
+    },
+    CorruptionTick {
+        level: f32,
+        effects: serde_json::Value,
+    },
+    PathCleared {
+        path_index: usize,
+        mini_boss: String,
+    },
+    ConvergenceUnlocked {
+        convergence_room: usize,
+    },
+    BreachWarning {
+        message: String,
+    },
+    // Tower messages
+    TowerList {
+        towers: Vec<serde_json::Value>,
+    },
+    TowerEntered {
+        tower_name: String,
+        floor: u32,
+        tier: String,
+    },
+    TowerFloorStatus {
+        floor: serde_json::Value,
+    },
+    TowerPlayerNearby {
+        player_name: String,
+        room_x: u32,
+        room_y: u32,
+    },
+    TowerFirstClear {
+        tower: String,
+        floor: u32,
+        player: String,
     },
     StateChanges {
         #[serde(skip_serializing_if = "Option::is_none")]

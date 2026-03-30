@@ -131,6 +131,12 @@ pub struct CombatState {
     pub flee_attempts: u32,
     #[serde(default)]
     pub combat_log: Vec<String>,
+    /// If set, boss enrages after this many rounds (T5+ dungeons).
+    #[serde(default)]
+    pub enrage_round: Option<u32>,
+    /// True once enrage has triggered.
+    #[serde(default)]
+    pub enrage_active: bool,
 }
 
 impl CombatState {
@@ -145,6 +151,7 @@ impl CombatState {
         self.round = 1;
         self.player_dodging = false;
         self.flee_attempts = 0;
+        self.enrage_active = false;
         self.combat_log.clear();
 
         // Roll initiative
@@ -187,6 +194,8 @@ impl CombatState {
         self.round = 0;
         self.action_economy = ActionEconomy::default();
         self.player_dodging = false;
+        self.enrage_round = None;
+        self.enrage_active = false;
     }
 
     /// Get whose turn it currently is.
@@ -399,5 +408,49 @@ impl CombatState {
     /// Get living enemies count.
     pub fn living_enemies(&self) -> Vec<&Enemy> {
         self.enemies.iter().filter(|e| e.hp > 0).collect()
+    }
+
+    /// Check if enrage should trigger this round, and apply AoE damage if so.
+    /// Returns Some(damage_per_player) if enrage fires this round, None otherwise.
+    pub fn check_enrage(&mut self) -> Option<i32> {
+        if let Some(enrage_at) = self.enrage_round {
+            if self.round >= enrage_at && !self.enrage_active {
+                self.enrage_active = true;
+                self.combat_log.push(format!(
+                    "*** ENRAGE! The boss enters a frenzy after round {}! ***",
+                    enrage_at
+                ));
+            }
+            if self.enrage_active {
+                // Find the boss (highest HP enemy) and calculate AoE damage
+                let boss_max_hp = self.enemies.iter()
+                    .filter(|e| e.hp > 0)
+                    .map(|e| e.max_hp)
+                    .max()
+                    .unwrap_or(0);
+                let aoe_damage = (boss_max_hp as f32 * 0.25).round() as i32;
+                if aoe_damage > 0 {
+                    self.combat_log.push(format!(
+                        "Enrage AoE: {} damage to all players in the room!",
+                        aoe_damage
+                    ));
+                }
+                return Some(aoe_damage);
+            }
+        }
+        None
+    }
+
+    /// Set up an enrage timer for boss combat in tiered dungeons.
+    /// enrage_round = max(8, 25 - tier * 2)
+    pub fn set_enrage_timer(&mut self, tier: u32) {
+        if tier >= 5 {
+            let enrage_at = (25u32.saturating_sub(tier * 2)).max(8);
+            self.enrage_round = Some(enrage_at);
+            self.combat_log.push(format!(
+                "The boss will enrage after round {}!",
+                enrage_at
+            ));
+        }
     }
 }

@@ -13,6 +13,8 @@ use crate::engine::character::{Class, Race, Stats};
 use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::executor::{execute_tool_call, execute_tool_call_with_shop, ToolExecResult};
+use crate::engine::dungeon::generate_tiered_dungeon;
+use crate::engine::tower::{tower_definitions, generate_floor, floor_summary, meets_entry_requirement};
 use crate::storage::shop_store::ShopStore;
 use crate::llm::client::XaiClient;
 use crate::llm::pricing::{SessionCost, TokenUsage};
@@ -266,6 +268,356 @@ async fn handle_client_msg(
                 }
             } else {
                 send_msg(sender, &ServerMsg::Error { code: "no_adventure".to_string(), message: "No active adventure".to_string() }).await;
+            }
+        }
+
+
+        // ---------------------------------------------------------------
+        // Dungeon messages
+        // ---------------------------------------------------------------
+
+        ClientMsg::DungeonEnter { seed, tier } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if adv.dungeon.is_some() {
+                    send_msg(sender, &ServerMsg::Error { code: "already_in_dungeon".into(), message: "Already in a dungeon".into() }).await;
+                } else {
+                    let s = seed.unwrap_or_else(|| {
+                        use std::time::{SystemTime, UNIX_EPOCH};
+                        SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+                    });
+                    let t = tier.unwrap_or(0).min(10);
+                    let dungeon = generate_tiered_dungeon(s, t);
+                    let room_json = dungeon.current_room().map(|r| serde_json::json!({
+                        "name": r.name, "type": format!("{}", r.room_type),
+                        "description": r.description,
+                        "exits": r.exits.iter().map(|e| &e.direction).collect::<Vec<_>>(),
+                    })).unwrap_or(serde_json::json!(null));
+                    let name = dungeon.name.clone();
+                    let tier_val = dungeon.tier;
+                    let floors = dungeon.floors.len();
+                    adv.dungeon = Some(dungeon);
+                    sess.store.save_adventure(&adv).ok();
+                    send_msg(sender, &ServerMsg::DungeonEntered { name, tier: tier_val, floors, room: room_json }).await;
+                    let state = build_state_with_map(&adv);
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                }
+                sess.adventure = Some(adv);
+            } else {
+                send_msg(sender, &ServerMsg::Error { code: "no_adventure".into(), message: "No active adventure".into() }).await;
+            }
+        }
+
+        ClientMsg::DungeonMove { direction } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if let Some(ref mut dungeon) = adv.dungeon {
+                    // Check skill gates
+                    let cf = dungeon.current_floor;
+                    let cr = dungeon.current_room;
+                    let blocked = if let Some(floor) = dungeon.floors.get(cf) {
+                        if let Some(room) = floor.rooms.get(cr) {
+                            if let Some(ei) = room.exits.iter().position(|e| e.direction.to_lowercase() == direction.to_lowercase()) {
+                                floor.skill_gates.iter().any(|g| g.room_id == cr && g.exit_index == ei)
+                            } else { false }
+                        } else { false }
+                    } else { false };
+
+                    if blocked {
+                        send_msg(sender, &ServerMsg::Error { code: "skill_gate_locked".into(), message: "Exit is skill-gated. Use dungeon_skill_check first.".into() }).await;
+                    } else {
+                        match dungeon.move_to_room(&direction) {
+                            Ok(result) => {
+                                let room_json = serde_json::json!({
+                                    "name": result.room_name, "type": format!("{}", result.room_type),
+                                    "description": result.description, "has_enemies": result.has_enemies,
+                                    "has_trap": result.has_trap, "exits": result.exits,
+                                });
+                                sess.store.save_adventure(&adv).ok();
+                                send_msg(sender, &ServerMsg::DungeonRoomChanged { room: room_json, floor: result.floor, room_id: result.room_id }).await;
+                                let state = build_state_with_map(&adv);
+                                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                            }
+                            Err(e) => {
+                                send_msg(sender, &ServerMsg::Error { code: "move_failed".into(), message: e }).await;
+                            }
+                        }
+                    }
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_dungeon".into(), message: "Not in a dungeon".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::DungeonSkillCheck { direction, skill_id } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if let Some(ref mut dungeon) = adv.dungeon {
+                    let cf = dungeon.current_floor;
+                    let cr = dungeon.current_room;
+                    let gate_info = if let Some(floor) = dungeon.floors.get(cf) {
+                        if let Some(room) = floor.rooms.get(cr) {
+                            if let Some(ei) = room.exits.iter().position(|e| e.direction.to_lowercase() == direction.to_lowercase()) {
+                                floor.skill_gates.iter().find(|g| g.room_id == cr && g.exit_index == ei).cloned()
+                            } else { None }
+                        } else { None }
+                    } else { None };
+
+                    if let Some(gate) = gate_info {
+                        let player_rank = adv.skills.get(&skill_id).map(|s| s.rank).unwrap_or(0);
+                        if player_rank < gate.required_rank {
+                            send_msg(sender, &ServerMsg::Error { code: "insufficient_rank".into(),
+                                message: format!("Need {} rank {} but have {}", gate.required_skill, gate.required_rank, player_rank) }).await;
+                        } else {
+                            let roll = DiceRoller::roll("1d20", 1, player_rank as i32);
+                            let success = roll.total >= gate.dc;
+                            if success {
+                                if let Some(floor) = dungeon.floors.get_mut(cf) {
+                                    if let Some(room) = floor.rooms.get(cr) {
+                                        if let Some(ei) = room.exits.iter().position(|e| e.direction.to_lowercase() == direction.to_lowercase()) {
+                                            floor.skill_gates.retain(|g| !(g.room_id == cr && g.exit_index == ei));
+                                        }
+                                    }
+                                }
+                            }
+                            sess.store.save_adventure(&adv).ok();
+                            send_msg(sender, &ServerMsg::DungeonSkillGateResult {
+                                skill: skill_id, roll: roll.total, dc: gate.dc, success,
+                            }).await;
+                        }
+                    } else {
+                        send_msg(sender, &ServerMsg::Error { code: "no_gate".into(), message: "No skill gate on that exit".into() }).await;
+                    }
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_dungeon".into(), message: "Not in a dungeon".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::DungeonActivatePoint { puzzle_id, room_id } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if let Some(ref mut dungeon) = adv.dungeon {
+                    let cf = dungeon.current_floor;
+                    if let Some(floor) = dungeon.floors.get_mut(cf) {
+                        if let Some(puzzle) = floor.simultaneous_puzzles.iter_mut().find(|p| p.id == puzzle_id) {
+                            if puzzle.solved {
+                                send_msg(sender, &ServerMsg::Error { code: "already_solved".into(), message: "Puzzle already solved".into() }).await;
+                            } else if let Some(point) = puzzle.activation_points.iter_mut().find(|ap| ap.room_id == room_id) {
+                                use std::time::{SystemTime, UNIX_EPOCH};
+                                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+                                point.activated_by = Some(adv.character.name.clone());
+                                point.activated_at = Some(now);
+
+                                let activated: Vec<u64> = puzzle.activation_points.iter().filter_map(|ap| ap.activated_at).collect();
+                                let all_ok = activated.len() >= puzzle.required_count as usize;
+                                let in_window = if all_ok && activated.len() >= 2 {
+                                    let mn = activated.iter().min().unwrap();
+                                    let mx = activated.iter().max().unwrap();
+                                    (mx - mn) <= puzzle.timer_window_ms as u64
+                                } else { all_ok };
+                                let solved = all_ok && in_window;
+                                if solved { puzzle.solved = true; }
+                                let ac = activated.len();
+                                let rc = puzzle.required_count;
+
+                                sess.store.save_adventure(&adv).ok();
+                                send_msg(sender, &ServerMsg::DungeonPuzzleActivation {
+                                    puzzle_id, activated_count: ac, required_count: rc, solved,
+                                }).await;
+                            } else {
+                                send_msg(sender, &ServerMsg::Error { code: "no_point".into(), message: "No activation point in that room".into() }).await;
+                            }
+                        } else {
+                            send_msg(sender, &ServerMsg::Error { code: "puzzle_not_found".into(), message: "No such puzzle".into() }).await;
+                        }
+                    }
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_dungeon".into(), message: "Not in a dungeon".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::DungeonRetreat => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if adv.combat.active {
+                    send_msg(sender, &ServerMsg::Error { code: "in_combat".into(), message: "Cannot retreat during combat".into() }).await;
+                } else if let Some(ref d) = adv.dungeon {
+                    let msg = format!("You retreat from {}.", d.name);
+                    adv.dungeon = None;
+                    sess.store.save_adventure(&adv).ok();
+                    send_msg(sender, &ServerMsg::DungeonRetreated { message: msg }).await;
+                    let state = build_state_with_map(&adv);
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_dungeon".into(), message: "Not in a dungeon".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::DungeonStatus => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let status = if let Some(ref d) = adv.dungeon {
+                    let room = d.current_room();
+                    let floor = d.current_floor();
+                    serde_json::json!({
+                        "in_dungeon": true, "name": d.name, "tier": d.tier,
+                        "total_floors": d.floors.len(),
+                        "current_floor": d.current_floor, "current_room": d.current_room,
+                        "room": room.map(|r| serde_json::json!({
+                            "name": r.name, "type": format!("{}", r.room_type),
+                            "cleared": r.cleared,
+                            "exits": r.exits.iter().map(|e| serde_json::json!({"direction": e.direction, "locked": e.locked})).collect::<Vec<_>>(),
+                        })),
+                        "floor_info": floor.map(|f| serde_json::json!({
+                            "skill_gates": f.skill_gates.len(),
+                            "puzzles": f.simultaneous_puzzles.len(),
+                            "corruption_enabled": f.corruption_enabled,
+                        })),
+                    })
+                } else {
+                    serde_json::json!({"in_dungeon": false})
+                };
+                send_msg(sender, &ServerMsg::DungeonStatus { status }).await;
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Tower messages
+        // ---------------------------------------------------------------
+
+        ClientMsg::TowerList => {
+            let towers = tower_definitions();
+            let list: Vec<serde_json::Value> = towers.iter().map(|t| serde_json::json!({
+                "id": t.id, "name": t.name, "base_tier": t.base_tier,
+                "entry_skill_rank": t.entry_skill_rank, "description": t.description,
+            })).collect();
+            send_msg(sender, &ServerMsg::TowerList { towers: list }).await;
+        }
+
+        ClientMsg::TowerEnter { tower_id } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if adv.dungeon.is_some() {
+                    send_msg(sender, &ServerMsg::Error { code: "already_in_dungeon".into(), message: "Already in a dungeon/tower".into() }).await;
+                } else {
+                    let towers = tower_definitions();
+                    if let Some(tower) = towers.iter().find(|t| t.id == tower_id) {
+                        let max_rank = adv.skills.skills.iter().map(|s| s.rank).max().unwrap_or(0);
+                        if !meets_entry_requirement(tower, max_rank) {
+                            send_msg(sender, &ServerMsg::Error { code: "entry_denied".into(),
+                                message: format!("{} requires skill rank {}+", tower.name, tower.entry_skill_rank) }).await;
+                        } else {
+                            let floor = generate_floor(tower, 0);
+                            let tier = floor.tier.round() as u32;
+                            let dungeon = generate_tiered_dungeon(tower.seed, tier);
+                            let mut td = dungeon;
+                            td.name = format!("{} — Floor 0", tower.name);
+                            let tower_name = tower.name.clone();
+                            let tier_str = format!("{:.1}", floor.tier);
+                            adv.dungeon = Some(td);
+                            sess.store.save_adventure(&adv).ok();
+                            send_msg(sender, &ServerMsg::TowerEntered { tower_name, floor: 0, tier: tier_str }).await;
+                            let state = build_state_with_map(&adv);
+                            send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                        }
+                    } else {
+                        send_msg(sender, &ServerMsg::Error { code: "tower_not_found".into(), message: "Unknown tower".into() }).await;
+                    }
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::TowerMove { direction } => {
+            // Delegate to dungeon move logic
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if let Some(ref mut dungeon) = adv.dungeon {
+                    match dungeon.move_to_room(&direction) {
+                        Ok(result) => {
+                            let room_json = serde_json::json!({
+                                "name": result.room_name, "type": format!("{}", result.room_type),
+                                "description": result.description, "has_enemies": result.has_enemies,
+                                "exits": result.exits,
+                            });
+                            sess.store.save_adventure(&adv).ok();
+                            send_msg(sender, &ServerMsg::DungeonRoomChanged { room: room_json, floor: result.floor, room_id: result.room_id }).await;
+                        }
+                        Err(e) => send_msg(sender, &ServerMsg::Error { code: "move_failed".into(), message: e }).await,
+                    }
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_tower".into(), message: "Not in a tower".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::TowerAscend => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                if let Some(ref mut dungeon) = adv.dungeon {
+                    match dungeon.move_to_room("Descend") {
+                        Ok(result) => {
+                            let room_json = serde_json::json!({
+                                "name": result.room_name, "type": format!("{}", result.room_type),
+                                "description": result.description, "exits": result.exits,
+                            });
+                            sess.store.save_adventure(&adv).ok();
+                            send_msg(sender, &ServerMsg::DungeonRoomChanged { room: room_json, floor: result.floor, room_id: result.room_id }).await;
+                        }
+                        Err(e) => send_msg(sender, &ServerMsg::Error { code: "ascend_failed".into(), message: e }).await,
+                    }
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_tower".into(), message: "Not in a tower".into() }).await;
+                }
+                sess.adventure = Some(adv);
+            }
+        }
+
+        ClientMsg::TowerCheckpoint { floor } => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                if adv.dungeon.is_some() {
+                    let cost = crate::engine::tower::checkpoint_teleport_cost(floor);
+                    send_msg(sender, &ServerMsg::DungeonStatus {
+                        status: serde_json::json!({"checkpoint_attuned": true, "floor": floor, "teleport_cost": cost}),
+                    }).await;
+                } else {
+                    send_msg(sender, &ServerMsg::Error { code: "not_in_tower".into(), message: "Not in a tower".into() }).await;
+                }
+            }
+        }
+
+        ClientMsg::TowerTeleport { target_floor } => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let cost = crate::engine::tower::checkpoint_teleport_cost(target_floor);
+                if adv.character.gold < cost {
+                    send_msg(sender, &ServerMsg::Error { code: "insufficient_gold".into(),
+                        message: format!("Need {} gold, have {}", cost, adv.character.gold) }).await;
+                } else {
+                    send_msg(sender, &ServerMsg::DungeonStatus {
+                        status: serde_json::json!({"teleport_available": true, "target_floor": target_floor, "cost": cost}),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::TowerFloorStatus { tower_id, floor } => {
+            let towers = tower_definitions();
+            if let Some(tower) = towers.iter().find(|t| t.id == tower_id) {
+                let f = generate_floor(tower, floor);
+                let summary = floor_summary(&f);
+                send_msg(sender, &ServerMsg::TowerFloorStatus { floor: summary }).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error { code: "tower_not_found".into(), message: "Unknown tower".into() }).await;
             }
         }
 
@@ -594,7 +946,7 @@ async fn handle_client_msg(
                     send_cost_update(sender, &sess).await;
 
                     if let Some(ref adv) = sess.adventure {
-                        let state = build_state_with_map(adv);
+                        let state = build_state_with_map(&adv);
                         send_msg(sender, &ServerMsg::StateUpdate { state }).await;
                     }
                 } else {
@@ -607,7 +959,7 @@ async fn handle_client_msg(
         ClientMsg::GetCharacterSheet | ClientMsg::GetInventory | ClientMsg::GetQuests => {
             let sess = session.lock().await;
             if let Some(ref adv) = sess.adventure {
-                let state = build_state_with_map(adv);
+                let state = build_state_with_map(&adv);
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
             }
         }
@@ -636,7 +988,7 @@ async fn handle_client_msg(
         ClientMsg::GetNpcs => {
             let sess = session.lock().await;
             if let Some(ref adv) = sess.adventure {
-                let state = build_state_with_map(adv);
+                let state = build_state_with_map(&adv);
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
             }
         }
@@ -991,7 +1343,7 @@ async fn continue_tool_loop(
                 send_cost_update(sender, &sess).await;
 
                 if let Some(ref adv) = sess.adventure {
-                    let state = build_state_with_map(adv);
+                    let state = build_state_with_map(&adv);
                     send_msg(sender, &ServerMsg::StateUpdate { state }).await;
                 }
 

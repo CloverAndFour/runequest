@@ -6,6 +6,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 use super::combat::EnemyType;
+use super::dungeon::SkillGate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TowerInfo {
@@ -13,6 +14,10 @@ pub struct TowerInfo {
     pub name: String,
     pub base_tier: f32,
     pub seed: u64,
+    /// Minimum skill rank required to enter (0 = no requirement)
+    pub entry_skill_rank: u8,
+    /// Flavor description
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +28,19 @@ pub struct TowerFloor {
     pub width: u32,
     pub height: u32,
     pub rooms: Vec<TowerRoom>,
-    pub safe_floor: bool,
+    /// Guard floor: guards patrol all rooms, attack killers on sight.
+    pub guard_floor: bool,
+    /// Tier of guards on this floor (only relevant if guard_floor).
+    pub guard_tier: f32,
+    /// Skill gates on this floor (T2+ effective tier).
+    #[serde(default)]
+    pub skill_gates: Vec<SkillGate>,
+    /// Whether the boss on this floor has been killed.
+    #[serde(default)]
+    pub boss_killed: bool,
+    /// Whether first-clear bonus has been claimed.
+    #[serde(default)]
+    pub first_clear_claimed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,7 +59,7 @@ pub enum TowerRoomType {
     Combat,
     Treasure,
     Trap,
-    Safe,       // Rest area, no PvP
+    GuardPatrolled, // Guards patrol — attack killers on sight, defend non-killers
     Stairs,     // Go to next floor
     Boss,       // Floor boss
 }
@@ -57,16 +74,16 @@ pub struct TowerEnemy {
 /// The 10 towers in the world.
 pub fn tower_definitions() -> Vec<TowerInfo> {
     vec![
-        TowerInfo { id: "tower_dawn".into(), name: "Tower of Dawn".into(), base_tier: 2.0, seed: 1001 },
-        TowerInfo { id: "ironspire".into(), name: "Ironspire".into(), base_tier: 3.5, seed: 1002 },
-        TowerInfo { id: "thornkeep".into(), name: "The Thornkeep".into(), base_tier: 4.5, seed: 1003 },
-        TowerInfo { id: "tidecaller".into(), name: "Tidecaller Spire".into(), base_tier: 5.0, seed: 1004 },
-        TowerInfo { id: "shadowpillar".into(), name: "Shadowpillar".into(), base_tier: 5.5, seed: 1005 },
-        TowerInfo { id: "nexus".into(), name: "The Nexus".into(), base_tier: 6.0, seed: 1006 },
-        TowerInfo { id: "dragonwatch".into(), name: "Dragonwatch".into(), base_tier: 7.0, seed: 1007 },
-        TowerInfo { id: "frostspire".into(), name: "Frostspire".into(), base_tier: 8.0, seed: 1008 },
-        TowerInfo { id: "abyss".into(), name: "The Abyss".into(), base_tier: 8.5, seed: 1009 },
-        TowerInfo { id: "primordial_spire".into(), name: "Primordial Spire".into(), base_tier: 9.5, seed: 1010 },
+        TowerInfo { id: "tower_dawn".into(), name: "Tower of Dawn".into(), base_tier: 2.0, seed: 1001, entry_skill_rank: 0, description: "Beginner-friendly, gentle scaling".into() },
+        TowerInfo { id: "ironspire".into(), name: "Ironspire".into(), base_tier: 3.5, seed: 1002, entry_skill_rank: 2, description: "Solo/duo training ground".into() },
+        TowerInfo { id: "thornkeep".into(), name: "The Thornkeep".into(), base_tier: 4.5, seed: 1003, entry_skill_rank: 3, description: "First party content".into() },
+        TowerInfo { id: "tidecaller".into(), name: "Tidecaller Spire".into(), base_tier: 5.0, seed: 1004, entry_skill_rank: 4, description: "Coordinated parties".into() },
+        TowerInfo { id: "shadowpillar".into(), name: "Shadowpillar".into(), base_tier: 5.5, seed: 1005, entry_skill_rank: 4, description: "PvP-heavy, competitive".into() },
+        TowerInfo { id: "nexus".into(), name: "The Nexus".into(), base_tier: 6.0, seed: 1006, entry_skill_rank: 5, description: "Guild territory wars".into() },
+        TowerInfo { id: "dragonwatch".into(), name: "Dragonwatch".into(), base_tier: 7.0, seed: 1007, entry_skill_rank: 6, description: "Serious raid content".into() },
+        TowerInfo { id: "frostspire".into(), name: "Frostspire".into(), base_tier: 8.0, seed: 1008, entry_skill_rank: 7, description: "Endgame guild content".into() },
+        TowerInfo { id: "abyss".into(), name: "The Abyss".into(), base_tier: 8.5, seed: 1009, entry_skill_rank: 8, description: "Hardcore, high PvP".into() },
+        TowerInfo { id: "primordial_spire".into(), name: "Primordial Spire".into(), base_tier: 9.5, seed: 1010, entry_skill_rank: 9, description: "Server-first pinnacle".into() },
     ]
 }
 
@@ -79,7 +96,7 @@ pub fn generate_floor(tower: &TowerInfo, floor_number: u32) -> TowerFloor {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
     let tier = tower.base_tier + floor_number as f32 * 0.2;
-    let safe_floor = floor_number % 10 == 0 && floor_number > 0;
+    let guard_floor = floor_number % 10 == 0 && floor_number > 0;
 
     let size = (8 + floor_number * 2).min(50);
     let width = size;
@@ -89,10 +106,10 @@ pub fn generate_floor(tower: &TowerInfo, floor_number: u32) -> TowerFloor {
 
     for y in 0..height {
         for x in 0..width {
-            let room_type = if safe_floor {
-                TowerRoomType::Safe
+            let room_type = if guard_floor {
+                TowerRoomType::GuardPatrolled
             } else if x == 0 && y == 0 {
-                TowerRoomType::Safe // Entrance is always safe
+                TowerRoomType::GuardPatrolled // Entrance is always safe
             } else if x == width - 1 && y == height - 1 {
                 TowerRoomType::Stairs
             } else if x == width / 2 && y == height / 2 && floor_number % 5 == 4 {
@@ -106,7 +123,7 @@ pub fn generate_floor(tower: &TowerInfo, floor_number: u32) -> TowerFloor {
                 } else if roll < 0.70 {
                     TowerRoomType::Trap
                 } else if roll < 0.75 {
-                    TowerRoomType::Safe
+                    TowerRoomType::GuardPatrolled
                 } else {
                     TowerRoomType::Empty
                 }
@@ -138,6 +155,14 @@ pub fn generate_floor(tower: &TowerInfo, floor_number: u32) -> TowerFloor {
         }
     }
 
+    // Generate skill gates for higher-tier floors
+    let effective_tier = tier.round() as u32;
+    let skill_gates = if effective_tier >= 2 && !guard_floor {
+        generate_tower_skill_gates(&mut rng, effective_tier, width, height)
+    } else {
+        Vec::new()
+    };
+
     TowerFloor {
         tower_id: tower.id.clone(),
         floor_number,
@@ -145,7 +170,11 @@ pub fn generate_floor(tower: &TowerInfo, floor_number: u32) -> TowerFloor {
         width,
         height,
         rooms,
-        safe_floor,
+        guard_floor,
+        guard_tier: if guard_floor { tier } else { 0.0 },
+        skill_gates,
+        boss_killed: false,
+        first_clear_claimed: false,
     }
 }
 
@@ -163,9 +192,57 @@ pub fn floor_summary(floor: &TowerFloor) -> serde_json::Value {
         "total_rooms": floor.rooms.len(),
         "combat_rooms": combat_rooms,
         "cleared_rooms": cleared_rooms,
-        "safe_floor": floor.safe_floor,
+        "guard_floor": floor.guard_floor,
+        "guard_tier": format!("{:.1}", floor.guard_tier),
+        "first_clear_claimed": floor.first_clear_claimed,
+        "boss_killed": floor.boss_killed,
+        "skill_gates": floor.skill_gates.len(),
         "has_boss": has_boss,
     })
+}
+
+
+/// Calculate boss HP scaled by nearby player count.
+/// Each additional player within 3 rooms adds 30% base HP.
+pub fn boss_hp_scaled(base_hp: i32, nearby_players: u32) -> i32 {
+    let multiplier = 1.0 + 0.3 * (nearby_players.saturating_sub(1) as f32);
+    (base_hp as f32 * multiplier).round() as i32
+}
+
+/// Calculate teleport cost to a checkpoint floor.
+pub fn checkpoint_teleport_cost(floor_number: u32) -> u32 {
+    floor_number * 10
+}
+
+/// Check if a player meets the entry requirement for a tower.
+pub fn meets_entry_requirement(tower: &TowerInfo, max_skill_rank: u8) -> bool {
+    max_skill_rank >= tower.entry_skill_rank
+}
+
+/// Generate skill gates for a tower floor.
+fn generate_tower_skill_gates(rng: &mut ChaCha8Rng, effective_tier: u32, width: u32, height: u32) -> Vec<SkillGate> {
+    let skill_ids = [
+        "weapon_mastery", "shield_wall", "fortitude", "lockpicking", "stealth",
+        "evocation", "healing", "tracking", "smithing", "enchanting",
+    ];
+    let gate_count = (effective_tier / 3).min(3) as usize;
+    let dc = 10 + effective_tier as i32 * 2;
+    let min_rank = 1u8.max(effective_tier.saturating_sub(1) as u8);
+
+    let mut gates = Vec::new();
+    for i in 0..gate_count {
+        let room_x: u32 = rng.gen_range(1..width.max(2));
+        let room_y: u32 = rng.gen_range(1..height.max(2));
+        let room_id = (room_y * width + room_x) as usize;
+        gates.push(SkillGate {
+            room_id,
+            exit_index: 0,
+            required_skill: skill_ids[i % skill_ids.len()].to_string(),
+            required_rank: min_rank,
+            dc,
+        });
+    }
+    gates
 }
 
 #[cfg(test)]
@@ -211,10 +288,10 @@ mod tests {
     fn test_safe_floor_every_10() {
         let tower = &tower_definitions()[0];
         let f10 = generate_floor(tower, 10);
-        assert!(f10.safe_floor);
-        assert!(f10.rooms.iter().all(|r| r.room_type == TowerRoomType::Safe));
+        assert!(f10.guard_floor);
+        assert!(f10.rooms.iter().all(|r| r.room_type == TowerRoomType::GuardPatrolled));
         let f5 = generate_floor(tower, 5);
-        assert!(!f5.safe_floor);
+        assert!(!f5.guard_floor);
     }
 
     #[test]
@@ -222,7 +299,7 @@ mod tests {
         let tower = &tower_definitions()[0];
         let f1 = generate_floor(tower, 1);
         let entrance = f1.rooms.iter().find(|r| r.x == 0 && r.y == 0).unwrap();
-        assert_eq!(entrance.room_type, TowerRoomType::Safe);
+        assert_eq!(entrance.room_type, TowerRoomType::GuardPatrolled);
     }
 
     #[test]
@@ -253,6 +330,42 @@ mod tests {
         assert!((f5.tier - 3.0).abs() < f32::EPSILON);
     }
 
+
+    #[test]
+    fn test_boss_hp_scaling() {
+        assert_eq!(boss_hp_scaled(100, 1), 100);
+        assert_eq!(boss_hp_scaled(100, 2), 130);
+        assert_eq!(boss_hp_scaled(100, 10), 370);
+    }
+
+    #[test]
+    fn test_checkpoint_cost() {
+        assert_eq!(checkpoint_teleport_cost(0), 0);
+        assert_eq!(checkpoint_teleport_cost(10), 100);
+        assert_eq!(checkpoint_teleport_cost(50), 500);
+    }
+
+    #[test]
+    fn test_entry_requirements() {
+        let towers = tower_definitions();
+        assert!(meets_entry_requirement(&towers[0], 0));
+        assert!(!meets_entry_requirement(&towers[1], 1));
+        assert!(meets_entry_requirement(&towers[1], 2));
+        assert!(!meets_entry_requirement(&towers[9], 8));
+        assert!(meets_entry_requirement(&towers[9], 9));
+    }
+
+    #[test]
+    fn test_guard_floor_has_guard_tier() {
+        let tower = &tower_definitions()[0];
+        let f10 = generate_floor(tower, 10);
+        assert!(f10.guard_floor);
+        assert!(f10.guard_tier > 0.0);
+        let f1 = generate_floor(tower, 1);
+        assert!(!f1.guard_floor);
+        assert!((f1.guard_tier - 0.0).abs() < f32::EPSILON);
+    }
+
     #[test]
     fn test_floor_summary() {
         let tower = &tower_definitions()[0];
@@ -260,6 +373,6 @@ mod tests {
         let summary = floor_summary(&f1);
         assert_eq!(summary["tower"], "tower_dawn");
         assert_eq!(summary["floor"], 1);
-        assert_eq!(summary["safe_floor"], false);
+        assert_eq!(summary["guard_floor"], false);
     }
 }

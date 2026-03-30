@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
-use super::combat::{Enemy, EnemyAttack};
+use super::combat::{Enemy, EnemyAttack, EnemyType};
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -15,6 +15,8 @@ use super::combat::{Enemy, EnemyAttack};
 pub struct Dungeon {
     pub name: String,
     pub seed: u64,
+    #[serde(default)]
+    pub tier: u32,
     pub floors: Vec<Floor>,
     pub current_floor: usize,
     pub current_room: usize,
@@ -27,6 +29,18 @@ pub struct Floor {
     pub height: u32,
     pub rooms: Vec<Room>,
     pub corridors: Vec<Corridor>,
+    #[serde(default)]
+    pub skill_gates: Vec<SkillGate>,
+    #[serde(default)]
+    pub simultaneous_puzzles: Vec<SimultaneousPuzzle>,
+    #[serde(default)]
+    pub crafting_stations: Vec<DungeonCraftingStation>,
+    #[serde(default)]
+    pub split_paths: Option<SplitPath>,
+    #[serde(default)]
+    pub corruption_enabled: bool,
+    #[serde(default)]
+    pub corruption_rate: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -100,6 +114,112 @@ impl std::fmt::Display for RoomType {
             RoomType::Stairs => write!(f, "Stairs"),
         }
     }
+}
+
+
+// ---------------------------------------------------------------------------
+// Tiered dungeon data structures
+// ---------------------------------------------------------------------------
+
+/// A skill-gated lock on a door/exit. Requires a specific skill at minimum rank.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillGate {
+    pub room_id: usize,
+    pub exit_index: usize,
+    pub required_skill: String,
+    pub required_rank: u8,
+    pub dc: i32,
+}
+
+/// A puzzle requiring simultaneous activation by multiple players.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimultaneousPuzzle {
+    pub id: String,
+    pub activation_points: Vec<ActivationPoint>,
+    pub timer_window_ms: u32,
+    pub required_count: u32,
+    #[serde(default)]
+    pub solved: bool,
+}
+
+/// A single activation point within a simultaneous puzzle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivationPoint {
+    pub floor: usize,
+    pub room_id: usize,
+    pub skill_required: Option<(String, u8)>,
+    pub activated_by: Option<String>,
+    pub activated_at: Option<u64>,
+}
+
+/// A floor section that splits into multiple paths requiring separate parties.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SplitPath {
+    pub paths: Vec<PathBranch>,
+    pub convergence_room: usize,
+    #[serde(default)]
+    pub unlocked: bool,
+}
+
+/// A single branch of a split path.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PathBranch {
+    pub entry_room: usize,
+    pub rooms: Vec<usize>,
+    pub mini_boss_room: usize,
+    #[serde(default)]
+    pub cleared: bool,
+}
+
+/// Corruption state for a player in a T7+ dungeon.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CorruptionState {
+    pub level: f32,      // 0.0 to 1.0
+    pub gain_rate: f32,  // per combat round
+}
+
+impl CorruptionState {
+    /// Apply one combat round of corruption. Returns the new level.
+    pub fn tick(&mut self) -> f32 {
+        self.level = (self.level + self.gain_rate).min(1.0);
+        self.level
+    }
+
+    /// Get current debuff effects based on corruption level.
+    pub fn effects(&self) -> CorruptionEffects {
+        let pct = (self.level * 100.0) as u32;
+        CorruptionEffects {
+            attack_penalty: if pct >= 25 { 2 } else { 0 },
+            save_disadvantage: pct >= 50,
+            half_movement: pct >= 75,
+            ac_penalty: if pct >= 75 { 2 } else { 0 },
+            hp_damage_per_round_pct: if pct >= 100 { 10 } else { 0 },
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.level = 0.0;
+    }
+}
+
+/// Debuff effects from corruption.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CorruptionEffects {
+    pub attack_penalty: i32,
+    pub save_disadvantage: bool,
+    pub half_movement: bool,
+    pub ac_penalty: i32,
+    pub hp_damage_per_round_pct: u32,
+}
+
+/// A dungeon crafting station for mid-dungeon crafting barriers (T8+).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DungeonCraftingStation {
+    pub room_id: usize,
+    pub required_skill: String,
+    pub required_rank: u8,
+    pub recipe_item: String,
+    pub materials: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -1159,6 +1279,7 @@ pub fn generate_dungeon(seed: u64) -> Dungeon {
             height,
             rooms,
             corridors,
+            ..Default::default()
         });
     }
 
@@ -1187,12 +1308,669 @@ pub fn generate_dungeon(seed: u64) -> Dungeon {
     let mut dungeon = Dungeon {
         name,
         seed,
+        tier: 0,
         floors,
         current_floor: 0,
         current_room: 0,
     };
 
     // Mark entrance room as discovered and visited
+    dungeon.discover_room(0, 0);
+    if let Some(room) = dungeon.current_room_mut() {
+        room.visited = true;
+    }
+
+    dungeon
+}
+
+
+// ---------------------------------------------------------------------------
+// Tier scaling formulas (from design doc)
+// ---------------------------------------------------------------------------
+
+const FLOOR_COUNTS: [u32; 11] = [1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 15];
+const SKILL_GATES_REQUIRED: [u32; 11] = [0, 0, 1, 2, 3, 5, 8, 12, 20, 30, 40];
+const SIMULTANEOUS_PLAYERS: [u32; 11] = [1, 1, 1, 2, 3, 4, 6, 10, 15, 25, 50];
+const PATH_COUNTS: [u32; 11] = [1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5];
+const CRAFTING_BARRIERS: [u32; 11] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 4];
+const CORRUPTION_RATES: [f32; 11] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.015, 0.02, 0.03];
+
+fn tier_floor_count(tier: u32) -> u32 {
+    FLOOR_COUNTS[tier.min(10) as usize]
+}
+
+fn tier_rooms_per_floor(tier: u32, floor_idx: u32) -> u32 {
+    5 + tier * 2 + floor_idx
+}
+
+fn tier_grid_width(tier: u32) -> u32 {
+    20 + tier * 9
+}
+
+fn tier_grid_height(tier: u32) -> u32 {
+    15 + tier * 7
+}
+
+fn tier_enemies_per_room(tier: u32) -> (u32, u32) {
+    let base = 1 + tier / 2;
+    (base.max(1), (base + 1).max(2))
+}
+
+fn tier_trap_detection_dc(tier: u32) -> i32 {
+    8 + tier as i32 * 2
+}
+
+fn tier_trap_save_dc(tier: u32) -> i32 {
+    10 + tier as i32 * 2
+}
+
+fn tier_boss_hp_multiplier(tier: u32) -> f32 {
+    2.0 + tier as f32 * 0.5
+}
+
+fn tier_boss_add_count(tier: u32) -> u32 {
+    tier / 2
+}
+
+fn tier_treasure_gold(rng: &mut StdRng, tier: u32) -> u32 {
+    let min_g = tier * 5;
+    let max_g = tier * 25 + 10;
+    rng.gen_range(min_g..=max_g.max(min_g + 1))
+}
+
+fn tier_skill_check_dc(tier: u32) -> i32 {
+    10 + tier as i32 * 2
+}
+
+fn tier_min_skill_rank(tier: u32) -> u8 {
+    1u8.max(tier.saturating_sub(1) as u8)
+}
+
+pub fn tier_enrage_round(tier: u32) -> u32 {
+    (25u32.saturating_sub(tier * 2)).max(8)
+}
+
+fn tier_timer_window_ms(tier: u32) -> u32 {
+    ((10u32.saturating_sub(tier)).max(3)) * 1000
+}
+
+/// All skill IDs for skill gate generation.
+const ALL_SKILL_IDS: &[&str] = &[
+    "weapon_mastery", "shield_wall", "fortitude", "rage", "reckless_fury",
+    "primal_toughness", "holy_smite", "divine_shield", "lay_on_hands",
+    "blade_finesse", "stealth", "lockpicking", "evasion", "marksmanship",
+    "tracking", "beast_lore", "survival", "martial_arts", "ki_focus",
+    "iron_body", "flurry", "evocation", "abjuration", "spell_mastery",
+    "eldritch_blast", "curse_weaving", "soul_harvest", "healing", "blessing",
+    "turn_undead", "inspire", "lore", "charm", "song_of_rest",
+    "leatherworking", "smithing", "woodworking", "alchemy", "enchanting",
+    "tailoring", "jewelcrafting", "runecrafting", "artificing", "theurgy",
+];
+
+const CRAFTING_SKILL_IDS: &[&str] = &[
+    "leatherworking", "smithing", "woodworking", "alchemy", "enchanting",
+    "tailoring", "jewelcrafting", "runecrafting", "artificing", "theurgy",
+];
+
+const CRAFTING_MATERIALS: &[&str] = &[
+    "void_shard", "mana_crystal", "ectoplasm", "primordial_essence",
+    "shadow_thread", "celestial_ore", "dragon_scale", "lich_dust",
+];
+
+const BARRIER_RECIPES: &[&str] = &[
+    "void_sigil", "warding_stone", "shadow_key", "primordial_seal",
+];
+
+/// Tier-based monster stat curves for deterministic dungeon generation.
+/// Format: (min_hp, max_hp, base_ac, to_hit, damage_dice, damage_mod)
+const TIER_MONSTER_STATS: [(i32, i32, i32, i32, &str, i32); 11] = [
+    (3, 6, 8, 1, "1d4", 0),
+    (10, 18, 12, 4, "1d6", 2),
+    (18, 30, 13, 5, "1d6", 3),
+    (28, 45, 14, 6, "1d8", 4),
+    (40, 60, 15, 7, "1d8", 5),
+    (55, 85, 16, 8, "1d10", 6),
+    (75, 117, 17, 9, "1d10", 7),
+    (105, 170, 19, 11, "1d10", 9),
+    (150, 250, 20, 12, "1d12", 11),
+    (220, 370, 22, 14, "2d10", 12),
+    (320, 550, 24, 15, "2d12", 14),
+];
+
+const TIER_MONSTER_NAMES: [[&str; 4]; 11] = [
+    ["Giant Rat", "Cave Spider", "Glow Wisp", "Shambling Corpse"],
+    ["Kobold Thug", "Giant Spider", "Arcane Sprite", "Skeleton"],
+    ["Goblin Warrior", "Wolf", "Fire Imp", "Zombie"],
+    ["Orc Raider", "Shadow Cat", "Flame Elemental", "Ghoul"],
+    ["Orc Warchief", "Werewolf", "Mind Flayer Spawn", "Wraith"],
+    ["Hill Giant", "Displacer Beast", "Naga", "Vampire Spawn"],
+    ["Stone Golem", "Nightwalker", "Elder Elemental", "Death Knight"],
+    ["Fire Giant", "Shadow Dragon", "Beholder", "Lich"],
+    ["Storm Giant", "Void Stalker", "Astral Devourer", "Demilich"],
+    ["Titan Warrior", "Dread Wraith Lord", "Arch-Lich", "Dracolich"],
+    ["Primordial Juggernaut", "Primordial Lurker", "Primordial Arcanum", "Primordial Undying"],
+];
+
+const TIER_ATTACK_NAMES: [&str; 4] = ["Slam", "Strike", "Blast", "Drain"];
+
+/// Generate a deterministic enemy template for the given tier and type.
+fn tiered_enemy_template(rng: &mut StdRng, tier: u32, enemy_type: EnemyType) -> EnemyTemplate {
+    let t = tier.clamp(0, 10) as usize;
+    let (min_hp, max_hp, base_ac, base_hit, dice, base_mod) = TIER_MONSTER_STATS[t];
+
+    let (hp_mult, ac_adj, hit_adj, mod_adj) = match enemy_type {
+        EnemyType::Brute   => (1.20f64, 1i32, -1i32, -1i32),
+        EnemyType::Skulker => (0.80, 1, 2, 1),
+        EnemyType::Mystic  => (0.90, -1, 1, 0),
+        EnemyType::Undead  => (1.05, 0, 0, 0),
+    };
+
+    let hp = (rng.gen_range(min_hp..=max_hp) as f64 * hp_mult).round() as i32;
+    let type_idx = match enemy_type {
+        EnemyType::Brute => 0, EnemyType::Skulker => 1,
+        EnemyType::Mystic => 2, EnemyType::Undead => 3,
+    };
+
+    EnemyTemplate {
+        name: TIER_MONSTER_NAMES[t][type_idx].to_string(),
+        hp,
+        ac: base_ac + ac_adj,
+        attacks: vec![EnemyAttackTemplate {
+            name: TIER_ATTACK_NAMES[type_idx].to_string(),
+            damage_dice: dice.to_string(),
+            damage_modifier: base_mod + mod_adj,
+            to_hit_bonus: base_hit + hit_adj,
+        }],
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tiered dungeon generator
+// ---------------------------------------------------------------------------
+
+/// Generate a dungeon scaled to the given tier (0-10).
+///
+/// Uses the same deterministic seed-based approach as `generate_dungeon` but with
+/// tier-appropriate scaling for floors, rooms, enemies, and teamwork mechanics.
+///
+/// Mechanics by tier:
+/// - T0-T1: Basic solo content
+/// - T2+: Skill-gated locks
+/// - T3+: Simultaneous puzzles
+/// - T5+: Boss enrage timers
+/// - T6+: Split paths requiring multiple parties
+/// - T7+: Corruption (forces player rotation)
+/// - T8+: Mid-dungeon crafting barriers
+pub fn generate_tiered_dungeon(seed: u64, tier: u32) -> Dungeon {
+    let tier = tier.clamp(0, 10);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    // Generate name
+    let prefix = PREFIXES.choose(&mut rng).unwrap_or(&"Dark");
+    let suffix = SUFFIXES.choose(&mut rng).unwrap_or(&"Depths");
+    let name = format!("The {} {}", prefix, suffix);
+
+    // Tier scaling
+    let num_floors = tier_floor_count(tier) as usize;
+    let grid_w = tier_grid_width(tier);
+    let grid_h = tier_grid_height(tier);
+    let total_skill_gates = SKILL_GATES_REQUIRED[tier as usize];
+    let num_paths = PATH_COUNTS[tier as usize];
+    let num_crafting_barriers = CRAFTING_BARRIERS[tier as usize];
+    let corruption_rate = CORRUPTION_RATES[tier as usize];
+    let corruption_enabled = corruption_rate > 0.0;
+    let enemy_types = [EnemyType::Brute, EnemyType::Skulker, EnemyType::Mystic, EnemyType::Undead];
+
+    let mut floors = Vec::new();
+    let mut gates_placed = 0u32;
+
+    for floor_idx in 0..num_floors {
+        let level = (floor_idx + 1) as u32;
+        let target_rooms = tier_rooms_per_floor(tier, floor_idx as u32) as usize;
+
+        // ---- Place rooms ----
+        let mut rooms: Vec<Room> = Vec::new();
+        let max_room_dim = 6u32.min(grid_w / 4).max(3);
+        for _room_id in 0..target_rooms {
+            for _ in 0..200 {
+                let rw = rng.gen_range(3..=max_room_dim);
+                let rh = rng.gen_range(3..=max_room_dim);
+                let rx = rng.gen_range(1..grid_w.saturating_sub(max_room_dim).max(2));
+                let ry = rng.gen_range(1..grid_h.saturating_sub(max_room_dim).max(2));
+
+                let overlaps = rooms.iter().any(|existing| {
+                    rooms_overlap(existing, rx, ry, rw, rh, 2)
+                });
+                if overlaps { continue; }
+
+                rooms.push(Room {
+                    id: rooms.len(),
+                    name: String::new(),
+                    room_type: RoomType::Empty,
+                    x: rx, y: ry, w: rw, h: rh,
+                    discovered: false, visited: false, cleared: false, searched: false,
+                    exits: Vec::new(),
+                    enemies: Vec::new(),
+                    trap: None,
+                    treasure: RoomTreasure::default(),
+                    description: String::new(),
+                });
+                break;
+            }
+        }
+
+        // Fix room IDs
+        for (i, room) in rooms.iter_mut().enumerate() {
+            room.id = i;
+        }
+
+        // ---- Assign room types ----
+        if !rooms.is_empty() {
+            if floor_idx == 0 {
+                rooms[0].room_type = RoomType::Entrance;
+            } else {
+                rooms[0].room_type = RoomType::Empty;
+            }
+
+            // Boss on last floor
+            if floor_idx == num_floors - 1 && rooms.len() > 1 {
+                let last = rooms.len() - 1;
+                rooms[last].room_type = RoomType::Boss;
+            }
+
+            // Stairs (except last floor)
+            if floor_idx < num_floors - 1 {
+                let candidates: Vec<usize> = (1..rooms.len())
+                    .filter(|&i| rooms[i].room_type == RoomType::Empty)
+                    .collect();
+                if let Some(&stairs_idx) = candidates.choose(&mut rng) {
+                    rooms[stairs_idx].room_type = RoomType::Stairs;
+                }
+            }
+
+            // Random types for remaining empty rooms
+            let last_idx = rooms.len() - 1;
+            for i in 0..rooms.len() {
+                if rooms[i].room_type == RoomType::Empty
+                    && !(floor_idx == 0 && i == 0)
+                    && !(floor_idx == num_floors - 1 && i == last_idx)
+                {
+                    rooms[i].room_type = random_room_type(&mut rng);
+                }
+            }
+        }
+
+        // ---- Build MST corridors ----
+        let mst_edges = prims_mst(&rooms);
+        let extra_count = if rooms.len() >= 2 { rng.gen_range(1..=2) } else { 0 };
+        let mut all_edges = mst_edges.clone();
+        for _ in 0..extra_count {
+            if rooms.len() < 2 { break; }
+            let a = rng.gen_range(0..rooms.len());
+            let b = rng.gen_range(0..rooms.len());
+            if a != b {
+                let edge = if a < b { (a, b) } else { (b, a) };
+                if !all_edges.contains(&edge) {
+                    all_edges.push(edge);
+                }
+            }
+        }
+
+        let mut corridors = Vec::new();
+        for &(from, to) in &all_edges {
+            if from >= rooms.len() || to >= rooms.len() { continue; }
+            let ac = room_center(&rooms[from]);
+            let bc = room_center(&rooms[to]);
+            let horizontal_first = rng.gen_bool(0.5);
+            let cells = carve_corridor(
+                (ac.0 as u32, ac.1 as u32),
+                (bc.0 as u32, bc.1 as u32),
+                horizontal_first,
+            );
+            corridors.push(Corridor {
+                from_room: from, to_room: to, cells, discovered: false,
+            });
+        }
+
+        // Create exits from corridors
+        for corridor in &corridors {
+            let from = corridor.from_room;
+            let to = corridor.to_room;
+            let dir_ft = direction_from_to(
+                rooms[from].x, rooms[from].y, rooms[from].w, rooms[from].h,
+                rooms[to].x, rooms[to].y, rooms[to].w, rooms[to].h,
+            );
+            let dir_tf = direction_from_to(
+                rooms[to].x, rooms[to].y, rooms[to].w, rooms[to].h,
+                rooms[from].x, rooms[from].y, rooms[from].w, rooms[from].h,
+            );
+            let unique_ft = unique_direction(&rooms[from].exits, &dir_ft);
+            rooms[from].exits.push(Exit {
+                direction: unique_ft, target_room: to, target_floor: None,
+                locked: false, key_item_id: None,
+            });
+            let unique_tf = unique_direction(&rooms[to].exits, &dir_tf);
+            rooms[to].exits.push(Exit {
+                direction: unique_tf, target_room: from, target_floor: None,
+                locked: false, key_item_id: None,
+            });
+        }
+
+        // ---- Populate rooms with tier-scaled content ----
+        let (enemy_min, enemy_max) = tier_enemies_per_room(tier);
+        let trap_detect_dc = tier_trap_detection_dc(tier);
+        let trap_save_dc = tier_trap_save_dc(tier);
+        let boss_hp_mult = tier_boss_hp_multiplier(tier);
+        let boss_adds = tier_boss_add_count(tier);
+
+        for room in &mut rooms {
+            room.name = room_name_for_type(&mut rng, &room.room_type);
+            room.description = room_description(&mut rng);
+
+            match room.room_type {
+                RoomType::Combat => {
+                    let count = rng.gen_range(enemy_min..=enemy_max);
+                    for _ in 0..count {
+                        let et = enemy_types[rng.gen_range(0..enemy_types.len())];
+                        room.enemies.push(tiered_enemy_template(&mut rng, tier, et));
+                    }
+                }
+                RoomType::Boss => {
+                    // Boss with HP multiplier
+                    let boss_type = enemy_types[rng.gen_range(0..enemy_types.len())];
+                    let mut boss = tiered_enemy_template(&mut rng, tier, boss_type);
+                    boss.hp = (boss.hp as f32 * boss_hp_mult) as i32;
+                    boss.name = format!("{} (Boss)", boss.name);
+                    boss.ac += 2;
+                    for atk in &mut boss.attacks {
+                        atk.damage_modifier += 2;
+                        atk.to_hit_bonus += 1;
+                    }
+                    room.enemies.push(boss);
+                    // Boss adds
+                    for _ in 0..boss_adds {
+                        let add_type = enemy_types[rng.gen_range(0..enemy_types.len())];
+                        room.enemies.push(tiered_enemy_template(&mut rng, tier, add_type));
+                    }
+                    room.treasure = RoomTreasure {
+                        gold: tier_treasure_gold(&mut rng, tier) * 3,
+                        item_ids: vec![],
+                    };
+                }
+                RoomType::Trap => {
+                    let trap_names = ["Pit Trap", "Poison Dart", "Flame Jet", "Blade Wall", "Poison Gas"];
+                    let save_stats = ["dex", "con"];
+                    room.trap = Some(TrapTemplate {
+                        name: trap_names[rng.gen_range(0..trap_names.len())].into(),
+                        detection_dc: trap_detect_dc,
+                        save_stat: save_stats[rng.gen_range(0..save_stats.len())].into(),
+                        save_dc: trap_save_dc,
+                        damage_dice: format!("{}d6", 1 + tier / 3),
+                        condition: if tier >= 3 { Some("Poisoned".into()) } else { None },
+                    });
+                    if rng.gen_bool(0.5) {
+                        room.treasure = RoomTreasure {
+                            gold: tier_treasure_gold(&mut rng, tier),
+                            item_ids: vec![],
+                        };
+                    }
+                }
+                RoomType::Treasure => {
+                    room.treasure = RoomTreasure {
+                        gold: tier_treasure_gold(&mut rng, tier),
+                        item_ids: vec![],
+                    };
+                }
+                RoomType::Entrance | RoomType::Rest => {
+                    room.cleared = true;
+                }
+                _ => {}
+            }
+        }
+
+        // ---- Stairs cross-floor exits ----
+        if floor_idx < num_floors - 1 {
+            if let Some(stairs_idx) = rooms.iter().position(|r| r.room_type == RoomType::Stairs) {
+                rooms[stairs_idx].exits.push(Exit {
+                    direction: "Descend".to_string(),
+                    target_room: 0,
+                    target_floor: Some(floor_idx + 1),
+                    locked: false,
+                    key_item_id: None,
+                });
+            }
+        }
+
+        // ---- Boss locked door (last floor) ----
+        if floor_idx == num_floors - 1 && rooms.len() >= 2 {
+            let boss_idx = rooms.len() - 1;
+            for room in rooms.iter_mut() {
+                for exit in &mut room.exits {
+                    if exit.target_room == boss_idx && exit.target_floor.is_none() {
+                        exit.locked = true;
+                        exit.key_item_id = Some("boss_key".to_string());
+                    }
+                }
+            }
+            let key_candidates: Vec<usize> = rooms.iter().enumerate()
+                .filter(|(i, r)| *i != boss_idx && r.room_type != RoomType::Entrance && r.room_type != RoomType::Stairs)
+                .map(|(i, _)| i).collect();
+            if let Some(&key_room) = key_candidates.choose(&mut rng) {
+                rooms[key_room].treasure.item_ids.push("boss_key".to_string());
+            }
+        }
+
+        // ---- Skill gates ----
+        let gates_for_floor = if total_skill_gates > 0 && !rooms.is_empty() {
+            let gates_remaining = total_skill_gates.saturating_sub(gates_placed);
+            let floors_remaining = (num_floors - floor_idx) as u32;
+            let gates_this_floor = if floors_remaining <= 1 {
+                gates_remaining
+            } else {
+                (gates_remaining + floors_remaining - 1) / floors_remaining
+            };
+
+            let min_rank = tier_min_skill_rank(tier);
+            let dc = tier_skill_check_dc(tier);
+            let mut skill_gates = Vec::new();
+
+            for _ in 0..gates_this_floor {
+                let room_candidates: Vec<usize> = rooms.iter().enumerate()
+                    .filter(|(_, r)| !r.exits.is_empty()
+                        && r.room_type != RoomType::Entrance
+                        && r.room_type != RoomType::Boss)
+                    .map(|(i, _)| i).collect();
+
+                if let Some(&room_id) = room_candidates.choose(&mut rng) {
+                    let exit_idx = rng.gen_range(0..rooms[room_id].exits.len());
+                    let skill_idx = (gates_placed as usize) % ALL_SKILL_IDS.len();
+
+                    skill_gates.push(SkillGate {
+                        room_id,
+                        exit_index: exit_idx,
+                        required_skill: ALL_SKILL_IDS[skill_idx].to_string(),
+                        required_rank: min_rank,
+                        dc,
+                    });
+                    gates_placed += 1;
+                }
+            }
+            skill_gates
+        } else {
+            Vec::new()
+        };
+
+        // ---- Simultaneous puzzles (T3+) ----
+        let puzzles = if tier >= 3 && floor_idx > 0 {
+            let players_needed = SIMULTANEOUS_PLAYERS[tier as usize];
+            let timer_ms = tier_timer_window_ms(tier);
+            let puzzle_rooms: Vec<usize> = rooms.iter().enumerate()
+                .filter(|(_, r)| matches!(r.room_type, RoomType::Puzzle | RoomType::Empty))
+                .map(|(i, _)| i).collect();
+
+            if puzzle_rooms.len() >= players_needed.min(puzzle_rooms.len() as u32) as usize
+                && !puzzle_rooms.is_empty()
+            {
+                let count = (players_needed as usize).min(puzzle_rooms.len());
+                let points: Vec<ActivationPoint> = puzzle_rooms.iter()
+                    .take(count)
+                    .map(|&room_id| ActivationPoint {
+                        floor: floor_idx, room_id,
+                        skill_required: None,
+                        activated_by: None, activated_at: None,
+                    }).collect();
+
+                vec![SimultaneousPuzzle {
+                    id: format!("puzzle_f{}", floor_idx),
+                    activation_points: points,
+                    timer_window_ms: timer_ms,
+                    required_count: count as u32,
+                    solved: false,
+                }]
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        // ---- Split paths (T6+) ----
+        let split_paths = if num_paths >= 2
+            && floor_idx >= num_floors / 2
+            && rooms.len() >= (num_paths as usize * 3 + 1)
+        {
+            let non_special: Vec<usize> = rooms.iter().enumerate()
+                .filter(|(_, r)| matches!(r.room_type,
+                    RoomType::Combat | RoomType::Empty | RoomType::Trap | RoomType::Treasure))
+                .map(|(i, _)| i).collect();
+
+            if non_special.len() >= num_paths as usize * 2 {
+                let mut paths = Vec::new();
+                let rooms_per_path = non_special.len() / num_paths as usize;
+                let mut used = 0usize;
+
+                for _p in 0..num_paths as usize {
+                    let start = used;
+                    let end = (start + rooms_per_path).min(non_special.len());
+                    let path_rooms: Vec<usize> = non_special[start..end].to_vec();
+                    if path_rooms.len() >= 2 {
+                        let mini_boss = *path_rooms.last().unwrap();
+                        paths.push(PathBranch {
+                            entry_room: path_rooms[0],
+                            rooms: path_rooms,
+                            mini_boss_room: mini_boss,
+                            cleared: false,
+                        });
+                    }
+                    used = end;
+                }
+
+                // Mark mini-boss rooms
+                for path in &paths {
+                    if let Some(r) = rooms.get_mut(path.mini_boss_room) {
+                        if r.room_type != RoomType::Boss {
+                            r.room_type = RoomType::Combat;
+                            r.enemies.clear();
+                            let boss_type = enemy_types[rng.gen_range(0..enemy_types.len())];
+                            let mut mini = tiered_enemy_template(&mut rng, tier, boss_type);
+                            mini.hp = (mini.hp as f32 * 1.5) as i32;
+                            mini.name = format!("{} (Mini-Boss)", mini.name);
+                            mini.ac += 1;
+                            r.enemies.push(mini);
+                            r.name = "Mini-Boss Chamber".to_string();
+                        }
+                    }
+                }
+
+                if !paths.is_empty() {
+                    let convergence = rooms.len() - 1;
+                    Some(SplitPath { paths, convergence_room: convergence, unlocked: false })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // ---- Crafting stations (T8+) ----
+        let crafting_stations = if num_crafting_barriers > 0 && floor_idx >= num_floors / 2 {
+            let placed_so_far: u32 = floors.iter()
+                .map(|f: &Floor| f.crafting_stations.len() as u32).sum();
+            let barriers_remaining = num_crafting_barriers.saturating_sub(placed_so_far);
+            let floors_remaining = (num_floors - floor_idx) as u32;
+            let barriers_this_floor = if floors_remaining <= 1 {
+                barriers_remaining
+            } else {
+                (barriers_remaining + floors_remaining - 1) / floors_remaining
+            }.min(barriers_remaining);
+
+            let required_rank = tier.saturating_sub(3) as u8;
+            let mut stations = Vec::new();
+            for b in 0..barriers_this_floor {
+                let station_rooms: Vec<usize> = rooms.iter().enumerate()
+                    .filter(|(_, r)| matches!(r.room_type, RoomType::Empty | RoomType::Rest | RoomType::Puzzle))
+                    .map(|(i, _)| i).collect();
+                if let Some(&room_id) = station_rooms.choose(&mut rng) {
+                    let si = (placed_so_far + b) as usize;
+                    stations.push(DungeonCraftingStation {
+                        room_id,
+                        required_skill: CRAFTING_SKILL_IDS[si % CRAFTING_SKILL_IDS.len()].to_string(),
+                        required_rank,
+                        recipe_item: BARRIER_RECIPES[si % BARRIER_RECIPES.len()].to_string(),
+                        materials: vec![CRAFTING_MATERIALS[si % CRAFTING_MATERIALS.len()].to_string()],
+                    });
+                }
+            }
+            stations
+        } else {
+            Vec::new()
+        };
+
+        floors.push(Floor {
+            level,
+            width: grid_w,
+            height: grid_h,
+            rooms,
+            corridors,
+            skill_gates: gates_for_floor,
+            simultaneous_puzzles: puzzles,
+            crafting_stations,
+            split_paths,
+            corruption_enabled,
+            corruption_rate,
+        });
+    }
+
+    // ---- Ascend exits on floors 2+ ----
+    for target_floor_idx in 0..num_floors.saturating_sub(1) {
+        let next_floor_idx = target_floor_idx + 1;
+        if let Some(stairs_room_idx) = floors[target_floor_idx]
+            .rooms.iter().position(|r| r.room_type == RoomType::Stairs)
+        {
+            if next_floor_idx < floors.len() && !floors[next_floor_idx].rooms.is_empty() {
+                floors[next_floor_idx].rooms[0].exits.push(Exit {
+                    direction: "Ascend".to_string(),
+                    target_room: stairs_room_idx,
+                    target_floor: Some(target_floor_idx),
+                    locked: false,
+                    key_item_id: None,
+                });
+            }
+        }
+    }
+
+    let mut dungeon = Dungeon {
+        name,
+        seed,
+        tier,
+        floors,
+        current_floor: 0,
+        current_room: 0,
+    };
+
     dungeon.discover_room(0, 0);
     if let Some(room) = dungeon.current_room_mut() {
         room.visited = true;
@@ -1272,6 +2050,97 @@ mod tests {
         assert!(!exits.is_empty(), "Entrance should have at least one exit");
         let result = d.move_to_room(&exits[0]);
         assert!(result.is_ok());
+    }
+
+
+    #[test]
+    fn test_tiered_dungeon_t0() {
+        let d = generate_tiered_dungeon(42, 0);
+        assert_eq!(d.tier, 0);
+        assert_eq!(d.floors.len(), 1);
+        assert!(d.floors[0].rooms.len() >= 3);
+        assert!(!d.floors[0].corruption_enabled);
+        assert!(d.floors[0].skill_gates.is_empty());
+    }
+
+    #[test]
+    fn test_tiered_dungeon_t3() {
+        let d = generate_tiered_dungeon(42, 3);
+        assert_eq!(d.tier, 3);
+        assert_eq!(d.floors.len(), 3);
+        let total_gates: usize = d.floors.iter().map(|f| f.skill_gates.len()).sum();
+        assert!(total_gates > 0, "T3 should have skill gates");
+        assert!(!d.floors[0].corruption_enabled);
+    }
+
+    #[test]
+    fn test_tiered_dungeon_t5() {
+        let d = generate_tiered_dungeon(42, 5);
+        assert_eq!(d.tier, 5);
+        assert_eq!(d.floors.len(), 4);
+        let total_gates: usize = d.floors.iter().map(|f| f.skill_gates.len()).sum();
+        assert!(total_gates >= 3, "T5 should have at least 3 skill gates");
+    }
+
+    #[test]
+    fn test_tiered_dungeon_t7_corruption() {
+        let d = generate_tiered_dungeon(42, 7);
+        assert_eq!(d.tier, 7);
+        assert_eq!(d.floors.len(), 6);
+        assert!(d.floors[0].corruption_enabled);
+        assert!(d.floors[0].corruption_rate > 0.0);
+    }
+
+    #[test]
+    fn test_tiered_dungeon_t10() {
+        let d = generate_tiered_dungeon(42, 10);
+        assert_eq!(d.tier, 10);
+        assert_eq!(d.floors.len(), 15);
+        assert!(d.floors[0].corruption_enabled);
+        let total_gates: usize = d.floors.iter().map(|f| f.skill_gates.len()).sum();
+        assert!(total_gates >= 20, "T10 should have many skill gates");
+        let total_stations: usize = d.floors.iter().map(|f| f.crafting_stations.len()).sum();
+        assert!(total_stations > 0, "T10 should have crafting stations");
+    }
+
+    #[test]
+    fn test_tiered_dungeon_deterministic() {
+        let d1 = generate_tiered_dungeon(42, 5);
+        let d2 = generate_tiered_dungeon(42, 5);
+        assert_eq!(d1.name, d2.name);
+        assert_eq!(d1.floors.len(), d2.floors.len());
+        for (f1, f2) in d1.floors.iter().zip(d2.floors.iter()) {
+            assert_eq!(f1.rooms.len(), f2.rooms.len());
+            assert_eq!(f1.skill_gates.len(), f2.skill_gates.len());
+        }
+    }
+
+    #[test]
+    fn test_corruption_state() {
+        let mut cs = CorruptionState { level: 0.0, gain_rate: 0.01 };
+        cs.tick();
+        assert!((cs.level - 0.01).abs() < f32::EPSILON);
+        let effects = cs.effects();
+        assert_eq!(effects.attack_penalty, 0);
+
+        cs.level = 0.5;
+        let effects = cs.effects();
+        assert_eq!(effects.attack_penalty, 2);
+        assert!(effects.save_disadvantage);
+        assert!(!effects.half_movement);
+    }
+
+    #[test]
+    fn test_tier_formulas() {
+        assert_eq!(tier_floor_count(0), 1);
+        assert_eq!(tier_floor_count(5), 4);
+        assert_eq!(tier_floor_count(10), 15);
+        assert_eq!(tier_grid_width(0), 20);
+        assert_eq!(tier_grid_width(10), 110);
+        assert_eq!(tier_grid_height(0), 15);
+        assert_eq!(tier_grid_height(10), 85);
+        assert_eq!(tier_enrage_round(5), 15);
+        assert_eq!(tier_enrage_round(10), 8);
     }
 
     #[test]

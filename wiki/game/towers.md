@@ -109,3 +109,55 @@ The engine tracks each player's highest floor reached per tower.
 ## Finding Towers
 
 Towers are placed at specific fixed counties during world generation. When a player is at a county with `has_tower: true`, the map view shows the tower name and the option to enter. Tower locations are visible on the hex map as distinct markers.
+
+## Guard Floors
+
+Every 5th floor (5, 10, 15, ...) features a **guard encounter** that must be defeated before the player can ascend. Guard difficulty scales with the floor's effective tier. Guards function as a gatekeeper -- players who cannot defeat the guard are not ready for the floors above.
+
+## Boss HP Scaling
+
+Boss HP scales with floor number using the formula:
+
+```
+boss_hp = base_hp * (1.0 + floor * 0.15)
+```
+
+This means a boss on floor 20 has `1.0 + 20 * 0.15 = 4.0x` the base HP of a floor-0 boss. Combined with tier scaling, deep-floor bosses in high-tier towers become extreme challenges requiring coordinated raid parties.
+
+## Checkpoints
+
+Players can **attune to checkpoints** on safe floors (every 10th floor: 10, 20, 30, ...). Attuning is free and records the checkpoint permanently for that player and tower.
+
+Once attuned, a player can teleport back to that floor from the tower entrance without walking through every floor again.
+
+## Teleportation
+
+Teleporting to a checkpoint costs gold:
+
+```
+cost = floor_number * 10
+```
+
+Example: teleporting to floor 30 costs 300 gold. If the player lacks sufficient gold, the teleport fails with an error.
+
+Teleportation is only available from the tower entrance (floor 0). You cannot teleport between arbitrary checkpoint floors.
+
+## Entry Requirements
+
+There is no minimum tier requirement to enter any tower. However, higher-tier towers will be lethal for under-geared players. The game relies on natural difficulty rather than artificial gates -- a T2 player can walk into Primordial Spire, but they will die immediately.
+
+The only hard requirement is that the player must be at a county with `has_tower: true` and the `tower_id` must match the tower at that county.
+
+## First-Clear Tracking
+
+The server tracks the **first player** to clear each floor of each tower. When a floor is cleared for the first time server-wide, all connected players receive a `tower_first_clear` WebSocket message announcing the achievement.
+
+This creates a competitive race for deep-floor first clears, especially in endgame towers like The Abyss and Primordial Spire.
+
+## REST API
+
+See [REST API Reference](/api/rest.md#tower) for the 7 tower endpoints.
+
+## WebSocket Messages
+
+See [WebSocket Reference](/api/websocket.md#tower) for tower client and server message types.
