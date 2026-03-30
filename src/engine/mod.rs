@@ -30,7 +30,7 @@ pub use character::{Character, Class, Race, Stats};
 pub use combat::{CombatState, Enemy, EnemyAttack, EnemyType};
 pub use crafting::{CRAFTING_GRAPH, CraftingSkill, material_to_item, CraftingGraph};
 pub use dice::{DiceResult, DiceRoller};
-pub use dungeon::{Dungeon, generate_dungeon};
+pub use dungeon::{Dungeon, generate_dungeon, generate_tiered_dungeon, CorruptionState, CorruptionEffects, SkillGate, SimultaneousPuzzle, ActivationPoint, SplitPath, PathBranch, DungeonCraftingStation};
 pub use equipment::{Equipment, EquipSlot, Rarity};
 pub use executor::execute_tool_call;
 pub use inventory::{Inventory, Item, ItemType};
