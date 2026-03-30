@@ -291,6 +291,10 @@ pub enum ServerMsg {
         xp_reward: u32,
         victory: bool,
     },
+    CooldownState {
+        llm_remaining_ms: u64,
+        fixed_remaining_ms: u64,
+    },
     Error {
         code: String,
         message: String,

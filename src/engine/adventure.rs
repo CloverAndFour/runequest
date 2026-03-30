@@ -53,6 +53,10 @@ pub struct AdventureState {
     pub murderer: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub last_llm_action_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub last_fixed_action_at: Option<DateTime<Utc>>,
 }
 
 impl AdventureState {
@@ -201,6 +205,8 @@ impl AdventureState {
             murderer: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            last_llm_action_at: None,
+            last_fixed_action_at: None,
         }
     }
     pub fn new_with_background(
@@ -295,6 +301,8 @@ impl AdventureState {
             murderer: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            last_llm_action_at: None,
+            last_fixed_action_at: None,
         }
     }
 

@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::auth::middleware::{require_auth, AuthMode, AuthState, AuthUser};
+use crate::engine::rate_limit::{self, ActionCategory};
 use crate::auth::{JwtManager, UserStore};
 use crate::engine::adventure::AdventureState;
 use crate::engine::character::{Class, Race, Stats};
@@ -368,6 +369,34 @@ fn err_not_found(msg: &str) -> (StatusCode, Json<ApiError>) {
     )
 }
 
+/// Check rate limit for an API action. Returns 429 if on cooldown. Admin users are exempt.
+fn check_api_cooldown(
+    adventure: &crate::engine::adventure::AdventureState,
+    category: ActionCategory,
+    user_role: &str,
+) -> Option<axum::response::Response> {
+    if user_role == "admin" {
+        return None;
+    }
+    if let Err(remaining_ms) = rate_limit::check_cooldown(
+        category,
+        adventure.last_llm_action_at,
+        adventure.last_fixed_action_at,
+    ) {
+        let secs = (remaining_ms as f64 / 1000.0).ceil() as u64;
+        Some(
+            (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({
+                "error": format!("Action on cooldown. Wait {}s.", secs),
+                "code": "cooldown",
+                "remaining_ms": remaining_ms,
+            }))).into_response()
+        )
+    } else {
+        None
+    }
+}
+
+
 fn err_internal(msg: &str) -> (StatusCode, Json<ApiError>) {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -548,7 +577,7 @@ async fn shop_view(
     State(state): State<Arc<ApiState>>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
     };
@@ -573,6 +602,12 @@ async fn shop_buy(
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
 
     let args = serde_json::json!({"item_id": body.item_id, "quantity": body.quantity});
     match execute_tool_call_with_shop(&mut adventure, "buy_item", &args, Some(&state.shop_store)) {
@@ -599,6 +634,12 @@ async fn shop_sell(
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
 
     let args = serde_json::json!({"item_name": body.item_name});
     match execute_tool_call_with_shop(&mut adventure, "sell_item", &args, Some(&state.shop_store)) {
@@ -1297,6 +1338,15 @@ async fn send_message(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Llm, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Llm);
+
+
+
+
     // Apply condition effects
     let condition_effects = apply_turn_effects(&mut adventure);
     if !condition_effects.is_empty() {
@@ -1350,10 +1400,17 @@ async fn send_choice(
     Json(req): Json<ChoiceRequest>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Llm, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Llm);
+
 
     // Load history and find the pending choices tool_call_id from the last display event
     let display_events = store.load_display_history(&id).unwrap_or_default();
@@ -1423,7 +1480,7 @@ async fn roll_dice(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
@@ -1516,6 +1573,13 @@ async fn combat_action(
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Llm, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Llm);
+
 
     if !adventure.combat.active {
         return err_json("no_combat", "No active combat").into_response();
@@ -1888,6 +1952,13 @@ async fn equip_item(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Equipment, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Equipment);
+
+
     let args = serde_json::json!({"item_name": req.item_name});
     match execute_tool_call(&mut adventure, "equip_item", &args) {
         Ok(ToolExecResult::Immediate(result)) => {
@@ -1913,6 +1984,13 @@ async fn unequip_item(
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Equipment, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Equipment);
+
 
     let args = serde_json::json!({"slot": req.slot});
     match execute_tool_call(&mut adventure, "unequip_slot", &args) {
@@ -2303,6 +2381,13 @@ async fn craft_item(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
     let args = serde_json::json!({"recipe_id": req.recipe_id});
     match execute_tool_call(&mut adventure, "craft_item", &args) {
         Ok(ToolExecResult::Immediate(result)) => {
@@ -2332,6 +2417,13 @@ async fn gather_materials(
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
 
     let args = serde_json::json!({});
     match execute_tool_call(&mut adventure, "gather", &args) {
@@ -2440,6 +2532,13 @@ async fn dungeon_enter(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
     if adventure.dungeon.is_some() {
         return err_json("already_in_dungeon", "Already in a dungeon. Leave first.").into_response();
     }
@@ -2494,6 +2593,13 @@ async fn dungeon_move(
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
 
     let dungeon = match adventure.dungeon.as_mut() {
         Some(d) => d,
@@ -2573,6 +2679,13 @@ async fn dungeon_skill_check(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
     let dungeon = match adventure.dungeon.as_mut() {
         Some(d) => d,
         None => return err_json("not_in_dungeon", "Not currently in a dungeon").into_response(),
@@ -2650,6 +2763,13 @@ async fn dungeon_activate_point(
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
 
     let dungeon = match adventure.dungeon.as_mut() {
         Some(d) => d,
@@ -2730,6 +2850,13 @@ async fn dungeon_retreat(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
     if adventure.dungeon.is_none() {
         return err_json("not_in_dungeon", "Not currently in a dungeon").into_response();
     }
@@ -2754,7 +2881,7 @@ async fn dungeon_status(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
@@ -2889,6 +3016,13 @@ async fn tower_enter(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
     if adventure.dungeon.is_some() {
         return err_json("already_in_dungeon", "Already in a dungeon/tower. Leave first.").into_response();
     }
@@ -2960,6 +3094,20 @@ async fn tower_ascend(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+
+
     let dungeon = match adventure.dungeon.as_ref() {
         Some(d) => d,
         None => return err_json("not_in_tower", "Not currently in a tower").into_response(),
@@ -3008,7 +3156,7 @@ async fn tower_checkpoint(
     Json(_req): Json<TowerCheckpointRequest>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
@@ -3045,10 +3193,17 @@ async fn tower_teleport(
     Json(req): Json<TowerTeleportRequest>,
 ) -> impl IntoResponse {
     let store = make_store(&state, &user.username);
-    let adventure = match store.load_adventure(&id) {
+    let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
 
     if adventure.dungeon.is_none() {
         return err_json("not_in_tower", "Not currently in a tower").into_response();

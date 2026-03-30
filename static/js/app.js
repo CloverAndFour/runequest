@@ -17,6 +17,8 @@ var chatHistoryTotal = 0;
 var chatHistoryLoaded = 0;
 let currentModel = 'grok-4-1-fast-reasoning';
 let loadingOverlayTimeout = null;
+let cooldowns = { llm: 0, fixed: 0 };
+let cooldownInterval = null;
 
 
 const LOADING_FLAVOR_TEXTS = [
@@ -224,6 +226,9 @@ function handleServerMsg(msg) {
         case 'friend_chat_history':
             handleFriendChatHistory(msg);
             break;
+        case 'cooldown_state':
+            handleCooldownState(msg);
+            break;
         case 'password_changed':
             handlePasswordChanged();
             break;
@@ -238,7 +243,12 @@ function handleServerMsg(msg) {
             break;
         case 'error':
             hideAdventureLoadingOverlay();
-            showToast(msg.message, true);
+            if (msg.code === 'cooldown') {
+                showToast(msg.message, true);
+                // Don't clear UI — action was rejected, keep buttons visible
+            } else {
+                showToast(msg.message, true);
+            }
             break;
     }
 }
@@ -674,6 +684,58 @@ function showToast(message, isError = false) {
     setTimeout(() => toast.remove(), 4000);
 }
 
+// Cooldown management
+function handleCooldownState(msg) {
+    cooldowns.llm = msg.llm_remaining_ms || 0;
+    cooldowns.fixed = msg.fixed_remaining_ms || 0;
+    startCooldownTicker();
+    applyCooldownUI();
+}
+
+function startCooldownTicker() {
+    if (cooldownInterval) return;
+    cooldownInterval = setInterval(function() {
+        cooldowns.llm = Math.max(0, cooldowns.llm - 100);
+        cooldowns.fixed = Math.max(0, cooldowns.fixed - 100);
+        applyCooldownUI();
+        if (cooldowns.llm <= 0 && cooldowns.fixed <= 0) {
+            clearInterval(cooldownInterval);
+            cooldownInterval = null;
+        }
+    }, 100);
+}
+
+function applyCooldownUI() {
+    // Fixed action buttons: gather type uses fixed cooldown, others use LLM cooldown
+    document.querySelectorAll('.fixed-choice').forEach(function(btn) {
+        var type = btn.dataset.type;
+        var isFixed = (type === 'gather' || type === 'shop');
+        var remaining = isFixed ? cooldowns.fixed : cooldowns.llm;
+        if (remaining > 0) {
+            btn.disabled = true;
+            if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+            btn.textContent = btn.dataset.originalText + ' (' + Math.ceil(remaining / 1000) + 's)';
+        } else {
+            btn.disabled = false;
+            if (btn.dataset.originalText) {
+                btn.textContent = btn.dataset.originalText;
+                delete btn.dataset.originalText;
+            }
+        }
+    });
+
+    // LLM choice buttons
+    document.querySelectorAll('.llm-choices-section .choice-btn').forEach(function(btn) {
+        btn.disabled = cooldowns.llm > 0;
+    });
+
+    // Custom input
+    var customInput = document.getElementById('customAction');
+    var customBtn = document.getElementById('customActionBtn');
+    if (customInput) customInput.disabled = cooldowns.llm > 0;
+    if (customBtn) customBtn.disabled = cooldowns.llm > 0;
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -971,6 +1033,9 @@ function renderFixedActions() {
             handleFixedAction(btn.dataset.action, btn.dataset.type);
         });
     });
+
+    // Apply any active cooldowns to newly rendered buttons
+    applyCooldownUI();
 }
 
 function handleFixedAction(action, type) {

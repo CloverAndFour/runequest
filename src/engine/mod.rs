@@ -23,6 +23,7 @@ pub mod tower;
 pub mod world;
 pub mod world_map;
 pub mod worldgen;
+pub mod rate_limit;
 
 pub use adventure::AdventureState;
 pub use backgrounds::Background;

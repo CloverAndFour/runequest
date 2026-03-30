@@ -50,6 +50,7 @@ use crate::web::protocol::{ActionInfo, ChatMessageInfo, ClientMsg, EnemyInfo, Fr
 use crate::web::presence::{FriendEvent, PresenceRegistry};
 use crate::storage::friends_store::FriendsStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
+use crate::engine::rate_limit::{self, ActionCategory};
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -115,6 +116,8 @@ pub async fn handle_socket(
     let friends_store = FriendsStore::new(&data_dir);
     let friend_code = generate_friend_code(&user.username);
     let mut friend_rx = presence.connect(user.username.clone(), friend_code.clone()).await;
+
+    let user_role = user.role.clone();
 
     let session = Arc::new(Mutex::new(Session {
         username: user.username.clone(),
@@ -187,6 +190,7 @@ pub async fn handle_socket(
                         let response = handle_client_msg(
                             client_msg, &session, &xai_client, &mut sender,
                             &shop_store, &friends_store, &presence, &user_store,
+                            &user_role,
                         ).await;
 
                         if let Err(e) = response {
@@ -283,6 +287,42 @@ fn log_usage(sess: &Session, usage: &TokenUsage) {
     });
 }
 
+fn client_msg_tag(msg: &ClientMsg) -> &'static str {
+    match msg {
+        ClientMsg::SendMessage { .. } => "send_message",
+        ClientMsg::SelectChoice { .. } => "select_choice",
+        ClientMsg::CombatAction { .. } => "combat_action",
+        ClientMsg::Gather => "gather",
+        ClientMsg::CraftItem { .. } => "craft_item",
+        ClientMsg::ShopBuy { .. } => "shop_buy",
+        ClientMsg::ShopSell { .. } => "shop_sell",
+        ClientMsg::EquipItem { .. } => "equip_item",
+        ClientMsg::UnequipItem { .. } => "unequip_item",
+        ClientMsg::DungeonMove { .. } => "dungeon_move",
+        ClientMsg::DungeonEnter { .. } => "dungeon_enter",
+        ClientMsg::DungeonSkillCheck { .. } => "dungeon_skill_check",
+        ClientMsg::DungeonActivatePoint { .. } => "dungeon_activate_point",
+        ClientMsg::DungeonRetreat => "dungeon_retreat",
+        ClientMsg::TowerMove { .. } => "tower_move",
+        ClientMsg::TowerEnter { .. } => "tower_enter",
+        ClientMsg::TowerAscend => "tower_ascend",
+        ClientMsg::TowerTeleport { .. } => "tower_teleport",
+        _ => "read_only",
+    }
+}
+
+async fn send_cooldown_state(
+    sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    last_llm: Option<chrono::DateTime<chrono::Utc>>,
+    last_fixed: Option<chrono::DateTime<chrono::Utc>>,
+) {
+    let (llm_ms, fixed_ms) = rate_limit::remaining_cooldowns_ws(last_llm, last_fixed);
+    send_msg(sender, &ServerMsg::CooldownState {
+        llm_remaining_ms: llm_ms,
+        fixed_remaining_ms: fixed_ms,
+    }).await;
+}
+
 async fn handle_client_msg(
     msg: ClientMsg,
     session: &Arc<Mutex<Session>>,
@@ -292,7 +332,35 @@ async fn handle_client_msg(
     friends_store: &FriendsStore,
     presence: &PresenceRegistry,
     user_store: &Arc<crate::auth::UserStore>,
+    user_role: &str,
 ) -> anyhow::Result<()> {
+    // Rate limit check (admin users are exempt)
+    let tag = client_msg_tag(&msg);
+    let category = rate_limit::classify_action(tag);
+    if category != ActionCategory::ReadOnly && user_role != "admin" {
+        let mut sess = session.lock().await;
+        if let Some(ref mut adv) = sess.adventure {
+            if let Err(remaining_ms) = rate_limit::check_cooldown_ws(
+                category,
+                adv.last_llm_action_at,
+                adv.last_fixed_action_at,
+            ) {
+                let secs = (remaining_ms as f64 / 1000.0).ceil() as u64;
+                send_msg(sender, &ServerMsg::Error {
+                    code: "cooldown".to_string(),
+                    message: format!("Action on cooldown. Wait {}s.", secs),
+                }).await;
+                send_cooldown_state(sender, adv.last_llm_action_at, adv.last_fixed_action_at).await;
+                return Ok(());
+            }
+            // Stamp cooldown now — prevents rapid-fire even if action fails
+            rate_limit::stamp_cooldown(adv, category);
+            // Send updated cooldown state to frontend
+            send_cooldown_state(sender, adv.last_llm_action_at, adv.last_fixed_action_at).await;
+        }
+        drop(sess);
+    }
+
     match msg {
         ClientMsg::ViewShop => {
             let mut sess = session.lock().await;
@@ -992,9 +1060,16 @@ async fn handle_client_msg(
                     Some(adv.character.level),
                 ).await;
             }
+            // Capture cooldown timestamps before dropping session lock
+            let (cd_llm, cd_fixed) = sess.adventure.as_ref()
+                .map(|a| (a.last_llm_action_at, a.last_fixed_action_at))
+                .unwrap_or((None, None));
             drop(sess);
 
             send_msg(sender, &ServerMsg::AdventureLoaded { state: state_json }).await;
+
+            // Send initial cooldown state
+            send_cooldown_state(sender, cd_llm, cd_fixed).await;
 
             // Send location chat history and players
             if let Some(ref loc) = loc_name {
