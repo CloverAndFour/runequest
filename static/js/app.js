@@ -878,7 +878,12 @@ function renderFixedActions() {
 }
 
 function handleFixedAction(action, type) {
-    document.querySelectorAll('.fixed-choices-section, .llm-choices-section, .choices-container').forEach(function(el) { el.remove(); });
+    var mechanical = (type === "gather" || type === "shop");
+    if (mechanical) {
+        document.querySelectorAll('.fixed-choices-section, .choices-separator').forEach(function(el) { el.remove(); });
+    } else {
+        document.querySelectorAll('.fixed-choices-section, .llm-choices-section, .choices-container, .choices-separator').forEach(function(el) { el.remove(); });
+    }
     if (type === 'travel') {
         var direction = action.replace('travel_dir:', '');
         showLoadingSpinner();
