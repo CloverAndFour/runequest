@@ -119,6 +119,33 @@ pub fn direction_to_offset(direction: &str) -> Option<HexCoord> {
     }
 }
 
+/// Safe zone radius: counties within this distance from a race spawn
+/// get reduced encounter rates.
+const SAFE_ZONE_RADIUS: i32 = 5;
+const INNER_SAFE_RADIUS: i32 = 2;
+
+/// Compute the hex distance from a coordinate to the nearest race spawn point.
+fn distance_to_nearest_spawn(target: &HexCoord) -> i32 {
+    let mut min_dist = i32::MAX;
+    for county in WORLD.counties.values() {
+        if county.race_spawn.is_some() {
+            let dist = hex_distance(target, &county.coord);
+            if dist < min_dist {
+                min_dist = dist;
+            }
+        }
+    }
+    min_dist
+}
+
+/// Hex distance between two axial coordinates.
+fn hex_distance(a: &HexCoord, b: &HexCoord) -> i32 {
+    let dq = (a.q - b.q).abs();
+    let dr = (a.r - b.r).abs();
+    let ds = ((a.q + a.r) - (b.q + b.r)).abs();
+    *[dq, dr, ds].iter().max().unwrap()
+}
+
 /// Move to an adjacent county. Returns the new county or error.
 pub fn travel(pos: &mut PlayerPosition, discovery: &mut DiscoveryState, direction: &str) -> Result<TravelResult, String> {
     let offset = direction_to_offset(direction)
@@ -135,15 +162,25 @@ pub fn travel(pos: &mut PlayerPosition, discovery: &mut DiscoveryState, directio
     pos.location_idx = 0;
     discovery.discover(target);
 
-    // Roll for encounter based on county tier
+    // Roll for encounter based on county tier, adjusted by proximity to spawn
     let mut rng = rand::thread_rng();
-    let encounter_chance = 0.05 + county.tier * 0.04;
+    let spawn_dist = distance_to_nearest_spawn(&target);
+    let (encounter_chance, encounter_tier) = if spawn_dist <= INNER_SAFE_RADIUS {
+        // Inner safe zone (0-2 hexes from spawn): very rare, weakest enemies
+        (0.02_f32, 0_u32)
+    } else if spawn_dist <= SAFE_ZONE_RADIUS {
+        // Outer safe zone (3-5 hexes): reduced rate, T0 enemies regardless of county tier
+        let rate = 0.03 + (spawn_dist as f32 - INNER_SAFE_RADIUS as f32) * 0.01;
+        (rate, 0)
+    } else {
+        // Wilderness: normal encounter rate based on county tier
+        let rate = 0.05 + county.tier * 0.04;
+        (rate, county.tier.round() as u32)
+    };
     let encounter = if rng.gen::<f32>() < encounter_chance {
-        // Generate encounter enemies based on county tier
-        let tier = county.tier.round() as u32;
         let enemy_types = [EnemyType::Brute, EnemyType::Skulker, EnemyType::Mystic, EnemyType::Undead];
         let enemy_type = enemy_types[rng.gen_range(0..enemy_types.len())];
-        let enemy = generate_monster(tier, enemy_type);
+        let enemy = generate_monster(encounter_tier, enemy_type);
         Some(vec![enemy])
     } else {
         None
