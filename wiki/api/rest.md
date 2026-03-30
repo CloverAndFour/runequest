@@ -2,17 +2,106 @@
 
 ## Overview
 
-All protected routes require `Authorization: Bearer <JWT>` header.
+All protected routes require `Authorization: Bearer <JWT>` header or `Authorization: Bearer <API_KEY>` (keys with `rq_` prefix).
 CORS is fully open (any origin/method/headers).
 
-Base URL: `http://host:2998`
+Base URL: `http://host:2998` (or `https://host:2998` when TLS enabled)
 
 ## Authentication
 
 | Method | Path | Auth | Request Body | Response |
 |---|---|---|---|---|
 | POST | `/api/auth/login` | No | `{username, password}` | `{token, username, role}` or 401 |
+| POST | `/api/auth/change-password` | Yes | `{current_password, new_password}` | `{success: true}` or 400 `{error}` |
+| POST | `/api/auth/api-keys` | Yes | `{name}` | `{id, name, key, prefix, created_at}` (key shown once) |
+| GET | `/api/auth/api-keys` | Yes | -- | `[{id, name, prefix, created_at, last_used}]` |
+| DELETE | `/api/auth/api-keys/:key_id` | Yes | -- | `{success: true}` |
 | GET | `/health` | No | -- | `"ok"` |
+
+### Change Password
+
+`POST /api/auth/change-password`
+
+Requires authentication. Verifies current password with argon2id before updating.
+
+**Request:**
+```json
+{
+  "current_password": "old-password",
+  "new_password": "new-password-min-8-chars"
+}
+```
+
+**Success response (200):**
+```json
+{ "success": true }
+```
+
+**Error response (400):**
+```json
+{ "error": "Current password is incorrect" }
+{ "error": "New password must be at least 8 characters" }
+```
+
+### API Keys
+
+API keys provide long-lived authentication tokens for programmatic access (AI agents, bots). Keys use the `rq_` prefix + 32 hex characters (128 bits entropy). Only the SHA-256 hash is stored server-side; the plaintext key is returned once at creation and cannot be retrieved again.
+
+**Limits:** Max 10 keys per user.
+
+**Authentication:** API keys work anywhere JWT tokens work -- `Authorization: Bearer rq_...` header or `?token=rq_...` query parameter. The auth middleware detects the `rq_` prefix to route through hash lookup instead of JWT validation.
+
+**`last_used`:** Updated on each successful authentication with the key.
+
+#### Create API Key
+
+`POST /api/auth/api-keys`
+
+**Request:**
+```json
+{ "name": "my-bot" }
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "name": "my-bot",
+  "key": "rq_a1b2c3d4e5f6...",
+  "prefix": "rq_a1b2",
+  "created_at": "2026-03-30T12:00:00Z"
+}
+```
+
+The `key` field contains the full plaintext key. **This is the only time the key is shown.**
+
+#### List API Keys
+
+`GET /api/auth/api-keys`
+
+**Response (200):**
+```json
+[
+  {
+    "id": "uuid",
+    "name": "my-bot",
+    "prefix": "rq_a1b2",
+    "created_at": "2026-03-30T12:00:00Z",
+    "last_used": "2026-03-30T15:30:00Z"
+  }
+]
+```
+
+No plaintext keys are returned. Use `prefix` to identify keys.
+
+#### Revoke API Key
+
+`DELETE /api/auth/api-keys/:key_id`
+
+**Response (200):**
+```json
+{ "success": true }
+```
 
 ## Adventures
 

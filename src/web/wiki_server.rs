@@ -16,6 +16,7 @@ pub async fn run_wiki_server(
     port: u16,
     bind_address: &str,
     wiki_dir: PathBuf,
+    tls_config: Option<axum_server::tls_rustls::RustlsConfig>,
 ) -> Result<()> {
     let wiki_dir = Arc::new(wiki_dir.canonicalize().unwrap_or(wiki_dir));
 
@@ -25,9 +26,18 @@ pub async fn run_wiki_server(
         .with_state(wiki_dir);
 
     let addr = format!("{}:{}", bind_address, port);
-    eprintln!("Wiki server listening on {}", addr);
-    let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+
+    if let Some(tls) = tls_config {
+        eprintln!("Wiki server listening on https://{}", addr);
+        let addr: std::net::SocketAddr = addr.parse()?;
+        axum_server::bind_rustls(addr, tls)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        eprintln!("Wiki server listening on http://{}", addr);
+        let listener = TcpListener::bind(&addr).await?;
+        axum::serve(listener, app).await?;
+    }
     Ok(())
 }
 

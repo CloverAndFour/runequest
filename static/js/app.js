@@ -29,7 +29,6 @@ const LOADING_FLAVOR_TEXTS = [
 ];
 
 function showAdventureLoadingOverlay(isCreating) {
-    console.log("[OVERLAY] showAdventureLoadingOverlay called, isCreating:", isCreating);
     hideAdventureLoadingOverlay();
     const flavor = LOADING_FLAVOR_TEXTS[Math.floor(Math.random() * LOADING_FLAVOR_TEXTS.length)];
     const title = isCreating ? "Creating Adventure" : "Loading Adventure";
@@ -45,7 +44,6 @@ function showAdventureLoadingOverlay(isCreating) {
         </div>
     `;
     document.body.appendChild(overlay);
-    console.log("[OVERLAY] overlay appended to body, element:", overlay, "body children:", document.body.children.length);
 
     overlay.querySelector("#loadingRetryBtn")?.addEventListener("click", () => {
         hideAdventureLoadingOverlay();
@@ -59,7 +57,6 @@ function showAdventureLoadingOverlay(isCreating) {
 }
 
 function hideAdventureLoadingOverlay() {
-    console.log("[OVERLAY] hideAdventureLoadingOverlay called, existing overlay:", document.querySelector(".adventure-loading-overlay"));
     if (loadingOverlayTimeout) {
         clearTimeout(loadingOverlayTimeout);
         loadingOverlayTimeout = null;

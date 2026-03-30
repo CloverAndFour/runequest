@@ -9,6 +9,7 @@ use axum::{
 use std::sync::Arc;
 
 use super::JwtManager;
+use super::UserStore;
 
 #[derive(Debug, Clone)]
 pub struct AuthUser {
@@ -25,6 +26,7 @@ pub enum AuthMode {
 pub struct AuthState {
     pub auth_mode: AuthMode,
     pub jwt_manager: Arc<JwtManager>,
+    pub user_store: Arc<UserStore>,
 }
 
 pub async fn require_auth(
@@ -58,15 +60,29 @@ pub async fn require_auth(
         None => return redirect_or_401(&req),
     };
 
-    match auth_state.jwt_manager.validate_token(&token) {
-        Ok(claims) => {
-            req.extensions_mut().insert(AuthUser {
-                username: claims.sub,
-                role: claims.role,
-            });
-            next.run(req).await
+    // Check if this is an API key (rq_ prefix) or a JWT
+    if token.starts_with("rq_") {
+        match auth_state.user_store.authenticate_api_key(&token) {
+            Ok(user) => {
+                req.extensions_mut().insert(AuthUser {
+                    username: user.username,
+                    role: user.role.to_string(),
+                });
+                next.run(req).await
+            }
+            Err(_) => redirect_or_401(&req),
         }
-        Err(_) => redirect_or_401(&req),
+    } else {
+        match auth_state.jwt_manager.validate_token(&token) {
+            Ok(claims) => {
+                req.extensions_mut().insert(AuthUser {
+                    username: claims.sub,
+                    role: claims.role,
+                });
+                next.run(req).await
+            }
+            Err(_) => redirect_or_401(&req),
+        }
     }
 }
 

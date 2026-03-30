@@ -44,6 +44,14 @@ enum Commands {
 
         #[arg(long, default_value = "wiki", env = "RUNEQUEST_WIKI_DIR")]
         wiki_dir: PathBuf,
+
+        /// Path to TLS certificate file (PEM format)
+        #[arg(long, env = "RUNEQUEST_TLS_CERT")]
+        tls_cert: Option<PathBuf>,
+
+        /// Path to TLS private key file (PEM format)
+        #[arg(long, env = "RUNEQUEST_TLS_KEY")]
+        tls_key: Option<PathBuf>,
     },
 
     /// Manage users
@@ -84,8 +92,24 @@ async fn main() -> Result<()> {
             wiki_port,
             wiki_bind_address,
             wiki_dir,
+            tls_cert,
+            tls_key,
         } => {
             let base_path = resolve_data_dir(data_dir.as_deref())?;
+
+            // TLS configuration
+            let tls_config = match (&tls_cert, &tls_key) {
+                (Some(cert), Some(key)) => {
+                    let config = axum_server::tls_rustls::RustlsConfig::from_pem_file(cert, key).await?;
+                    eprintln!("TLS enabled with cert: {}", cert.display());
+                    Some(config)
+                }
+                (None, None) => {
+                    eprintln!("TLS disabled (no --tls-cert/--tls-key provided)");
+                    None
+                }
+                _ => anyhow::bail!("Both --tls-cert and --tls-key must be provided together"),
+            };
 
             // Shared resources created once
             let api_key = std::env::var("XAI_API_KEY").map_err(|_| {
@@ -124,10 +148,12 @@ async fn main() -> Result<()> {
             let model_api = model.clone();
             let auth_mode_api = auth_mode.clone();
 
+            let tls_web = tls_config.clone();
             let web_handle = tokio::spawn(async move {
-                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth, shop_store_web, presence_web).await
+                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth, shop_store_web, presence_web, tls_web).await
             });
 
+            let tls_api = tls_config.clone();
             let api_handle = tokio::spawn(async move {
                 runequest::web::api_server::run_api_server(
                     api_port,
@@ -140,15 +166,18 @@ async fn main() -> Result<()> {
                     jwt_api,
                     shop_store_api,
                     presence_api,
+                    tls_api,
                 )
                 .await
             });
 
+            let tls_wiki = tls_config.clone();
             let wiki_handle = tokio::spawn(async move {
                 runequest::web::wiki_server::run_wiki_server(
                     wiki_port,
                     &wiki_bind_address,
                     wiki_dir,
+                    tls_wiki,
                 )
                 .await
             });

@@ -1,11 +1,13 @@
-//! User storage with argon2id password hashing.
+//! User storage with argon2id password hashing and API key management.
 
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use chrono::{DateTime, Utc};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -33,6 +35,18 @@ impl std::fmt::Display for UserRole {
     }
 }
 
+/// A stored API key record. The actual key is never stored -- only its SHA-256 hash.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyRecord {
+    pub id: String,
+    pub name: String,
+    pub key_hash: String,
+    pub prefix: String,
+    pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub last_used: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
@@ -42,6 +56,8 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     #[serde(default)]
     pub last_login: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub api_keys: Vec<ApiKeyRecord>,
 }
 
 pub struct UserStore {
@@ -123,6 +139,7 @@ impl UserStore {
             role,
             created_at: Utc::now(),
             last_login: None,
+            api_keys: Vec::new(),
         };
 
         users.insert(username.to_string(), user);
@@ -154,6 +171,141 @@ impl UserStore {
         }
 
         Ok(user.clone())
+    }
+
+    /// Change a user's password. Verifies current password first.
+    pub fn change_password(
+        &self,
+        username: &str,
+        current_password: &str,
+        new_password: &str,
+    ) -> Result<()> {
+        if new_password.len() < 8 {
+            return Err(RunequestError::InvalidGameState(
+                "New password must be at least 8 characters".to_string(),
+            ));
+        }
+
+        // Verify current password
+        let users = self.load()?;
+        let user = users
+            .get(username)
+            .ok_or_else(|| RunequestError::UserNotFound(username.to_string()))?;
+
+        let parsed_hash = PasswordHash::new(&user.password_hash)
+            .map_err(|_| RunequestError::AuthenticationFailed)?;
+
+        Argon2::default()
+            .verify_password(current_password.as_bytes(), &parsed_hash)
+            .map_err(|_| {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                RunequestError::AuthenticationFailed
+            })?;
+
+        // Hash new password and save
+        let salt = SaltString::generate(&mut OsRng);
+        let new_hash = Argon2::default()
+            .hash_password(new_password.as_bytes(), &salt)
+            .map_err(|_| RunequestError::AuthenticationFailed)?
+            .to_string();
+
+        let mut users = self.load()?;
+        if let Some(u) = users.get_mut(username) {
+            u.password_hash = new_hash;
+            self.save(&users)?;
+        }
+        Ok(())
+    }
+
+    /// Create a new API key for a user. Returns the plaintext key (shown once).
+    pub fn create_api_key(&self, username: &str, name: &str) -> Result<(ApiKeyRecord, String)> {
+        if name.is_empty() || name.len() > 64 {
+            return Err(RunequestError::InvalidGameState(
+                "API key name must be 1-64 characters".to_string(),
+            ));
+        }
+
+        let mut users = self.load()?;
+        let user = users
+            .get_mut(username)
+            .ok_or_else(|| RunequestError::UserNotFound(username.to_string()))?;
+
+        if user.api_keys.len() >= 10 {
+            return Err(RunequestError::InvalidGameState(
+                "Maximum 10 API keys per user".to_string(),
+            ));
+        }
+
+        // Generate key: rq_ + 32 hex chars (128 bits)
+        let mut key_bytes = [0u8; 16];
+        rand::thread_rng().fill_bytes(&mut key_bytes);
+        let plaintext_key = format!("rq_{}", hex::encode(key_bytes));
+
+        // Hash it
+        let mut hasher = Sha256::new();
+        hasher.update(plaintext_key.as_bytes());
+        let key_hash = hex::encode(hasher.finalize());
+
+        let record = ApiKeyRecord {
+            id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
+            name: name.to_string(),
+            key_hash,
+            prefix: plaintext_key[..12].to_string(),
+            created_at: Utc::now(),
+            last_used: None,
+        };
+
+        user.api_keys.push(record.clone());
+        self.save(&users)?;
+
+        Ok((record, plaintext_key))
+    }
+
+    /// List API keys for a user (without hashes).
+    pub fn list_api_keys(&self, username: &str) -> Result<Vec<ApiKeyRecord>> {
+        let users = self.load()?;
+        let user = users
+            .get(username)
+            .ok_or_else(|| RunequestError::UserNotFound(username.to_string()))?;
+        Ok(user.api_keys.clone())
+    }
+
+    /// Revoke (delete) an API key by its ID.
+    pub fn revoke_api_key(&self, username: &str, key_id: &str) -> Result<()> {
+        let mut users = self.load()?;
+        let user = users
+            .get_mut(username)
+            .ok_or_else(|| RunequestError::UserNotFound(username.to_string()))?;
+
+        let before = user.api_keys.len();
+        user.api_keys.retain(|k| k.id != key_id);
+        if user.api_keys.len() == before {
+            return Err(RunequestError::InvalidGameState(
+                "API key not found".to_string(),
+            ));
+        }
+        self.save(&users)?;
+        Ok(())
+    }
+
+    /// Authenticate an API key. Returns the user if valid.
+    pub fn authenticate_api_key(&self, key: &str) -> Result<User> {
+        let mut hasher = Sha256::new();
+        hasher.update(key.as_bytes());
+        let key_hash = hex::encode(hasher.finalize());
+
+        let mut users = self.load()?;
+        for user in users.values_mut() {
+            for api_key in &mut user.api_keys {
+                if api_key.key_hash == key_hash {
+                    api_key.last_used = Some(Utc::now());
+                    let result = user.clone();
+                    self.save(&users)?;
+                    return Ok(result);
+                }
+            }
+        }
+        Err(RunequestError::AuthenticationFailed)
     }
 }
 

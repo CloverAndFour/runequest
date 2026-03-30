@@ -4,7 +4,10 @@
 
 ```
 ws://host:2999/ws?token=<JWT>
+wss://host:2999/ws?token=<JWT>   (when TLS enabled)
 ```
+
+API keys also accepted: `?token=rq_...`
 
 All messages are JSON with a `type` field (snake_case).
 
@@ -47,6 +50,15 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_item` | `recipe_id` | Craft an item using a recipe |
 | `list_recipes` | `skill?, tier?` | List crafting recipes (optional filters) |
 | `list_materials` | -- | List all crafting materials |
+
+### Account Management
+
+| Type | Fields | Description |
+|---|---|---|
+| `change_password` | `current_password, new_password` | Change account password (new password >= 8 chars) |
+| `create_api_key` | `name` | Create a new API key (max 10 per user) |
+| `list_api_keys` | -- | List all API keys (no plaintext returned) |
+| `revoke_api_key` | `key_id` | Revoke an API key by ID |
 
 ### Shop
 
@@ -220,6 +232,17 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_result` | `recipe_name, output, quantity, skill_progress` | Crafting outcome |
 | `recipe_list` | `recipes` | List of recipes (with filters applied) |
 | `material_list` | `materials` | List of all materials |
+
+### Account Management
+
+| Type | Fields | Description |
+|---|---|---|
+| `password_changed` | -- | Password changed successfully |
+| `api_key_created` | `id, name, key, prefix, created_at` | New API key created (plaintext `key` shown once) |
+| `api_key_list` | `keys[]` | List of API keys (`{id, name, prefix, created_at, last_used}` per entry, no plaintext) |
+| `api_key_revoked` | `key_id` | API key revoked successfully |
+
+On error, the server sends the standard `error` message with `code` and `message` fields.
 
 ### Shop
 

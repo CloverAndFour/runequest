@@ -15,6 +15,7 @@
 - [Crafting Stations](game/stations.md) — 12 station types, tier caps, world placement
 - [Equipment Lines](game/equipment.md) — 10 equipment lines, weapon/armor stats per tier, crafting requirements
 - [Crafting Balance](game/crafting-balance.md) — Graph analysis, complexity metrics, mixing scores, equipment costs
+- [Potions & Consumables](game/potions-and-consumables.md) — 70 consumable types, tier scaling, recipes, corruption management, raid logistics
 
 ### World & Exploration
 - [World Map](game/world.md) — 251K county hex grid, biomes, features, 10 race spawns
@@ -31,6 +32,10 @@
 
 ## API Reference
 
-- [REST API](api/rest.md) — All HTTP endpoints on port 2998
-- [WebSocket Protocol](api/websocket.md) — All ClientMsg/ServerMsg types on port 2999
+- [REST API](api/rest.md) — All HTTP endpoints on port 2998 (supports TLS, JWT + API key auth)
+- [WebSocket Protocol](api/websocket.md) — All ClientMsg/ServerMsg types on port 2999 (supports TLS/WSS)
 - [Crafting API](api/crafting.md) — Recipe lookup, crafting execution, material queries
+
+**Authentication:** All protected endpoints accept JWT tokens or API keys (`rq_` prefix). API keys are long-lived tokens for programmatic access (AI agents, bots). See the REST API reference for key management endpoints.
+
+**TLS:** All servers support TLS via `--tls-cert` and `--tls-key` CLI args. Frontend auto-detects `wss://` vs `ws://`.

@@ -10,11 +10,14 @@ Last updated: 2026-03-30
 
 RuneQuest is a D&D adventure chat system powered by Grok 4.1 (xAI). It features a turn-based combat system inspired by Baldur's Gate 3, procedural dungeons, a world map, and an OSRS-themed pixel art frontend.
 
-**Dual-server architecture:** Two servers run simultaneously sharing the same backend:
+**Triple-server architecture:** Three servers run simultaneously sharing the same backend:
 - **Port 2999** -- Web UI (SPA + WebSocket)
 - **Port 2998** -- REST API (JSON endpoints)
+- **Port 2997** -- Internal Wiki (API reference + game wiki, static site)
 
-Both interfaces are fully playable. Every game action available in the UI must also be available via the API.
+Both game interfaces (web UI and REST API) are fully playable. Every game action available in the UI must also be available via the API.
+
+**TLS support:** All three servers support TLS via `axum-server` with `rustls`. Enabled with `--tls-cert` and `--tls-key` CLI args (or `RUNEQUEST_TLS_CERT` / `RUNEQUEST_TLS_KEY` env vars). Both must be provided; falls back to plain HTTP when absent. The frontend auto-detects `wss://` vs `ws://` based on page protocol.
 
 ## Project Structure
 
@@ -26,6 +29,7 @@ runequest/
   ARCHITECTURE.md               # This file
   data/
     jwt_secret.key              # Auto-generated HS256 secret
+    api_keys.json               # API key hashes + metadata (SHA-256, no plaintext)
     users.json                  # User credentials (argon2id hashed)
     usage.jsonl                 # LLM cost/token log
     users/<username>/adventures/<uuid>/
@@ -39,8 +43,8 @@ runequest/
     auth/
       mod.rs                    # Re-exports
       jwt.rs                    # JWT creation/validation (HS256, 24h)
-      middleware.rs             # Auth middleware (Bearer token or ?token= query)
-      user_store.rs             # User CRUD, argon2id password hashing
+      middleware.rs             # Auth middleware (Bearer/API key token or ?token= query)
+      user_store.rs             # User CRUD, argon2id password hashing, API key management
     engine/
       mod.rs                    # Re-exports
       npc.rs                    # NPC model (Npc, NpcType, NpcInteraction)
@@ -103,6 +107,7 @@ runequest/
       party.js                    # Party panel, combat timer, PvP UI
       location-chat.js            # Location public chat UI
       combat.js                 # Combat UI (initiative bar, actions, enemy HP)
+      settings.js               # Account settings panel (change password, API keys)
       select.js                 # Adventure select + character creation (race + background)
   tests/
     login.spec.ts               # Auth tests (5 tests, browser)
@@ -118,7 +123,7 @@ runequest/
 
 ## REST API Endpoints (Port 2998)
 
-All protected routes require `Authorization: Bearer <JWT>` header.
+All protected routes require `Authorization: Bearer <JWT>` header or `Authorization: Bearer <API_KEY>` (keys with `rq_` prefix).
 CORS is fully open (any origin/method/headers).
 
 ### Authentication
@@ -126,7 +131,15 @@ CORS is fully open (any origin/method/headers).
 | Method | Path | Auth | Request Body | Response |
 |--------|------|------|-------------|----------|
 | `POST` | `/api/auth/login` | No | `{username, password}` | `{token, username, role}` or 401 |
+| `POST` | `/api/auth/change-password` | Yes | `{current_password, new_password}` | `{success: true}` or 400 `{error}` |
+| `POST` | `/api/auth/api-keys` | Yes | `{name}` | `{id, name, key, prefix, created_at}` (key shown once) |
+| `GET` | `/api/auth/api-keys` | Yes | -- | `[{id, name, prefix, created_at, last_used}]` |
+| `DELETE` | `/api/auth/api-keys/:key_id` | Yes | -- | `{success: true}` |
 | `GET` | `/health` | No | -- | `"ok"` |
+
+`change-password`: New password must be >= 8 characters. Current password is verified with argon2id before updating.
+
+`api-keys`: API keys use `rq_` prefix + 32 hex chars (128 bits entropy). Only the SHA-256 hash is stored; the plaintext key is returned once at creation. Max 10 keys per user. Keys work anywhere JWT tokens work (`Authorization: Bearer rq_...` or `?token=rq_...`). The auth middleware detects the `rq_` prefix to distinguish API keys from JWTs. `last_used` is updated on each authentication.
 
 ### Adventures
 
@@ -315,7 +328,7 @@ Undiscovered hexes show `name: "???"`, `tier: "?"`, `biome: "unknown"`, and null
 
 ## WebSocket Protocol (Port 2999)
 
-Connection: `ws://host:2999/ws?token=<JWT>`
+Connection: `ws://host:2999/ws?token=<JWT>` (or `wss://` when TLS enabled). API keys also accepted: `?token=rq_...`.
 
 ### Client -> Server Messages
 
@@ -339,6 +352,15 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_item` | `recipe_id` | Craft an item using a recipe |
 | `list_recipes` | `skill?, tier?` | List crafting recipes (optional filters) |
 | `list_materials` | -- | List all crafting materials |
+
+#### Account Management
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `change_password` | `current_password, new_password` | Change account password (>= 8 chars) |
+| `create_api_key` | `name` | Create a new API key (max 10 per user) |
+| `list_api_keys` | -- | List all API keys (no plaintext) |
+| `revoke_api_key` | `key_id` | Revoke an API key |
 
 #### Dungeon
 
@@ -393,6 +415,10 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_result` | `recipe_name, output, quantity, skill_progress` | Crafting outcome |
 | `recipe_list` | `recipes` | List of recipes |
 | `material_list` | `materials` | List of materials |
+| `password_changed` | -- | Password changed successfully |
+| `api_key_created` | `id, name, key, prefix, created_at` | New API key (plaintext key shown once) |
+| `api_key_list` | `keys[]` | List of API keys (id, name, prefix, created_at, last_used) |
+| `api_key_revoked` | `key_id` | API key revoked |
 
 #### Dungeon
 
@@ -1712,11 +1738,13 @@ These have stable `image_id` values used for pre-generated portraits.
 ## Auth System
 
 - **Passwords:** Argon2id with random salt
+- **Change password:** `POST /api/auth/change-password` or WS `change_password`. Verifies current password with argon2id before updating. New password must be >= 8 characters.
 - **JWT:** HS256, 24-hour expiry. Secret auto-generated (64 bytes, file perms 0o600)
 - **Claims:** `{sub: username, role: "admin"|"user", exp, iat}`
+- **API keys:** Long-lived tokens for programmatic access (AI agents, bots). Format: `rq_` + 32 hex chars (128 bits entropy). Only SHA-256 hash stored in `data/api_keys.json`; plaintext shown once at creation. Max 10 per user. `last_used` updated on each authentication.
 - **Username rules:** 3-32 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphens
 - **Auth mode:** Enabled if `--require-auth` flag or any users exist. Disabled = default admin user
-- **Middleware:** Token from `Authorization: Bearer` header or `?token=` query param
+- **Middleware:** Token from `Authorization: Bearer` header or `?token=` query param. Detects `rq_` prefix to route API keys through SHA-256 hash lookup instead of JWT validation.
 - **Timing attack mitigation:** 1-second sleep on failed auth
 
 ## Configuration
@@ -1727,9 +1755,12 @@ These have stable `image_id` values used for pre-generated portraits.
 | `XAI_MODEL` | `grok-4-1-fast-reasoning` | LLM model |
 | `RUNEQUEST_PORT` | 2999 | Web server port |
 | `RUNEQUEST_API_PORT` | 2998 | REST API port |
+| `RUNEQUEST_WIKI_PORT` | 2997 | Wiki server port |
 | `RUNEQUEST_BIND_ADDR` | 0.0.0.0 | Bind address |
 | `RUNEQUEST_DATA_DIR` | `$XDG_DATA_HOME/runequest` | Data directory |
 | `RUNEQUEST_REQUIRE_AUTH` | false | Force auth |
+| `RUNEQUEST_TLS_CERT` | (none) | TLS certificate path (PEM) |
+| `RUNEQUEST_TLS_KEY` | (none) | TLS private key path (PEM) |
 
 ## Build & Deploy
 

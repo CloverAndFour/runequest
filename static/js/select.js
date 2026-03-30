@@ -23,6 +23,7 @@ export function renderSelectScreen(container, adventures, handlers) {
     }
 
     html += `<button class="stone-btn" id="newAdventureBtn">New Adventure</button>
+        <button class="stone-btn" id="accountBtn" style="margin-top:12px;">Account Settings</button>
         <button class="stone-btn danger" id="logoutBtn" style="margin-top:12px;">Log Out</button>
     </div>`;
 
@@ -32,6 +33,9 @@ export function renderSelectScreen(container, adventures, handlers) {
         card.addEventListener('click', () => handlers.onLoad(card.dataset.id));
     });
     document.getElementById('newAdventureBtn')?.addEventListener('click', handlers.onNew);
+    document.getElementById('accountBtn')?.addEventListener('click', () => {
+        if (handlers.onAccount) handlers.onAccount();
+    });
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
         localStorage.removeItem('rq_token');
         localStorage.removeItem('rq_username');

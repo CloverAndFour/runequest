@@ -59,6 +59,7 @@ pub async fn run_server(
     require_auth_flag: bool,
     shop_store: ShopStore,
     presence: PresenceRegistry,
+    tls_config: Option<axum_server::tls_rustls::RustlsConfig>,
 ) -> anyhow::Result<()> {
     let api_key = std::env::var("XAI_API_KEY").map_err(|_| {
         anyhow::anyhow!(
@@ -92,6 +93,7 @@ pub async fn run_server(
     let auth_state = Arc::new(AuthState {
         auth_mode: auth_mode.clone(),
         jwt_manager: jwt_manager.clone(),
+        user_store: user_store.clone(),
     });
 
     // Static file directories
@@ -124,13 +126,21 @@ pub async fn run_server(
         .with_state(app_state);
 
     let addr = format!("{}:{}", bind_address, port);
-    eprintln!("RuneQuest server starting on http://{}", addr);
     eprintln!("Auth mode: {:?}", auth_mode);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    if let Some(tls) = tls_config {
+        eprintln!("RuneQuest server starting on https://{}", addr);
+        let addr: std::net::SocketAddr = addr.parse()?;
+        axum_server::bind_rustls(addr, tls)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        eprintln!("RuneQuest server starting on http://{}", addr);
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
 
     Ok(())
 }
@@ -186,6 +196,7 @@ async fn ws_handler(
 ) -> impl IntoResponse {
     let default_model = state.default_model.clone();
     let presence = state.presence.clone();
+    let user_store = state.user_store.clone();
     ws.on_upgrade(move |socket| {
         handle_socket(
             socket,
@@ -195,6 +206,7 @@ async fn ws_handler(
             default_model,
             state.shop_store.clone(),
             presence,
+            user_store,
         )
     })
 }
