@@ -133,6 +133,29 @@ All messages are JSON with a `type` field (snake_case).
 | `promote_guild_member` | `username` | Promote a member |
 | `kick_guild_member` | `username` | Kick a member |
 
+### Dungeon
+
+| Type | Fields | Description |
+|---|---|---|
+| `dungeon_enter` | `seed?, tier?` | Enter a dungeon |
+| `dungeon_move` | `direction` | Move to adjacent room |
+| `dungeon_skill_check` | `direction, skill_id` | Attempt skill gate |
+| `dungeon_activate_point` | `puzzle_id, room_id` | Activate puzzle point |
+| `dungeon_retreat` | -- | Leave dungeon |
+| `dungeon_status` | -- | Get dungeon state |
+
+### Tower
+
+| Type | Fields | Description |
+|---|---|---|
+| `tower_list` | -- | List all towers |
+| `tower_enter` | `tower_id` | Enter a tower |
+| `tower_move` | `direction` | Move in tower |
+| `tower_ascend` | -- | Go to next floor |
+| `tower_checkpoint` | `floor` | Attune checkpoint |
+| `tower_teleport` | `target_floor` | Teleport to floor (costs gold) |
+| `tower_floor_status` | `tower_id, floor` | Get floor info |
+
 ---
 
 ## Server -> Client Messages
@@ -289,6 +312,31 @@ All messages are JSON with a `type` field (snake_case).
 | `guild_list` | `guilds[]` | All guilds |
 | `guild_member_joined` | `username, guild_name` | New member |
 | `guild_member_left` | `username, guild_name` | Member left |
+
+### Dungeon
+
+| Type | Fields | Description |
+|---|---|---|
+| `dungeon_entered` | `name, tier, floors, room` | Entered dungeon |
+| `dungeon_room_changed` | `room, floor, room_id` | Moved to new room |
+| `dungeon_skill_gate_result` | `skill, roll, dc, success` | Skill check result |
+| `dungeon_puzzle_activation` | `puzzle_id, activated_count, required_count, solved` | Puzzle progress |
+| `dungeon_retreated` | `message` | Left dungeon |
+| `dungeon_status` | `status` | Current dungeon state |
+| `corruption_tick` | `level, effects` | Corruption damage (T7+) |
+| `path_cleared` | `path_index, mini_boss` | Split path cleared |
+| `convergence_unlocked` | `convergence_room` | All paths cleared |
+| `breach_warning` | `message` | Corruption breach warning |
+
+### Tower
+
+| Type | Fields | Description |
+|---|---|---|
+| `tower_list` | `towers[]` | Available towers |
+| `tower_entered` | `tower_name, floor, tier` | Entered tower |
+| `tower_floor_status` | `floor` | Floor details |
+| `tower_player_nearby` | `player_name, room_x, room_y` | Nearby player |
+| `tower_first_clear` | `tower, floor, player` | First clear achievement |
 
 ### System
 

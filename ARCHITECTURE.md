@@ -4,7 +4,7 @@
 > Claude MUST keep this document up to date after every change.
 > If you discover this document is inaccurate, STOP work, fix it, then resume.
 
-Last updated: 2026-03-29
+Last updated: 2026-03-30
 
 ## Overview
 
@@ -219,6 +219,34 @@ Crafting checks: (1) skill rank requirement, (2) crafting station availability (
 
 `list_recipes` is filtered by: (a) player's skill rank (only shows recipes at or below rank), (b) available crafting stations at current location.
 
+
+### Dungeon
+
+| Method | Path | Auth | Request Body | Response |
+|--------|------|------|-------------|----------|
+| `POST` | `/api/adventures/:id/dungeon/enter` | Yes | `{seed?, tier?}` | `{result, dungeon, state}` |
+| `POST` | `/api/adventures/:id/dungeon/move` | Yes | `{direction}` | `{result, room, floor, room_id, state}` |
+| `POST` | `/api/adventures/:id/dungeon/skill-check` | Yes | `{direction, skill_id}` | `{result, skill, roll, dc, success}` |
+| `POST` | `/api/adventures/:id/dungeon/activate-point` | Yes | `{puzzle_id, room_id}` | `{result, puzzle_id, activated_count, required_count, solved}` |
+| `POST` | `/api/adventures/:id/dungeon/retreat` | Yes | -- | `{result, message, state}` |
+| `GET` | `/api/adventures/:id/dungeon/status` | Yes | -- | `{in_dungeon, name?, tier?, ...}` |
+
+`direction` values: `"North"`, `"South"`, `"East"`, `"West"`, `"Descend"`, `"Ascend"`
+
+### Tower
+
+| Method | Path | Auth | Request Body | Response |
+|--------|------|------|-------------|----------|
+| `GET` | `/api/towers` | Yes | -- | `{towers: [{id, name, base_tier, ...}]}` |
+| `GET` | `/api/towers/:tower_id/floor/:floor_num` | Yes | -- | `{floor: FloorSummary}` |
+| `POST` | `/api/adventures/:id/tower/enter` | Yes | `{tower_id}` | `{result, tower_name, floor, tier, state}` |
+| `POST` | `/api/adventures/:id/tower/move` | Yes | `{direction}` | Same as dungeon/move |
+| `POST` | `/api/adventures/:id/tower/ascend` | Yes | -- | Same as dungeon/move (uses "Descend" direction internally) |
+| `POST` | `/api/adventures/:id/tower/checkpoint` | Yes | `{floor}` | `{checkpoint_attuned, floor, teleport_cost}` |
+| `POST` | `/api/adventures/:id/tower/teleport` | Yes | `{target_floor}` | `{teleport_available, target_floor, cost}` or error if insufficient gold |
+
+`tower/enter` requires the player to be at a county with `has_tower: true`. The `tower_id` must match the tower at that county.
+
 ### GameResponse Format
 
 ```json
@@ -312,6 +340,29 @@ All messages are JSON with a `type` field (snake_case).
 | `list_recipes` | `skill?, tier?` | List crafting recipes (optional filters) |
 | `list_materials` | -- | List all crafting materials |
 
+#### Dungeon
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `dungeon_enter` | `seed?, tier?` | Enter a dungeon |
+| `dungeon_move` | `direction` | Move to adjacent room |
+| `dungeon_skill_check` | `direction, skill_id` | Attempt skill gate |
+| `dungeon_activate_point` | `puzzle_id, room_id` | Activate puzzle point |
+| `dungeon_retreat` | -- | Leave dungeon |
+| `dungeon_status` | -- | Get dungeon state |
+
+#### Tower
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `tower_list` | -- | List all towers |
+| `tower_enter` | `tower_id` | Enter a tower |
+| `tower_move` | `direction` | Move in tower |
+| `tower_ascend` | -- | Go to next floor |
+| `tower_checkpoint` | `floor` | Attune checkpoint |
+| `tower_teleport` | `target_floor` | Teleport to floor (costs gold) |
+| `tower_floor_status` | `tower_id, floor` | Get floor info |
+
 
 ### Server -> Client Messages
 
@@ -342,6 +393,31 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_result` | `recipe_name, output, quantity, skill_progress` | Crafting outcome |
 | `recipe_list` | `recipes` | List of recipes |
 | `material_list` | `materials` | List of materials |
+
+#### Dungeon
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `dungeon_entered` | `name, tier, floors, room` | Entered dungeon |
+| `dungeon_room_changed` | `room, floor, room_id` | Moved to new room |
+| `dungeon_skill_gate_result` | `skill, roll, dc, success` | Skill check result |
+| `dungeon_puzzle_activation` | `puzzle_id, activated_count, required_count, solved` | Puzzle progress |
+| `dungeon_retreated` | `message` | Left dungeon |
+| `dungeon_status` | `status` | Current dungeon state |
+| `corruption_tick` | `level, effects` | Corruption damage (T7+) |
+| `path_cleared` | `path_index, mini_boss` | Split path cleared |
+| `convergence_unlocked` | `convergence_room` | All paths cleared |
+| `breach_warning` | `message` | Corruption breach warning |
+
+#### Tower
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `tower_list` | `towers[]` | Available towers |
+| `tower_entered` | `tower_name, floor, tier` | Entered tower |
+| `tower_floor_status` | `floor` | Floor details |
+| `tower_player_nearby` | `player_name, room_x, room_y` | Nearby player |
+| `tower_first_clear` | `tower, floor, player` | First clear achievement |
 
 **Display Event Types:** narrative, choice_selected, dice_result, dice_roll_request, choices, user_message, combat_action, combat_enemy, combat_started, combat_ended, state_changes
 
@@ -841,6 +917,10 @@ Locations may have `has_exchange: true` (exchange order book) or `has_guild_hall
 - **Navigation:** Move by cardinal direction + Descend/Ascend
 - **Key functions:** `generate_dungeon(seed)` (base), `generate_tiered_dungeon(seed, tier)` (tier-scaled), `dungeon_hint_for_tier(tier)` (vague hint text)
 
+**REST API:** 6 endpoints under `/api/adventures/:id/dungeon/` -- `enter`, `move`, `skill-check`, `activate-point`, `retreat`, `status`. See REST API Endpoints section above.
+
+**WebSocket:** Client sends `dungeon_enter`, `dungeon_move`, `dungeon_skill_check`, `dungeon_activate_point`, `dungeon_retreat`, `dungeon_status`. Server responds with `dungeon_entered`, `dungeon_room_changed`, `dungeon_skill_gate_result`, `dungeon_puzzle_activation`, `dungeon_retreated`, `dungeon_status`, `corruption_tick`, `path_cleared`, `convergence_unlocked`, `breach_warning`.
+
 ### Tower System (Shared Infinite Dungeons)
 
 10 towers placed at specific counties across the world map. All players share the same tower instance — floors are deterministically generated from tower seed + floor number using ChaCha8 RNG.
@@ -873,7 +953,23 @@ Locations may have `has_exchange: true` (exchange order book) or `has_guild_hall
 
 **Persistence** (`src/storage/tower_store.rs`): Floor state saved as `data/towers/{tower_id}_{floor}.json`. Shared across all players.
 
+**Guard floors:** Every 5th floor (5, 10, 15, ...) features a guard encounter that must be defeated to proceed. Guard difficulty scales with floor tier.
+
+**Boss HP scaling:** Boss HP scales with floor number: `base_hp * (1.0 + floor * 0.15)`. Higher floors produce significantly tougher bosses.
+
+**Checkpoints:** Players can attune to checkpoints on safe floors (every 10th floor). Attuning is free. Once attuned, the player can teleport back to that floor from the tower entrance.
+
+**Teleportation:** Teleporting to a checkpoint costs gold: `floor_number * 10` gold. Requires sufficient gold in inventory.
+
+**Entry requirements:** A player must be at a county with `has_tower: true` and the `tower_id` must match. No minimum tier requirement to enter, but higher-tier towers will be lethal for under-geared players.
+
+**First-clear tracking:** The server tracks the first player to clear each floor of each tower. First clears are announced to all connected players via the `tower_first_clear` WebSocket message.
+
 **LLM tools:** `enter_tower`, `tower_ascend`, `exit_tower`. Tracks highest floor reached.
+
+**REST API:** 7 endpoints -- `GET /api/towers` (list), `GET /api/towers/:tower_id/floor/:floor_num` (floor info), and 5 under `/api/adventures/:id/tower/` -- `enter`, `move`, `ascend`, `checkpoint`, `teleport`. See REST API Endpoints section above.
+
+**WebSocket:** Client sends `tower_list`, `tower_enter`, `tower_move`, `tower_ascend`, `tower_checkpoint`, `tower_teleport`, `tower_floor_status`. Server responds with `tower_list`, `tower_entered`, `tower_floor_status`, `tower_player_nearby`, `tower_first_clear`.
 
 ## LLM Integration
 
