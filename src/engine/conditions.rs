@@ -86,7 +86,7 @@ pub fn apply_turn_effects(state: &mut AdventureState) -> Vec<String> {
             if let Some(ref damage_dice) = effect.damage_per_turn {
                 let result = DiceRoller::roll(damage_dice, 1, 0);
                 let damage = std::cmp::max(result.total, 1);
-                state.character.hp -= damage;
+                state.character.apply_damage(damage);
                 effects.push(format!(
                     "{} deals {} damage (rolled {}). HP: {}/{}",
                     condition_name, damage, result.total,

@@ -225,6 +225,27 @@ impl Character {
         }
     }
 
+
+    /// Apply damage to the character, clamping HP to 0 and setting dead if HP reaches 0.
+    /// Death is permanent — once dead, the adventure is over.
+    pub fn apply_damage(&mut self, damage: i32) {
+        self.hp -= damage;
+        if self.hp <= 0 {
+            self.hp = 0;
+            self.dead = true;
+        }
+    }
+
+    /// Check if the character should be dead (hp <= 0) and set the dead flag.
+    /// Returns true if the character is dead.
+    pub fn check_death(&mut self) -> bool {
+        if self.hp <= 0 {
+            self.hp = 0;
+            self.dead = true;
+        }
+        self.dead
+    }
+
     pub fn proficiency_bonus(&self) -> i32 {
         match self.level {
             1..=4 => 2,

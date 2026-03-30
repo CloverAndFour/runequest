@@ -285,7 +285,7 @@ impl CombatState {
         let damage = if hit {
             let dmg_result = DiceRoller::roll(&best_attack.damage_dice, 1, best_attack.damage_modifier);
             let dmg = std::cmp::max(dmg_result.total, 1);
-            player.hp -= dmg;
+            player.apply_damage(dmg);
             dmg
         } else {
             0

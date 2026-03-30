@@ -202,12 +202,17 @@ pub fn execute_tool_call_with_shop(
         "update_hp" => {
             let delta = args["delta"].as_i64().unwrap_or(0) as i32;
             let reason = args["reason"].as_str().unwrap_or("unknown");
-            state.character.hp = std::cmp::min(state.character.hp + delta, state.character.max_hp);
+            if delta < 0 {
+                state.character.apply_damage(-delta);
+            } else {
+                state.character.hp = std::cmp::min(state.character.hp + delta, state.character.max_hp);
+            }
             Ok(ToolExecResult::Immediate(serde_json::json!({
                 "new_hp": state.character.hp,
                 "max_hp": state.character.max_hp,
                 "delta": delta,
                 "reason": reason,
+                "dead": state.character.dead,
             })))
         }
 
@@ -689,7 +694,7 @@ pub fn execute_tool_call_with_shop(
                                 };
                                 let damage = std::cmp::max(damage, 0);
 
-                                state.character.hp -= damage;
+                                state.character.apply_damage(damage);
 
                                 // Apply condition if any and save failed
                                 if !saved {
