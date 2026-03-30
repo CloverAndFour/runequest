@@ -3,7 +3,29 @@
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
-fn build_state_with_map(adventure: &crate::engine::adventure::AdventureState) -> serde_json::Value {    let mut state = serde_json::to_value(adventure).unwrap_or_default();    if let serde_json::Value::Object(ref mut map) = state {        map.insert("map_view".to_string(),            crate::engine::world_map::build_map_view(&adventure.world_position, &adventure.discovery, false));    }    state}
+fn build_state_with_map(adventure: &crate::engine::adventure::AdventureState) -> serde_json::Value {
+    let mut state = serde_json::to_value(adventure).unwrap_or_default();
+    if let serde_json::Value::Object(ref mut map) = state {
+        // Inject the small map_view summary
+        map.insert("map_view".to_string(),
+            crate::engine::world_map::build_map_view(&adventure.world_position, &adventure.discovery, false));
+        // Strip heavy fields the client never uses (91% of payload)
+        map.remove("world");
+        map.remove("dungeon");
+    }
+    state
+}
+
+/// Build client state from a pre-parsed JSON Value — avoids re-serializing AdventureState.
+fn build_client_state_from_json(mut value: serde_json::Value, adventure: &crate::engine::adventure::AdventureState) -> serde_json::Value {
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.insert("map_view".to_string(),
+            crate::engine::world_map::build_map_view(&adventure.world_position, &adventure.discovery, false));
+        map.remove("world");
+        map.remove("dungeon");
+    }
+    value
+}
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
@@ -84,6 +106,7 @@ pub async fn handle_socket(
     default_model: String,
     shop_store: ShopStore,
     presence: PresenceRegistry,
+    user_store: Arc<crate::auth::UserStore>,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let store = AdventureStore::new(&data_dir, &user.username);
@@ -163,7 +186,7 @@ pub async fn handle_socket(
 
                         let response = handle_client_msg(
                             client_msg, &session, &xai_client, &mut sender,
-                            &shop_store, &friends_store, &presence,
+                            &shop_store, &friends_store, &presence, &user_store,
                         ).await;
 
                         if let Err(e) = response {
@@ -268,6 +291,7 @@ async fn handle_client_msg(
     shop_store: &ShopStore,
     friends_store: &FriendsStore,
     presence: &PresenceRegistry,
+    user_store: &Arc<crate::auth::UserStore>,
 ) -> anyhow::Result<()> {
     match msg {
         ClientMsg::ViewShop => {
@@ -883,7 +907,7 @@ async fn handle_client_msg(
 
         ClientMsg::LoadAdventure { adventure_id } => {
             let mut sess = session.lock().await;
-            let adventure = sess.store.load_adventure(&adventure_id)?;
+            let (adventure, raw_json) = sess.store.load_adventure_with_json(&adventure_id)?;
             let history = sess.store.load_history(&adventure_id)?;
             let display_events = sess.store.load_display_history(&adventure_id)?;
 
@@ -901,7 +925,7 @@ async fn handle_client_msg(
                 });
             }
 
-            let state_json = build_state_with_map(&adventure);
+            let state_json = build_client_state_from_json(raw_json, &adventure);
             let adv_id = adventure.id.clone();
 
             // Build narrative events from LLM history
@@ -1002,7 +1026,14 @@ async fn handle_client_msg(
                 }).await;
             }
             if !display_events.is_empty() {
-                send_msg(sender, &ServerMsg::ChatHistory { entries: display_events }).await;
+                let total = display_events.len();
+                let page_size = 50;
+                let page = if total > page_size {
+                    display_events[total - page_size..].to_vec()
+                } else {
+                    display_events
+                };
+                send_msg(sender, &ServerMsg::ChatHistory { entries: page, total: Some(total) }).await;
             }
 
             // If character is dead, don't resume — send death message
@@ -1018,7 +1049,7 @@ async fn handle_client_msg(
             }
             else {
 
-            // Normal resume: call LLM
+            // Normal resume: only call LLM if we actually need to resume
             if needs_resume {
                 let mut sess = session.lock().await;
                 let resume_prompt = "The adventurer returns after a break. Briefly recap the current situation in 1-2 sentences, then present choices for what to do next. Include dice requirements in choices where relevant.";
@@ -1033,8 +1064,9 @@ async fn handle_client_msg(
                         timestamp: chrono::Utc::now(),
                     },
                 )?;
+                drop(sess);
+                continue_tool_loop(session, xai_client, sender, shop_store).await?;
             }
-            continue_tool_loop(session, xai_client, sender, shop_store).await?;
             } // end else (normal resume)
         }
 
@@ -1692,6 +1724,20 @@ async fn handle_client_msg(
             }
         }
 
+        ClientMsg::LoadOlderHistory { before_index, limit } => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let all_events = sess.store.load_display_history(&adv.id).unwrap_or_default();
+                let total = all_events.len();
+                let end = before_index.min(total);
+                let start = end.saturating_sub(limit);
+                let page = all_events[start..end].to_vec();
+                let has_more = start > 0;
+                drop(sess);
+                send_msg(sender, &ServerMsg::OlderHistory { entries: page, has_more }).await;
+            }
+        }
+
         ClientMsg::GetLocationPlayers => {
             let sess = session.lock().await;
             let username = sess.username.clone();
@@ -1720,6 +1766,90 @@ async fn handle_client_msg(
                     location: "Unknown".to_string(),
                     players: vec![],
                 }).await;
+            }
+        }
+
+        // Account management
+        ClientMsg::ChangePassword { current_password, new_password } => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            drop(sess);
+            match user_store.change_password(&username, &current_password, &new_password) {
+                Ok(()) => {
+                    send_msg(sender, &ServerMsg::PasswordChanged).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "change_password_failed".to_string(),
+                        message: e.to_string(),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::CreateApiKey { name } => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            drop(sess);
+            match user_store.create_api_key(&username, &name) {
+                Ok((record, plaintext_key)) => {
+                    send_msg(sender, &ServerMsg::ApiKeyCreated {
+                        id: record.id,
+                        name: record.name,
+                        key: plaintext_key,
+                        prefix: record.prefix,
+                        created_at: record.created_at.to_rfc3339(),
+                    }).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "create_api_key_failed".to_string(),
+                        message: e.to_string(),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::ListApiKeys => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            drop(sess);
+            match user_store.list_api_keys(&username) {
+                Ok(keys) => {
+                    let items: Vec<crate::web::protocol::ApiKeyListInfo> = keys.into_iter().map(|k| {
+                        crate::web::protocol::ApiKeyListInfo {
+                            id: k.id,
+                            name: k.name,
+                            prefix: k.prefix,
+                            created_at: k.created_at.to_rfc3339(),
+                            last_used: k.last_used.map(|d| d.to_rfc3339()),
+                        }
+                    }).collect();
+                    send_msg(sender, &ServerMsg::ApiKeyList { keys: items }).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "list_api_keys_failed".to_string(),
+                        message: e.to_string(),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::RevokeApiKey { key_id } => {
+            let sess = session.lock().await;
+            let username = sess.username.clone();
+            drop(sess);
+            match user_store.revoke_api_key(&username, &key_id) {
+                Ok(()) => {
+                    send_msg(sender, &ServerMsg::ApiKeyRevoked { key_id }).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "revoke_api_key_failed".to_string(),
+                        message: e.to_string(),
+                    }).await;
+                }
             }
         }
     }

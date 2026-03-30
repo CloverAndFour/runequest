@@ -7,11 +7,14 @@ import { renderAdventure } from './adventure.js';
 import { renderCombatStarted, renderCombatTurnStart, renderCombatActionResult, renderEnemyTurn, renderCombatEnded } from './combat.js';
 import { initFriendsPanel, handleFriendCode, handleFriendsList, handleFriendPresence, handleFriendRequestReceived, handleFriendRequestAccepted, handleFriendRequestSent, handleFriendChat, handleFriendChatSent, handleFriendChatHistory } from './friends.js';
 import { initLocationChat, handleLocationChat, handleLocationPresence, handleLocationChatHistory, onLocationChange } from './location-chat.js';
+import { initSettings, showSettingsModal, handlePasswordChanged, handleApiKeyCreated, handleApiKeyList, handleApiKeyRevoked } from './settings.js';
 
 const app = document.getElementById('app');
 let ws = null;
 let currentView = null;
 let gameState = null;
+var chatHistoryTotal = 0;
+var chatHistoryLoaded = 0;
 let currentModel = 'grok-4-1-fast-reasoning';
 let loadingOverlayTimeout = null;
 
@@ -26,6 +29,7 @@ const LOADING_FLAVOR_TEXTS = [
 ];
 
 function showAdventureLoadingOverlay(isCreating) {
+    console.log("[OVERLAY] showAdventureLoadingOverlay called, isCreating:", isCreating);
     hideAdventureLoadingOverlay();
     const flavor = LOADING_FLAVOR_TEXTS[Math.floor(Math.random() * LOADING_FLAVOR_TEXTS.length)];
     const title = isCreating ? "Creating Adventure" : "Loading Adventure";
@@ -41,6 +45,7 @@ function showAdventureLoadingOverlay(isCreating) {
         </div>
     `;
     document.body.appendChild(overlay);
+    console.log("[OVERLAY] overlay appended to body, element:", overlay, "body children:", document.body.children.length);
 
     overlay.querySelector("#loadingRetryBtn")?.addEventListener("click", () => {
         hideAdventureLoadingOverlay();
@@ -54,6 +59,7 @@ function showAdventureLoadingOverlay(isCreating) {
 }
 
 function hideAdventureLoadingOverlay() {
+    console.log("[OVERLAY] hideAdventureLoadingOverlay called, existing overlay:", document.querySelector(".adventure-loading-overlay"));
     if (loadingOverlayTimeout) {
         clearTimeout(loadingOverlayTimeout);
         loadingOverlayTimeout = null;
@@ -82,6 +88,7 @@ async function init() {
 function connectWebSocket() {
     ws = new WebSocketManager(getWsUrl(), {
         onOpen: () => {
+            initSettings((msg) => ws?.send(msg));
             showSelectScreen();
         },
         onMessage: (msg) => handleServerMsg(msg),
@@ -98,9 +105,10 @@ function handleServerMsg(msg) {
         case 'adventure_list':
             if (currentView === 'select') {
                 renderSelectScreen(app, msg.adventures, {
-                    onLoad: (id) => { showAdventureLoadingOverlay(false); ws.send({ type: 'load_adventure', adventure_id: id }); },
+                    onLoad: (id) => { console.log("[OVERLAY] onLoad called with id:", id); showAdventureLoadingOverlay(false); ws.send({ type: 'load_adventure', adventure_id: id }); },
                     onDelete: (id) => ws.send({ type: 'delete_adventure', adventure_id: id }),
                     onNew: () => showCreateScreen(),
+                    onAccount: () => showSettingsModal(),
                 });
             }
             break;
@@ -111,7 +119,12 @@ function handleServerMsg(msg) {
             showAdventureScreen();
             break;
         case 'chat_history':
-            renderChatHistory(msg.entries);
+            chatHistoryTotal = msg.total || msg.entries.length;
+            chatHistoryLoaded = msg.entries.length;
+            renderChatHistory(msg.entries, chatHistoryTotal > msg.entries.length);
+            break;
+        case 'older_history':
+            prependOlderHistory(msg.entries, msg.has_more);
             break;
         case 'narrative_chunk':
             appendNarrativeChunk(msg.text);
@@ -213,6 +226,18 @@ function handleServerMsg(msg) {
             break;
         case 'friend_chat_history':
             handleFriendChatHistory(msg);
+            break;
+        case 'password_changed':
+            handlePasswordChanged();
+            break;
+        case 'api_key_created':
+            handleApiKeyCreated(msg);
+            break;
+        case 'api_key_list':
+            handleApiKeyList(msg);
+            break;
+        case 'api_key_revoked':
+            handleApiKeyRevoked(msg);
             break;
         case 'error':
             hideAdventureLoadingOverlay();
@@ -476,12 +501,26 @@ function updateCostDisplay(data) {
     el.title = `Session: ${fmt(cost)}\nToday: ${fmt(data.today_cost_usd || 0)}\nThis week: ${fmt(data.week_cost_usd || 0)}\nThis month: ${fmt(data.month_cost_usd || 0)}\nAll time: ${fmt(data.total_cost_usd || 0)}\n${data.prompt_tokens || 0} input + ${data.completion_tokens || 0} output tokens`;
 }
 
-function renderChatHistory(entries) {
+function renderChatHistory(entries, hasMore) {
     const storyContent = document.querySelector('.story-content');
     if (!storyContent || !entries || entries.length === 0) return;
 
     const loadingEl = storyContent.querySelector('.loading-narrative');
     if (loadingEl) loadingEl.remove();
+
+    // Add 'load earlier' button if there's more history
+    if (hasMore) {
+        var loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'choice-btn load-more-history';
+        loadMoreBtn.textContent = 'Load earlier history...';
+        loadMoreBtn.addEventListener('click', function() {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = 'Loading...';
+            var beforeIndex = chatHistoryTotal - chatHistoryLoaded;
+            ws.send({ type: 'load_older_history', before_index: beforeIndex, limit: 50 });
+        });
+        storyContent.appendChild(loadMoreBtn);
+    }
 
     // Render each display event by type
     entries.forEach(entry => {
@@ -536,6 +575,58 @@ function renderChatHistory(entries) {
     storyContent.appendChild(sep);
 
     storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function prependOlderHistory(entries, hasMore) {
+    var storyContent = document.querySelector('.story-content');
+    if (!storyContent || !entries || entries.length === 0) return;
+    var oldBtn = storyContent.querySelector('.load-more-history');
+    var insertBefore = oldBtn ? oldBtn.nextSibling : storyContent.firstChild;
+
+    entries.forEach(function(entry) {
+        var div = document.createElement('div');
+        switch (entry.event_type) {
+            case 'narrative':
+                div.className = 'narrative-block history';
+                div.innerHTML = formatNarrative(entry.data.text || entry.data.content || '');
+                if (div.innerHTML) storyContent.insertBefore(div, insertBefore);
+                break;
+            case 'choice_selected':
+                div.className = 'narrative-block history';
+                div.style.color = 'var(--text-gold)';
+                div.textContent = '> ' + (entry.data.text || '');
+                if (div.textContent.length > 2) storyContent.insertBefore(div, insertBefore);
+                break;
+            case 'combat_action':
+                div.className = 'combat-action-log history ' + (entry.data.hit === true ? 'hit' : entry.data.hit === false ? 'miss' : 'neutral');
+                div.textContent = entry.data.description || '';
+                if (div.textContent) storyContent.insertBefore(div, insertBefore);
+                break;
+            default:
+                if (entry.data && (entry.data.text || entry.data.content)) {
+                    div.className = 'narrative-block history';
+                    div.textContent = entry.data.text || entry.data.content;
+                    storyContent.insertBefore(div, insertBefore);
+                }
+                break;
+        }
+    });
+
+    chatHistoryLoaded += entries.length;
+    if (oldBtn) oldBtn.remove();
+
+    if (hasMore) {
+        var loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'choice-btn load-more-history';
+        loadMoreBtn.textContent = 'Load earlier history...';
+        loadMoreBtn.addEventListener('click', function() {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = 'Loading...';
+            var beforeIndex = chatHistoryTotal - chatHistoryLoaded;
+            ws.send({ type: 'load_older_history', before_index: beforeIndex, limit: 50 });
+        });
+        storyContent.prepend(loadMoreBtn);
+    }
 }
 
 function showConditionEffects(effects) {

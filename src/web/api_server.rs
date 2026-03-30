@@ -34,7 +34,7 @@ use crate::llm::pricing::{model_cost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
 use crate::llm::tools::build_tool_definitions;
 use crate::llm::types::*;
-use crate::storage::adventure_store::{AdventureStore, DisplayEvent, HistoryMessage};
+use crate::storage::adventure_store::{AdventureCache, AdventureStore, DisplayEvent, HistoryMessage, new_adventure_cache};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,7 @@ pub struct ApiState {
     pub jwt_manager: Arc<JwtManager>,
     pub shop_store: ShopStore,
     pub presence: PresenceRegistry,
+    pub adventure_cache: AdventureCache,
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +151,35 @@ struct LoginResponse {
     token: String,
     username: String,
     role: String,
+}
+
+#[derive(Deserialize)]
+struct ChangePasswordRequest {
+    current_password: String,
+    new_password: String,
+}
+
+#[derive(Deserialize)]
+struct CreateApiKeyRequest {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct ApiKeyCreatedResponse {
+    id: String,
+    name: String,
+    key: String,
+    prefix: String,
+    created_at: String,
+}
+
+#[derive(Serialize)]
+struct ApiKeyListItem {
+    id: String,
+    name: String,
+    prefix: String,
+    created_at: String,
+    last_used: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -363,6 +393,7 @@ pub async fn run_api_server(
     jwt_manager: Arc<JwtManager>,
     shop_store: ShopStore,
     presence: PresenceRegistry,
+    tls_config: Option<axum_server::tls_rustls::RustlsConfig>,
 ) -> anyhow::Result<()> {
     let api_state = Arc::new(ApiState {
         data_dir,
@@ -373,11 +404,13 @@ pub async fn run_api_server(
         jwt_manager: jwt_manager.clone(),
         shop_store,
         presence,
+        adventure_cache: new_adventure_cache(),
     });
 
     let auth_state = Arc::new(AuthState {
         auth_mode,
         jwt_manager,
+        user_store: api_state.user_store.clone(),
     });
 
     let cors = CorsLayer::new()
@@ -392,6 +425,10 @@ pub async fn run_api_server(
 
     // Protected routes
     let protected_routes = Router::new()
+        .route("/api/auth/change-password", post(change_password_handler))
+        .route("/api/auth/api-keys", get(list_api_keys_handler))
+        .route("/api/auth/api-keys", post(create_api_key_handler))
+        .route("/api/auth/api-keys/:key_id", delete(revoke_api_key_handler))
         // Adventure CRUD
         .route("/api/adventures", get(list_adventures))
         .route("/api/adventures", post(create_adventure))
@@ -471,10 +508,18 @@ pub async fn run_api_server(
         .with_state(api_state);
 
     let addr = format!("{}:{}", bind_address, port);
-    eprintln!("RuneQuest REST API starting on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    if let Some(tls) = tls_config {
+        eprintln!("RuneQuest REST API starting on https://{}", addr);
+        let addr: std::net::SocketAddr = addr.parse()?;
+        axum_server::bind_rustls(addr, tls)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        eprintln!("RuneQuest REST API starting on http://{}", addr);
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        axum::serve(listener, app).await?;
+    }
 
     Ok(())
 }
@@ -502,7 +547,7 @@ async fn shop_view(
     Extension(user): Extension<AuthUser>,
     State(state): State<Arc<ApiState>>,
 ) -> impl IntoResponse {
-    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let store = make_store(&state, &user.username);
     let adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
@@ -523,7 +568,7 @@ async fn shop_buy(
     State(state): State<Arc<ApiState>>,
     Json(body): Json<ShopBuyRequest>,
 ) -> impl IntoResponse {
-    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let store = make_store(&state, &user.username);
     let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
@@ -549,7 +594,7 @@ async fn shop_sell(
     State(state): State<Arc<ApiState>>,
     Json(body): Json<ShopSellRequest>,
 ) -> impl IntoResponse {
-    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let store = make_store(&state, &user.username);
     let mut adventure = match store.load_adventure(&id) {
         Ok(a) => a,
         Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
@@ -574,8 +619,9 @@ async fn shop_sell(
 // ---------------------------------------------------------------------------
 
 fn make_store(state: &ApiState, username: &str) -> AdventureStore {
-    AdventureStore::new(&state.data_dir, username)
+    AdventureStore::with_cache(&state.data_dir, username, state.adventure_cache.clone())
 }
+
 
 fn build_combat_info(adventure: &AdventureState) -> Option<CombatInfo> {
     if !adventure.combat.active {
@@ -1043,6 +1089,80 @@ async fn login_handler(
             }
         }
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Account management
+// ---------------------------------------------------------------------------
+
+async fn change_password_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<ChangePasswordRequest>,
+) -> impl IntoResponse {
+    match state.user_store.change_password(&user.username, &req.current_password, &req.new_password) {
+        Ok(()) => Json(serde_json::json!({"success": true})).into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response()
+        }
+    }
+}
+
+async fn create_api_key_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<CreateApiKeyRequest>,
+) -> impl IntoResponse {
+    match state.user_store.create_api_key(&user.username, &req.name) {
+        Ok((record, plaintext_key)) => Json(ApiKeyCreatedResponse {
+            id: record.id,
+            name: record.name,
+            key: plaintext_key,
+            prefix: record.prefix,
+            created_at: record.created_at.to_rfc3339(),
+        }).into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response()
+        }
+    }
+}
+
+async fn list_api_keys_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    match state.user_store.list_api_keys(&user.username) {
+        Ok(keys) => {
+            let items: Vec<ApiKeyListItem> = keys.into_iter().map(|k| ApiKeyListItem {
+                id: k.id,
+                name: k.name,
+                prefix: k.prefix,
+                created_at: k.created_at.to_rfc3339(),
+                last_used: k.last_used.map(|d| d.to_rfc3339()),
+            }).collect();
+            Json(items).into_response()
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response()
+        }
+    }
+}
+
+async fn revoke_api_key_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(key_id): Path<String>,
+) -> impl IntoResponse {
+    match state.user_store.revoke_api_key(&user.username, &key_id) {
+        Ok(()) => Json(serde_json::json!({"success": true})).into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response()
+        }
     }
 }
 
@@ -3247,7 +3367,7 @@ async fn api_send_location_chat(
     State(state): State<Arc<ApiState>>,
     Json(req): Json<LocationChatRequest>,
 ) -> impl IntoResponse {
-    let store = crate::storage::adventure_store::AdventureStore::new(&state.data_dir, &user.username);
+    let store = make_store(&state, &user.username);
     let adventures = match store.list_adventures() {
         Ok(a) => a,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -3292,7 +3412,7 @@ async fn api_get_location_players(
     Extension(user): Extension<AuthUser>,
     State(state): State<Arc<ApiState>>,
 ) -> impl IntoResponse {
-    let store = crate::storage::adventure_store::AdventureStore::new(&state.data_dir, &user.username);
+    let store = make_store(&state, &user.username);
     let adventures = match store.list_adventures() {
         Ok(a) => a,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),

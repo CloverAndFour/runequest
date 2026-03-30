@@ -150,7 +150,28 @@ pub enum ClientMsg {
         text: String,
     },
     GetLocationPlayers,
+    // Display history pagination
+    LoadOlderHistory {
+        #[serde(default)]
+        before_index: usize,
+        #[serde(default = "default_history_page_size")]
+        limit: usize,
+    },
+    // Account management
+    ChangePassword {
+        current_password: String,
+        new_password: String,
+    },
+    CreateApiKey {
+        name: String,
+    },
+    ListApiKeys,
+    RevokeApiKey {
+        key_id: String,
+    },
 }
+
+fn default_history_page_size() -> usize { 50 }
 
 #[derive(Debug, Deserialize)]
 pub struct StatsInput {
@@ -219,6 +240,12 @@ pub enum ServerMsg {
     },
     ChatHistory {
         entries: Vec<crate::storage::adventure_store::DisplayEvent>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total: Option<usize>,
+    },
+    OlderHistory {
+        entries: Vec<crate::storage::adventure_store::DisplayEvent>,
+        has_more: bool,
     },
     ModelInfo {
         model: String,
@@ -443,6 +470,21 @@ pub enum ServerMsg {
     FriendRemoved {
         username: String,
     },
+    // Account management
+    PasswordChanged,
+    ApiKeyCreated {
+        id: String,
+        name: String,
+        key: String,
+        prefix: String,
+        created_at: String,
+    },
+    ApiKeyList {
+        keys: Vec<ApiKeyListInfo>,
+    },
+    ApiKeyRevoked {
+        key_id: String,
+    },
     // Location chat
     LocationChatMessage {
         from: String,
@@ -543,4 +585,13 @@ pub struct LocationChatMessageInfo {
     pub character_name: String,
     pub text: String,
     pub ts: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ApiKeyListInfo {
+    pub id: String,
+    pub name: String,
+    pub prefix: String,
+    pub created_at: String,
+    pub last_used: Option<String>,
 }

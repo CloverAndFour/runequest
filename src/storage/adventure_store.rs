@@ -1,12 +1,21 @@
 //! Adventure persistence — state snapshots + message history.
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use crate::engine::AdventureState;
 use crate::error::{RunequestError, Result};
 
 use serde::{Deserialize, Serialize};
+
+/// Shared adventure cache: (username, adventure_id) -> AdventureState
+pub type AdventureCache = Arc<RwLock<HashMap<(String, String), AdventureState>>>;
+
+pub fn new_adventure_cache() -> AdventureCache {
+    Arc::new(RwLock::new(HashMap::new()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryMessage {
@@ -41,6 +50,7 @@ pub struct AdventureSummary {
 pub struct AdventureStore {
     base_path: PathBuf,
     username: String,
+    cache: Option<AdventureCache>,
 }
 
 impl AdventureStore {
@@ -48,6 +58,15 @@ impl AdventureStore {
         Self {
             base_path: base_path.to_path_buf(),
             username: username.to_string(),
+            cache: None,
+        }
+    }
+
+    pub fn with_cache(base_path: &Path, username: &str, cache: AdventureCache) -> Self {
+        Self {
+            base_path: base_path.to_path_buf(),
+            username: username.to_string(),
+            cache: Some(cache),
         }
     }
 
@@ -101,13 +120,49 @@ impl AdventureStore {
     }
 
     pub fn load_adventure(&self, id: &str) -> Result<AdventureState> {
+        // Check cache first
+        if let Some(ref cache) = self.cache {
+            if let Ok(guard) = cache.read() {
+                let key = (self.username.clone(), id.to_string());
+                if let Some(adv) = guard.get(&key) {
+                    return Ok(adv.clone());
+                }
+            }
+        }
+
         let path = self.adventure_dir(id).join("state.json");
         if !path.exists() {
             return Err(RunequestError::AdventureNotFound(id.to_string()));
         }
         let data = std::fs::read_to_string(&path)?;
         let state: AdventureState = serde_json::from_str(&data)?;
+
+        // Populate cache
+        if let Some(ref cache) = self.cache {
+            if let Ok(mut guard) = cache.write() {
+                if guard.len() >= 64 {
+                    if let Some(k) = guard.keys().next().cloned() {
+                        guard.remove(&k);
+                    }
+                }
+                guard.insert((self.username.clone(), id.to_string()), state.clone());
+            }
+        }
+
         Ok(state)
+    }
+
+    /// Load adventure returning both the typed struct and the raw JSON Value.
+    /// Avoids re-serializing the struct when we need to send JSON to clients.
+    pub fn load_adventure_with_json(&self, id: &str) -> Result<(AdventureState, serde_json::Value)> {
+        let path = self.adventure_dir(id).join("state.json");
+        if !path.exists() {
+            return Err(RunequestError::AdventureNotFound(id.to_string()));
+        }
+        let data = std::fs::read_to_string(&path)?;
+        let state: AdventureState = serde_json::from_str(&data)?;
+        let value: serde_json::Value = serde_json::from_str(&data)?;
+        Ok((state, value))
     }
 
     pub fn save_adventure(&self, state: &AdventureState) -> Result<()> {
@@ -119,6 +174,14 @@ impl AdventureStore {
         let json = serde_json::to_string_pretty(state)?;
         std::fs::write(&tmp_path, &json)?;
         std::fs::rename(&tmp_path, &path)?;
+
+        // Update cache
+        if let Some(ref cache) = self.cache {
+            if let Ok(mut guard) = cache.write() {
+                guard.insert((self.username.clone(), state.id.clone()), state.clone());
+            }
+        }
+
         Ok(())
     }
 
@@ -132,6 +195,12 @@ impl AdventureStore {
         let dir = self.adventure_dir(id);
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
+        }
+        // Evict from cache
+        if let Some(ref cache) = self.cache {
+            if let Ok(mut guard) = cache.write() {
+                guard.remove(&(self.username.clone(), id.to_string()));
+            }
         }
         Ok(())
     }
