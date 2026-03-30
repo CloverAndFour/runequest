@@ -225,7 +225,7 @@ pub fn map_info(pos: &PlayerPosition, discovery: &DiscoveryState) -> serde_json:
     })
 }
 
-fn hex_direction_name(from: HexCoord, to: HexCoord) -> &'static str {
+pub fn hex_direction_name(from: HexCoord, to: HexCoord) -> &'static str {
     let dq = to.q - from.q;
     let dr = to.r - from.r;
     match (dq, dr) {

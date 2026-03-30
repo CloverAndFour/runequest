@@ -119,13 +119,13 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["choices"]
         })),
-        tool("set_scene", "Set the current scene/location. Updates the scene info shown to the player.", serde_json::json!({
+        tool("set_scene", "Update the scene description/atmosphere shown to the player. This does NOT change the player's location — location is controlled by the engine. Use this for narrative flavor only (e.g. describing the inside of a building, a campfire scene).", serde_json::json!({
             "type": "object",
             "properties": {
-                "location": {"type": "string", "description": "Location name"},
+                "location": {"type": "string", "description": "Optional sub-location label for narrative (e.g. 'Inside the tavern', 'By the river'). Does NOT change the player's actual hex world position."},
                 "description": {"type": "string", "description": "Scene description"}
             },
-            "required": ["location", "description"]
+            "required": ["description"]
         })),
         tool("start_combat", "Start a combat encounter. The ENGINE generates tier-appropriate enemies — do NOT specify hp, ac, or attacks. Just say what type and how many.", serde_json::json!({
             "type": "object",
@@ -184,12 +184,12 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
         // -------------------------------------------------------------------
         // World map tools
         // -------------------------------------------------------------------
-        tool("travel_to", "Travel to a connected location on the world map. The player can only travel to locations connected to their current position. May trigger random encounters on dangerous paths.", serde_json::json!({
+        tool("travel_to", "Travel to an adjacent hex county by compass direction. Valid directions: east, west, northeast, northwest, southeast, southwest. May trigger random encounters based on area tier.", serde_json::json!({
             "type": "object",
             "properties": {
-                "location": {"type": "string", "description": "Location name (e.g. 'Thornwall Village') or numeric ID"}
+                "direction": {"type": "string", "enum": ["east", "west", "northeast", "northwest", "southeast", "southwest"], "description": "Compass direction to travel"}
             },
-            "required": ["location"]
+            "required": ["direction"]
         })),
         tool("enter_dungeon", "Enter the dungeon at the player's current location. The location must be a Dungeon type. This generates the dungeon layout if it hasn't been visited before.", serde_json::json!({
             "type": "object",

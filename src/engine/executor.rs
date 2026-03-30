@@ -464,13 +464,26 @@ pub fn execute_tool_call_with_shop(
         }
 
         "set_scene" => {
-            let location = args["location"].as_str().unwrap_or("Unknown").to_string();
+            // set_scene only updates the narrative description, NOT the player's location.
+            // Location is controlled by the engine via the hex world system.
             let description = args["description"].as_str().unwrap_or("").to_string();
-            state.current_scene.location = location.clone();
             state.current_scene.description = description.clone();
+            // If a sub-location label is provided, note it but don't overwrite the hex county name
+            let sub_location = args["location"].as_str().unwrap_or("");
+            let location_display = if sub_location.is_empty() {
+                state.current_scene.location.clone()
+            } else {
+                // Show as "County Name — Sub-location" for narrative flavor
+                let base = world_map::current_county(&state.world_position)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| state.current_scene.location.clone());
+                format!("{} — {}", base, sub_location)
+            };
+            state.current_scene.location = location_display.clone();
             Ok(ToolExecResult::Immediate(serde_json::json!({
-                "location": location,
+                "location": location_display,
                 "description": description,
+                "note": "Location display updated for narrative. Actual hex position unchanged.",
             })))
         }
 
@@ -875,48 +888,46 @@ pub fn execute_tool_call_with_shop(
         // -----------------------------------------------------------------------
 
         "travel_to" => {
-            let location_str = args["location"].as_str().unwrap_or("");
-            let world = match &mut state.world {
-                Some(w) => w,
-                None => {
-                    return Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "error": "No world map exists in this adventure."
-                    })));
-                }
-            };
+            // Travel uses the hex world system with compass directions.
+            // Also accept old-style location names as a fallback (try to parse as direction).
+            let direction = args.get("direction")
+                .and_then(|v| v.as_str())
+                .or_else(|| args.get("location").and_then(|v| v.as_str()))
+                .unwrap_or("");
 
-            let location_id = match world.find_location(location_str) {
-                Some(id) => id,
-                None => {
-                    return Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "error": format!("Location '{}' not found. Use view_map or check available destinations.", location_str),
-                    })));
-                }
-            };
-
-            match world.travel_to(location_id) {
+            match world_map::travel(&mut state.world_position, &mut state.discovery, direction) {
                 Ok(result) => {
-                    state.current_scene.location = result.location_name.clone();
-                    state.current_scene.description = result.description.clone();
+                    state.current_scene.location = result.county_name.clone();
+                    state.current_scene.description = format!(
+                        "{} — {} (Tier {:.0})", result.region, result.biome, result.county_tier
+                    );
 
-                    if let Some(ref encounter) = result.encounter {
-                        if !encounter.enemies.is_empty() {
-                            let enemies: Vec<Enemy> = encounter.enemies.iter().map(|t| t.to_enemy()).collect();
+                    // Check for random encounter
+                    if let Some(ref enemies) = result.encounter {
+                        if !enemies.is_empty() {
                             let dex_mod = state.character.stats.modifier_for("dex").unwrap_or(0);
-                            state.combat.start(enemies, dex_mod);
-
+                            state.combat.start(enemies.clone(), dex_mod);
                             return Ok(ToolExecResult::CombatStarted);
                         }
                     }
 
-                    Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "arrived": result.location_name,
-                        "location_type": result.location_type,
-                        "description": result.description,
-                    })))
+                    let mut response = serde_json::json!({
+                        "arrived": result.county_name,
+                        "biome": result.biome,
+                        "region": result.region,
+                        "tier": result.county_tier,
+                    });
+                    if result.has_town {
+                        response["has_town"] = serde_json::json!(true);
+                    }
+                    if result.has_dungeon {
+                        response["has_dungeon"] = serde_json::json!(true);
+                    }
+                    Ok(ToolExecResult::Immediate(response))
                 }
                 Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
                     "error": e,
+                    "hint": "Use a compass direction: east, west, northeast, northwest, southeast, southwest",
                 }))),
             }
         }

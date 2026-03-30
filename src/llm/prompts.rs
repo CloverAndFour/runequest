@@ -49,7 +49,7 @@ pub fn build_system_prompt(state: &AdventureState) -> String {
 
    Rule of thumb: if a normal person could do it without risk, NO CHECK.
 
-6. **Use `set_scene` when the location changes** to update the player's scene info.
+6. **The engine controls player location — you CANNOT move the player.** The player's location is set by the engine (hex world system). You may use `set_scene` to update the scene description/atmosphere for narrative flavor, but it does NOT change the player's actual location. Travel is handled by `travel_to` with a compass direction (e.g. east, northwest). Never invent or reference locations that do not exist in the hex world.
 
 7. **Combat is handled by the engine, not by you.** When enemies appear:
    - Call `start_combat` with `enemy_type` (brute/skulker/mystic/undead/random) and `count` (1-6). The ENGINE generates balanced enemies based on the area tier — do NOT specify hp, ac, or attacks. This STARTS turn-based combat mode.
@@ -233,93 +233,82 @@ DUNGEON RULES:
 }
 
 fn build_world_section(state: &AdventureState) -> String {
-    let world = match &state.world {
-        Some(w) => w,
-        None => return String::new(),
-    };
-
-    use crate::engine::world::GameMode;
     use crate::engine::world_map;
 
-    // Use hex world county for location info, fall back to old world system
+    // Use hex world county for location info
     let (loc_name, loc_desc) = if let Some(county) = world_map::current_county(&state.world_position) {
         (county.name.clone(), format!("{} — {} (Tier {:.0})", county.region, county.biome, county.tier))
     } else {
-        let loc = world.current_loc();
-        (loc.name.clone(), loc.description.clone())
-    };
-    let loc = world.current_loc();
-    let mode_str = match &world.game_mode {
-        GameMode::WorldMap => "World Map (exploring)".to_string(),
-        GameMode::InTown { location_id } => {
-            format!("In Town: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
-        }
-        GameMode::InDungeon { location_id } => {
-            format!("In Dungeon at: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
-        }
-        GameMode::InTower { floor } => format!("In The Endless Tower, Floor {}", floor),
-        GameMode::Exploring { location_id } => {
-            format!("Exploring: {}", world.locations.get(*location_id).map(|l| l.name.as_str()).unwrap_or("?"))
-        }
+        ("Unknown".to_string(), "Unknown location".to_string())
     };
 
-    // List reachable destinations
-    let destinations = world.reachable_locations();
-    let dest_list = if destinations.is_empty() {
-        "None (isolated location)".to_string()
+    let has_town = world_map::current_county(&state.world_position).map(|c| c.has_town).unwrap_or(false);
+    let has_dungeon = world_map::current_county(&state.world_position).map(|c| c.has_dungeon).unwrap_or(false);
+
+    // List hex neighbors as travel directions
+    let neighbors = world_map::neighbors(state.world_position.coord());
+    let dest_list = if neighbors.is_empty() {
+        "None (edge of the world)".to_string()
     } else {
-        destinations
+        neighbors
             .iter()
-            .map(|(name, path)| format!("  - {} via {}", name, path))
+            .map(|(coord, county)| {
+                let dir = world_map::hex_direction_name(state.world_position.coord(), *coord);
+                let discovered = state.discovery.is_discovered(*coord);
+                if discovered {
+                    format!("  - {} — {} ({}, Tier {:.0})", dir, county.name, county.biome, county.tier)
+                } else {
+                    format!("  - {} — Unknown", dir)
+                }
+            })
             .collect::<Vec<_>>()
             .join("\n")
     };
 
-    // Shop info if in a town
-    let shop_section = match &world.game_mode {
-        GameMode::InTown { location_id } => {
-            let info = world.format_shop_info(*location_id);
-            if info.contains(":") { format!("\nSHOP:\n{}\n", info) } else { String::new() }
+    // Dungeon section if in a dungeon or tower
+    let dungeon_context = if let Some(ref world) = state.world {
+        use crate::engine::world::GameMode;
+        match &world.game_mode {
+            GameMode::InDungeon { .. } | GameMode::InTower { .. } => {
+                build_dungeon_section(state)
+            }
+            _ => String::new(),
         }
-        _ => String::new(),
+    } else {
+        String::new()
     };
 
-    // Dungeon section if in a dungeon or tower
-    let dungeon_context = match &world.game_mode {
-        GameMode::InDungeon { .. } | GameMode::InTower { .. } => {
-            build_dungeon_section(state)
-        }
-        _ => String::new(),
+    let facilities = {
+        let mut f = Vec::new();
+        if has_town { f.push("Town (shops, rest, crafting)"); }
+        if has_dungeon { f.push("Dungeon"); }
+        if f.is_empty() { "None".to_string() } else { f.join(", ") }
     };
 
     format!(
         r#"## WORLD MAP STATE
-World: {}
-Current Location: {} ({})
-Description: {}
-Game Mode: {}
+Current Location: {loc_name}
+Description: {loc_desc}
+Facilities: {facilities}
 
-Available Destinations:
-{}
-{}{}
+Travel Directions (use `travel_to` with a compass direction):
+{dest_list}
+{dungeon_context}
 WORLD MAP RULES:
-- The player explores an open world with towns, dungeons, wilderness areas, and landmarks.
-- Use `travel_to` to move between connected locations. Travel may trigger random encounters.
+- The player is in a hex-based world. Travel uses compass directions: east, west, northeast, northwest, southeast, southwest.
+- Use `travel_to` with a direction (e.g. "east", "northwest") to move to an adjacent county. Travel may trigger random encounters.
+- You CANNOT move the player to a named location. You can only move in compass directions.
 - In towns, players can visit shops (`view_shop`, `buy_item`, `sell_item`) and rest.
-- At dungeon locations, use `enter_dungeon` to explore. Use `exit_dungeon` to leave.
-- At The Endless Tower, use `enter_tower` to begin the infinite dungeon climb. Use `tower_ascend` to go up floors. Use `exit_tower` to leave.
+- If this location has a dungeon, use `enter_dungeon` to explore. Use `exit_dungeon` to leave.
 - When in a dungeon/tower, use `move_to_room` and `search_room` as normal for dungeon navigation.
-- Always present travel destinations as choices when the player is on the world map.
-- Describe locations atmospherically based on their type and description.
-- Warn players about danger levels when presenting travel options."#,
-        world.name,
-        loc_name,
-        format!("{:?}", loc.location_type),
-        loc_desc,
-        mode_str,
-        dest_list,
-        shop_section,
-        dungeon_context,
+- Always present travel directions as choices when the player wants to move.
+- Describe the current location atmospherically based on the biome and region.
+- Warn players about higher tier areas when presenting travel options."#,
+        loc_name = loc_name,
+        loc_desc = loc_desc,
+        facilities = facilities,
+        dest_list = dest_list,
+        dungeon_context = dungeon_context,
     )
 }
 
@@ -327,15 +316,15 @@ pub fn adventure_start_prompt(scenario: &Option<String>) -> String {
     match scenario {
         Some(s) if !s.is_empty() => format!(
             "The adventure begins! The scenario is: {}. \
-             Set the opening scene based on this scenario. Describe where the player is, \
-             what they see, and create an intriguing hook. Use set_scene to establish the location. \
+             Describe the opening scene based on this scenario and the player's current hex world location. \
+             Describe where the player is, what they see, and create an intriguing hook. \
              Then present the player with their first set of choices (include dice requirements where relevant). \
              Make it exciting and atmospheric!",
             s
         ),
-        _ => "The adventure begins! Set the opening scene for the player. Describe where they are, \
-              what they see, and create an intriguing hook to draw them in. Use set_scene to establish \
-              the location. Then present the player with their first set of choices (include dice \
+        _ => "The adventure begins! Describe the opening scene for the player based on their current \
+              hex world location. Describe where they are, what they see, and create an intriguing hook \
+              to draw them in. Then present the player with their first set of choices (include dice \
               requirements where relevant). Make it exciting!".to_string(),
     }
 }
