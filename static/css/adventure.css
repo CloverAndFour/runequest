@@ -2215,3 +2215,277 @@
     font-size: 12px;
     text-align: center;
 }
+
+/* ============================================================================
+   ITEM CONTEXT MENU
+   ============================================================================ */
+
+.item-context-menu {
+    position: fixed;
+    z-index: 2000;
+    min-width: 160px;
+    background: linear-gradient(180deg, #2d2215 0%, #1a1108 100%);
+    border: 2px solid var(--border-gold);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 8px rgba(200, 168, 78, 0.15);
+    padding: 0;
+    user-select: none;
+}
+
+.ctx-menu-header {
+    padding: 8px 12px;
+    font-family: var(--font-medieval);
+    font-size: 14px;
+    color: var(--text-gold);
+    border-bottom: 1px solid var(--border-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ctx-menu-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s, color 0.1s;
+}
+
+.ctx-menu-item:hover {
+    background: rgba(200, 168, 78, 0.2);
+    color: var(--text-gold);
+}
+
+.ctx-icon {
+    width: 20px;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* ============================================================================
+   ITEM INFO MODAL
+   ============================================================================ */
+
+.item-info-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2500;
+}
+
+.item-info-content {
+    background: linear-gradient(180deg, #2d2215 0%, #1a1108 100%);
+    border: 3px solid var(--border-gold);
+    box-shadow: 0 0 30px rgba(200, 168, 78, 0.2), 0 8px 32px rgba(0, 0, 0, 0.5);
+    padding: 24px;
+    min-width: 280px;
+    max-width: 380px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.item-info-name {
+    font-family: var(--font-medieval);
+    font-size: 20px;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.item-info-rarity {
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.item-info-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-gold), transparent);
+    margin: 12px 0;
+}
+
+.item-info-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.item-info-stats {
+    margin-bottom: 16px;
+}
+
+.item-info-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.3);
+    font-size: 12px;
+}
+
+.iis-label {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+}
+
+.iis-val {
+    color: var(--text-light);
+}
+
+.iis-val.damage {
+    color: var(--accent-red);
+    font-weight: bold;
+}
+
+.iis-val.ac {
+    color: var(--accent-blue);
+    font-weight: bold;
+}
+
+.iis-val.gold {
+    color: var(--text-gold);
+}
+
+.iis-val.enchant {
+    color: #cc44cc;
+}
+
+.item-info-enchant-desc {
+    font-size: 11px;
+    color: #cc88cc;
+    font-style: italic;
+    padding: 4px 0 4px 8px;
+    border-left: 2px solid #cc44cc;
+    margin: 4px 0 8px;
+}
+
+.item-info-props-title {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.item-info-prop {
+    font-size: 12px;
+    color: var(--text-gold);
+    padding: 2px 0 2px 8px;
+    border-left: 2px solid var(--border-gold);
+    margin-bottom: 2px;
+}
+
+.item-info-close {
+    width: 100%;
+    margin-top: 8px;
+    font-size: 13px;
+    padding: 8px;
+}
+
+/* ============================================================================
+   EQUIPMENT STATS OVERVIEW (Status tab)
+   ============================================================================ */
+
+.equip-overview-section {
+    margin-top: 16px;
+    border-top: 2px solid var(--border-dark);
+    padding-top: 12px;
+}
+
+.equip-overview-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.eo-stat {
+    flex: 1;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    padding: 8px;
+    text-align: center;
+}
+
+.eo-stat-label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.eo-stat-value {
+    font-size: 18px;
+    color: var(--text-gold);
+    font-weight: bold;
+}
+
+.eo-bonuses {
+    margin-bottom: 8px;
+}
+
+.eo-bonus {
+    font-size: 11px;
+    color: #cc88cc;
+    padding: 2px 0;
+}
+
+.eo-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.eo-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(74, 58, 42, 0.2);
+}
+
+.eo-item-slot {
+    width: 65px;
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+}
+
+.eo-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.eo-item-stat {
+    color: var(--text-muted);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* Examine narrative styling */
+.narrative-block.examine {
+    border-left: 3px solid var(--text-gold);
+    padding-left: 12px;
+    font-style: italic;
+}

@@ -1,5 +1,179 @@
 // Adventure screen renderer and info panel
 
+// ===== ITEM CONTEXT MENU =====
+let activeContextMenu = null;
+
+function dismissContextMenu() {
+    if (activeContextMenu) {
+        activeContextMenu.remove();
+        activeContextMenu = null;
+    }
+}
+
+document.addEventListener('click', (e) => {
+    if (activeContextMenu && !activeContextMenu.contains(e.target)) {
+        dismissContextMenu();
+    }
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') dismissContextMenu();
+});
+
+function showItemContextMenu(event, item, options) {
+    event.preventDefault();
+    event.stopPropagation();
+    dismissContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'item-context-menu';
+
+    const header = document.createElement('div');
+    header.className = 'ctx-menu-header';
+    const rarityClass = (item.rarity || 'common').toLowerCase();
+    header.className = 'ctx-menu-header rarity-' + rarityClass;
+    const displayName = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+    header.textContent = displayName;
+    menu.appendChild(header);
+
+    const actions = [];
+
+    if (options.canEquip) {
+        actions.push({ label: 'Equip', icon: '\u2694', action: () => {
+            if (window.rqWs) window.rqWs.send({ type: 'equip_item', item_name: options.equipName });
+        }});
+    }
+    if (options.canUnequip) {
+        actions.push({ label: 'Unequip', icon: '\u{1F44B}', action: () => {
+            if (window.rqWs) window.rqWs.send({ type: 'unequip_item', slot: options.slot });
+        }});
+    }
+    actions.push({ label: 'Info', icon: '\u{1F4CB}', action: () => showItemInfoModal(item) });
+    actions.push({ label: 'Examine', icon: '\u{1F50D}', action: () => examineItem(item) });
+    if (options.inBackpack) {
+        actions.push({ label: 'Drop', icon: '\u274C', action: () => {
+            if (window.rqWs) window.rqWs.send({ type: 'drop_item', item_name: displayName });
+        }});
+    }
+
+    actions.forEach(a => {
+        const btn = document.createElement('div');
+        btn.className = 'ctx-menu-item';
+        btn.innerHTML = '<span class="ctx-icon">' + a.icon + '</span> ' + escapeHtml(a.label);
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismissContextMenu();
+            a.action();
+        });
+        menu.appendChild(btn);
+    });
+
+    document.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    let x = event.clientX || 0;
+    let y = event.clientY || 0;
+    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+    if (x < 0) x = 4;
+    if (y < 0) y = 4;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    activeContextMenu = menu;
+}
+
+function showItemInfoModal(item) {
+    const existing = document.querySelector('.item-info-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'item-info-modal';
+
+    const displayName = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+    const rarityClass = (item.rarity || 'common').toLowerCase();
+
+    let html = '<div class="item-info-content">';
+    html += '<div class="item-info-name rarity-' + rarityClass + '">' + escapeHtml(displayName) + '</div>';
+    if (item.rarity && item.rarity.toLowerCase() !== 'common') {
+        html += '<div class="item-info-rarity rarity-' + rarityClass + '">' + escapeHtml(item.rarity) + '</div>';
+    }
+    html += '<div class="item-info-divider"></div>';
+
+    if (item.description) {
+        html += '<div class="item-info-desc">' + escapeHtml(item.description) + '</div>';
+    }
+
+    html += '<div class="item-info-stats">';
+    if (item.slot) html += '<div class="item-info-stat"><span class="iis-label">Slot</span><span class="iis-val">' + escapeHtml(formatSlotLabel(item.slot)) + '</span></div>';
+    if (item.item_type) html += '<div class="item-info-stat"><span class="iis-label">Type</span><span class="iis-val">' + escapeHtml(item.item_type) + '</span></div>';
+    if (item.damage_dice) html += '<div class="item-info-stat"><span class="iis-label">Damage</span><span class="iis-val damage">' + escapeHtml(item.damage_dice) + '</span></div>';
+    if (item.ac_bonus) html += '<div class="item-info-stat"><span class="iis-label">AC Bonus</span><span class="iis-val ac">+' + item.ac_bonus + '</span></div>';
+    if (item.tier != null) html += '<div class="item-info-stat"><span class="iis-label">Tier</span><span class="iis-val">' + item.tier + '</span></div>';
+    if (item.value != null) html += '<div class="item-info-stat"><span class="iis-label">Value</span><span class="iis-val gold">' + item.value + ' gold</span></div>';
+    if (item.enchantment) {
+        html += '<div class="item-info-stat"><span class="iis-label">Enchantment</span><span class="iis-val enchant">' + escapeHtml(item.enchantment.name_prefix) + '</span></div>';
+        if (item.enchantment.description) {
+            html += '<div class="item-info-enchant-desc">' + escapeHtml(item.enchantment.description) + '</div>';
+        }
+    }
+    if (item.properties && item.properties.length > 0) {
+        html += '<div class="item-info-props-title">Properties</div>';
+        item.properties.forEach(function(p) {
+            html += '<div class="item-info-prop">' + escapeHtml(typeof p === 'string' ? p : p.name || JSON.stringify(p)) + '</div>';
+        });
+    }
+    html += '</div>';
+
+    html += '<button class="stone-btn item-info-close">Close</button>';
+    html += '</div>';
+    modal.innerHTML = html;
+
+    document.body.appendChild(modal);
+    modal.querySelector('.item-info-close').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.addEventListener('keydown', function closeOnEsc(e) {
+        if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', closeOnEsc); }
+    });
+}
+
+function examineItem(item) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+    const displayName = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+    const desc = item.description || 'You see nothing special about it.';
+    const div = document.createElement('div');
+    div.className = 'narrative-block examine';
+    div.innerHTML = '<span style="color:var(--text-gold);">You examine the ' + escapeHtml(displayName) + ':</span> ' + escapeHtml(desc);
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function bindLongPress(element, callback) {
+    let timer = null;
+    let moved = false;
+    element.addEventListener('touchstart', function(e) {
+        moved = false;
+        timer = setTimeout(function() {
+            if (!moved) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                callback({ preventDefault: function(){}, stopPropagation: function(){}, clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }, 500);
+    }, { passive: false });
+    element.addEventListener('touchmove', function() { moved = true; if (timer) clearTimeout(timer); });
+    element.addEventListener('touchend', function() { if (timer) clearTimeout(timer); });
+    element.addEventListener('touchcancel', function() { if (timer) clearTimeout(timer); });
+}
+
+const SLOT_LABEL_MAP = {
+    head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet', hands: 'Hands',
+    main_hand: 'Main Hand', off_hand: 'Off Hand', ring1: 'Ring 1', ring2: 'Ring 2',
+    ring: 'Ring', amulet: 'Amulet', neck: 'Neck', back: 'Back',
+};
+
+function formatSlotLabel(slot) {
+    return SLOT_LABEL_MAP[slot] || slot.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+}
 
 export function renderAdventure(container, state, handlers) {
     if (!state) {
@@ -28,6 +202,7 @@ export function renderAdventure(container, state, handlers) {
             <div class="info-tabs">
                 <button class="info-tab active" data-tab="stats">Status</button>
                 <button class="info-tab" data-tab="inventory">Items</button>
+                <button class="info-tab" data-tab="skills">Skills</button>
                 <button class="info-tab" data-tab="map">Map</button>
                 <button class="info-tab" data-tab="quests">Quests</button>
             </div>
@@ -81,6 +256,9 @@ function renderTab(tab, state) {
         case 'inventory':
             renderInventory(el, state);
             break;
+        case 'skills':
+            renderSkills(el, state);
+            break;
         case 'map':
             renderMap(el, state);
             break;
@@ -127,6 +305,7 @@ function renderStatus(el, state) {
         </div>
 
         ${renderConditions(c.conditions)}
+        ${renderEquipOverview(state)}
     `;
 
     // Abilities section (merged from Skills tab)
@@ -187,6 +366,61 @@ function renderConditions(conditions) {
     return html;
 }
 
+function renderEquipOverview(state) {
+    const eq = state.equipment || {};
+    const equipped = Object.entries(eq).filter(function(e) { return e[1] != null; });
+    if (equipped.length === 0) return '';
+
+    let totalAc = 10;
+    let weaponDamage = null;
+    let weaponName = null;
+    let bonuses = [];
+
+    equipped.forEach(function(entry) {
+        var slot = entry[0], item = entry[1];
+        if (item.ac_bonus) totalAc += item.ac_bonus;
+        if (slot === 'main_hand' && item.damage_dice) {
+            weaponDamage = item.damage_dice;
+            weaponName = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+        }
+        if (item.enchantment && item.enchantment.description) {
+            bonuses.push(item.enchantment.name_prefix + ': ' + item.enchantment.description);
+        }
+    });
+
+    let html = '<div class="equip-overview-section">';
+    html += '<div class="section-title">Equipment Summary</div>';
+    html += '<div class="equip-overview-stats">';
+    html += '<div class="eo-stat"><span class="eo-stat-label">Total AC</span><span class="eo-stat-value">' + totalAc + '</span></div>';
+    if (weaponDamage) {
+        html += '<div class="eo-stat"><span class="eo-stat-label">Weapon</span><span class="eo-stat-value">' + escapeHtml(weaponDamage) + '</span></div>';
+    }
+    html += '</div>';
+
+    if (bonuses.length > 0) {
+        html += '<div class="eo-bonuses">';
+        bonuses.forEach(function(b) {
+            html += '<div class="eo-bonus">' + escapeHtml(b) + '</div>';
+        });
+        html += '</div>';
+    }
+
+    html += '<div class="eo-items">';
+    equipped.forEach(function(entry) {
+        var slot = entry[0], item = entry[1];
+        var name = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+        var rarityClass = (item.rarity || 'common').toLowerCase();
+        var stat = item.damage_dice ? item.damage_dice : item.ac_bonus ? 'AC +' + item.ac_bonus : '';
+        html += '<div class="eo-item">';
+        html += '<span class="eo-item-slot">' + escapeHtml(formatSlotLabel(slot)) + '</span>';
+        html += '<span class="eo-item-name rarity-' + rarityClass + '">' + escapeHtml(name) + '</span>';
+        if (stat) html += '<span class="eo-item-stat">' + escapeHtml(stat) + '</span>';
+        html += '</div>';
+    });
+    html += '</div></div>';
+    return html;
+}
+
 function renderStatBox(name, value) {
     const v = value || 10;
     const mod = Math.floor((v - 10) / 2);
@@ -221,7 +455,7 @@ function renderInventory(el, state) {
     ];
 
     let html = '<div class="section-title">Equipped</div>';
-    if (!inCombat) html += '<div class="equip-hint">Click to unequip</div>';
+    if (!inCombat) html += '<div class="equip-hint">Click to unequip \u00b7 Right-click for options</div>';
     html += '<div class="equip-slots">';
     SLOT_LABELS.forEach(([key, label]) => {
         const item = eq[key];
@@ -248,7 +482,7 @@ function renderInventory(el, state) {
 
     // Backpack
     html += '<div class="section-title" style="margin-top:12px;">Backpack</div>';
-    if (!inCombat) html += '<div class="equip-hint">Click equippable items to equip</div>';
+    if (!inCombat) html += '<div class="equip-hint">Click to equip \u00b7 Right-click for options</div>';
     if (!inv.items || inv.items.length === 0) {
         html += '<div class="empty-state" style="padding:8px;">Empty</div>';
     } else {
@@ -287,6 +521,107 @@ function renderInventory(el, state) {
             });
         });
     }
+
+    // Context menu handlers (right-click / long-press) for equipped items
+    el.querySelectorAll('.equip-slot.filled').forEach(function(slot) {
+        var slotKey = slot.dataset.slot;
+        var item = eq[slotKey];
+        if (!item) return;
+        var handler = function(e) {
+            showItemContextMenu(e, item, {
+                canUnequip: !inCombat,
+                slot: slotKey,
+                inBackpack: false,
+            });
+        };
+        slot.addEventListener('contextmenu', handler);
+        bindLongPress(slot, handler);
+    });
+
+    // Context menu handlers for backpack items
+    var itemEntries = el.querySelectorAll('.item-entry');
+    itemEntries.forEach(function(entry, idx) {
+        var item = inv.items[idx];
+        if (!item) return;
+        var itemName = item.enchantment ? item.enchantment.name_prefix + ' ' + item.name : item.name;
+        var handler = function(e) {
+            showItemContextMenu(e, item, {
+                canEquip: !inCombat && !!item.slot,
+                equipName: itemName,
+                inBackpack: true,
+            });
+        };
+        entry.addEventListener('contextmenu', handler);
+        bindLongPress(entry, handler);
+    });
+}
+
+function renderSkills(el, state) {
+    // Request skills from server if we don't have them cached
+    if (!state._skills_cache) {
+        if (window.rqWs) {
+            window.rqWs.send({ type: 'get_skills' });
+        }
+        el.innerHTML = '<div class="loading">Loading skills</div>';
+
+        // Listen for skills response
+        var handler = function(e) {
+            if (e.detail && e.detail.skills) {
+                state._skills_cache = e.detail.skills;
+                document.removeEventListener('skill-list-received', handler);
+                renderSkillsList(el, state._skills_cache);
+            }
+        };
+        document.addEventListener('skill-list-received', handler);
+        return;
+    }
+    renderSkillsList(el, state._skills_cache);
+}
+
+function renderSkillsList(el, skills) {
+    if (!skills || skills.length === 0) {
+        el.innerHTML = '<div class="empty-state">No skills data available.</div>';
+        return;
+    }
+
+    var combatKeys = ['swordsmanship','archery','defense','tactics','dual_wielding','heavy_weapons','polearms','unarmed','shield_use','thrown_weapons','melee','ranged','combat'];
+    var craftKeys = ['mining','smithing','woodcutting','carpentry','herbalism','alchemy','cooking','leatherworking','tailoring','jewelcrafting','enchanting','fishing','farming','brewing','fletching','masonry','tinkering','runecrafting','survival','gathering','smelting','weaving','pottery'];
+    var agilityKeys = ['stealth','lockpicking','pickpocket','acrobatics','athletics','perception','tracking','climbing','swimming','evasion','thievery'];
+    var knowledgeKeys = ['persuasion','intimidation','deception','bartering','leadership','diplomacy','performance','lore','medicine','arcana','nature','religion','history','investigation','bard','music','haggling'];
+
+    var categories = {};
+    skills.forEach(function(s) {
+        var cat = 'General';
+        if (combatKeys.some(function(k) { return s.id.indexOf(k) !== -1; })) cat = 'Combat';
+        else if (craftKeys.some(function(k) { return s.id.indexOf(k) !== -1; })) cat = 'Crafting & Gathering';
+        else if (agilityKeys.some(function(k) { return s.id.indexOf(k) !== -1; })) cat = 'Agility & Stealth';
+        else if (knowledgeKeys.some(function(k) { return s.id.indexOf(k) !== -1; })) cat = 'Knowledge & Social';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(s);
+    });
+
+    var html = '<div class="skills-panel">';
+    var order = ['Combat', 'Crafting & Gathering', 'Agility & Stealth', 'Knowledge & Social', 'General'];
+    order.forEach(function(cat) {
+        var list = categories[cat];
+        if (!list || list.length === 0) return;
+        html += '<div class="skills-category"><div class="section-title">' + escapeHtml(cat) + '</div>';
+        list.forEach(function(s) {
+            var pct = s.xp_to_next > 0 ? Math.min((s.xp / s.xp_to_next) * 100, 100) : (s.rank >= 10 ? 100 : 0);
+            var rankColor = s.rank === 0 ? 'var(--text-muted)' : s.rank >= 7 ? 'var(--text-gold-bright)' : s.rank >= 4 ? 'var(--text-gold)' : 'var(--text-light)';
+            html += '<div class="skill-entry">';
+            html += '<div class="skill-header">';
+            html += '<span class="skill-name">' + escapeHtml(s.name) + '</span>';
+            html += '<span class="skill-rank" style="color:' + rankColor + '">' + escapeHtml(s.rank_name) + ' (' + s.rank + ')</span>';
+            html += '</div>';
+            html += '<div class="bar-track skill-bar"><div class="bar-fill xp" style="width:' + pct + '%"></div></div>';
+            html += '<div class="skill-xp-label">' + s.xp + ' / ' + s.xp_to_next + ' XP</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
 }
 
 function renderMap(el, state) {
