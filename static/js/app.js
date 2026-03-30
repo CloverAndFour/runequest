@@ -13,6 +13,54 @@ let ws = null;
 let currentView = null;
 let gameState = null;
 let currentModel = 'grok-4-1-fast-reasoning';
+let loadingOverlayTimeout = null;
+
+
+const LOADING_FLAVOR_TEXTS = [
+    "Entering the realm...",
+    "Forging your destiny...",
+    "The runes align...",
+    "Consulting the oracle...",
+    "Opening ancient scrolls...",
+    "Crossing the threshold...",
+];
+
+function showAdventureLoadingOverlay(isCreating) {
+    hideAdventureLoadingOverlay();
+    const flavor = LOADING_FLAVOR_TEXTS[Math.floor(Math.random() * LOADING_FLAVOR_TEXTS.length)];
+    const title = isCreating ? "Creating Adventure" : "Loading Adventure";
+    const overlay = document.createElement("div");
+    overlay.className = "adventure-loading-overlay";
+    overlay.innerHTML = `
+        <div class="loading-rune"></div>
+        <div class="loading-title">${title}</div>
+        <div class="loading-flavor">${flavor}</div>
+        <div class="loading-error">
+            <p>This is taking longer than expected...</p>
+            <button class="stone-btn" id="loadingRetryBtn">Back to Menu</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector("#loadingRetryBtn")?.addEventListener("click", () => {
+        hideAdventureLoadingOverlay();
+        showSelectScreen();
+    });
+
+    loadingOverlayTimeout = setTimeout(() => {
+        const errorEl = overlay.querySelector(".loading-error");
+        if (errorEl) errorEl.classList.add("visible");
+    }, 30000);
+}
+
+function hideAdventureLoadingOverlay() {
+    if (loadingOverlayTimeout) {
+        clearTimeout(loadingOverlayTimeout);
+        loadingOverlayTimeout = null;
+    }
+    const overlay = document.querySelector(".adventure-loading-overlay");
+    if (overlay) overlay.remove();
+}
 
 async function init() {
     const token = getToken();
@@ -50,7 +98,7 @@ function handleServerMsg(msg) {
         case 'adventure_list':
             if (currentView === 'select') {
                 renderSelectScreen(app, msg.adventures, {
-                    onLoad: (id) => ws.send({ type: 'load_adventure', adventure_id: id }),
+                    onLoad: (id) => { showAdventureLoadingOverlay(false); ws.send({ type: 'load_adventure', adventure_id: id }); },
                     onDelete: (id) => ws.send({ type: 'delete_adventure', adventure_id: id }),
                     onNew: () => showCreateScreen(),
                 });
@@ -58,6 +106,7 @@ function handleServerMsg(msg) {
             break;
         case 'adventure_created':
         case 'adventure_loaded':
+            hideAdventureLoadingOverlay();
             if (msg.state) gameState = msg.state;
             showAdventureScreen();
             break;
@@ -166,6 +215,7 @@ function handleServerMsg(msg) {
             handleFriendChatHistory(msg);
             break;
         case 'error':
+            hideAdventureLoadingOverlay();
             showToast(msg.message, true);
             break;
     }
@@ -181,10 +231,10 @@ function showCreateScreen() {
     currentView = 'create';
     renderCreateScreen(app, {
         onBack: () => showSelectScreen(),
-        onCreate: (data) => ws.send({
-            type: 'create_adventure',
-            ...data,
-        }),
+        onCreate: (data) => {
+            showAdventureLoadingOverlay(true);
+            ws.send({ type: 'create_adventure', ...data });
+        },
     });
 }
 
