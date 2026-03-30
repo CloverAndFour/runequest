@@ -10,6 +10,7 @@ use super::equipment::{get_item, EquipSlot};
 use super::inventory::{Item, ItemType};
 use super::world_map;
 use crate::error::{RunequestError, Result};
+use crate::storage::shop_store::ShopStore;
 
 /// Result of executing a tool call.
 #[derive(Debug)]
@@ -39,6 +40,15 @@ pub fn execute_tool_call(
     state: &mut AdventureState,
     tool_name: &str,
     args: &Value,
+) -> Result<ToolExecResult> {
+    execute_tool_call_with_shop(state, tool_name, args, None)
+}
+
+pub fn execute_tool_call_with_shop(
+    state: &mut AdventureState,
+    tool_name: &str,
+    args: &Value,
+    shop_store: Option<&ShopStore>,
 ) -> Result<ToolExecResult> {
     state.updated_at = chrono::Utc::now();
 
@@ -1116,42 +1126,52 @@ pub fn execute_tool_call(
 
         "buy_item" => {
             let item_id = args["item_id"].as_str().unwrap_or("");
-            // Use hex world shop
+            let quantity = args["quantity"].as_u64().unwrap_or(1) as u32;
             let county = world_map::current_county(&state.world_position);
             match county {
                 Some(county) if county.has_town => {
-                    let shop_entries = world_map::generate_shop(county.tier);
-                    let entry = shop_entries.iter().find(|e| e.item_id == item_id);
-                    match entry {
-                        Some(entry) => {
-                            let item = match super::equipment::get_item(item_id) {
-                                Some(i) => i,
-                                None => return Ok(ToolExecResult::Immediate(serde_json::json!({
-                                    "success": false, "error": format!("Item '{}' not found", item_id)
-                                }))),
-                            };
-                            let price = std::cmp::max((item.value_gp as f32 * entry.price_mult).ceil() as u32, 1u32);
-                            if state.character.gold < price {
-                                return Ok(ToolExecResult::Immediate(serde_json::json!({
-                                    "success": false,
-                                    "error": format!("Not enough gold. Need {} but have {}", price, state.character.gold),
-                                })));
+                    if let Some(shop_store) = shop_store {
+                        let q = state.world_position.county_q;
+                        let r = state.world_position.county_r;
+                        let player_gold = state.character.gold;
+                        let result = shop_store.with_mut(|reg: &mut crate::engine::shop::ShopRegistry| {
+                            match reg.get_or_create(q, r) {
+                                Some(shop) => shop.buy(item_id, quantity, player_gold),
+                                None => Err("No shop at this location".to_string()),
                             }
-                            state.character.gold -= price;
-                            state.inventory.gold = state.character.gold;
-                            let mut inv_item = item.clone();
-                            inv_item.quantity = 1;
-                            state.inventory.items.push(inv_item);
-                            Ok(ToolExecResult::Immediate(serde_json::json!({
-                                "success": true,
-                                "message": format!("Bought {} for {} gold", item.name, price),
-                                "gold_remaining": state.character.gold,
-                            })))
+                        });
+                        match result {
+                            Ok(buy_result) => match buy_result {
+                                Ok((item_name, total_price)) => {
+                                    state.character.gold -= total_price;
+                                    state.inventory.gold = state.character.gold;
+                                    if let Some(item) = super::equipment::get_item(item_id) {
+                                        let mut inv_item = item.clone();
+                                        inv_item.quantity = quantity;
+                                        state.inventory.items.push(inv_item);
+                                    }
+                                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                                        "success": true,
+                                        "message": format!("Bought {} x{} for {} gold", item_name, quantity, total_price),
+                                        "gold_remaining": state.character.gold,
+                                    })))
+                                }
+                                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                                    "success": false,
+                                    "error": e,
+                                }))),
+                            },
+                            Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                                "success": false,
+                                "error": format!("{}", e),
+                            }))),
                         }
-                        None => Ok(ToolExecResult::Immediate(serde_json::json!({
+                    } else {
+                        // Fallback: no shop store (shouldn't happen in normal flow)
+                        Ok(ToolExecResult::Immediate(serde_json::json!({
                             "success": false,
-                            "error": format!("Item '{}' is not available in this shop", item_id),
-                        }))),
+                            "error": "Shop system unavailable.",
+                        })))
                     }
                 }
                 _ => Ok(ToolExecResult::Immediate(serde_json::json!({
@@ -1163,7 +1183,6 @@ pub fn execute_tool_call(
 
         "sell_item" => {
             let item_name = args["item_name"].as_str().unwrap_or("");
-            // Check we are at a town
             let county = world_map::current_county(&state.world_position);
             let at_town = county.map(|c| c.has_town).unwrap_or(false);
             if !at_town {
@@ -1177,15 +1196,37 @@ pub fn execute_tool_call(
             match idx {
                 Some(idx) => {
                     let item = state.inventory.items.remove(idx);
-                    let base_item = super::equipment::get_item(&item.id);
-                    let sell_price = base_item.map(|i| std::cmp::max(i.value_gp / 2, 1)).unwrap_or(1);
-                    state.character.gold += sell_price;
-                    state.inventory.gold = state.character.gold;
-                    Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "success": true,
-                        "message": format!("Sold {} for {} gold", item.name, sell_price),
-                        "gold_remaining": state.character.gold,
-                    })))
+                    if let Some(shop_store) = shop_store {
+                        let q = state.world_position.county_q;
+                        let r = state.world_position.county_r;
+                        let base_value = super::equipment::get_item(&item.id).map(|i| i.value_gp).unwrap_or(1);
+                        let sell_price = shop_store.with_mut(|reg: &mut crate::engine::shop::ShopRegistry| {
+                            match reg.get_or_create(q, r) {
+                                Some(shop) => shop.sell(&item.id, base_value, 1),
+                                None => (base_value * 60 / 100).max(1),
+                            }
+                        }).unwrap_or(1);
+                        state.character.gold += sell_price;
+                        state.inventory.gold = state.character.gold;
+                        Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "success": true,
+                            "message": format!("Sold {} for {} gold", item.name, sell_price),
+                            "sell_price": sell_price,
+                            "gold_remaining": state.character.gold,
+                        })))
+                    } else {
+                        // Fallback
+                        let base_item = super::equipment::get_item(&item.id);
+                        let sell_price = base_item.map(|i| std::cmp::max(i.value_gp / 2, 1)).unwrap_or(1);
+                        state.character.gold += sell_price;
+                        state.inventory.gold = state.character.gold;
+                        Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "success": true,
+                            "message": format!("Sold {} for {} gold", item.name, sell_price),
+                            "sell_price": sell_price,
+                            "gold_remaining": state.character.gold,
+                        })))
+                    }
                 }
                 None => Ok(ToolExecResult::Immediate(serde_json::json!({
                     "success": false,
@@ -1195,7 +1236,6 @@ pub fn execute_tool_call(
         }
 
         "view_shop" => {
-            // Try hex world first
             let county = world_map::current_county(&state.world_position);
             if let Some(county) = county {
                 if !county.has_town {
@@ -1203,24 +1243,52 @@ pub fn execute_tool_call(
                         "error": "No shop here — this county has no town."
                     })));
                 }
-                let shop_entries = world_map::generate_shop(county.tier);
-                let items: Vec<serde_json::Value> = shop_entries.iter().filter_map(|se| {
-                    let item = super::equipment::get_item(&se.item_id)?;
-                    let price = (item.value_gp as f32 * se.price_mult).ceil() as u32;
-                    Some(serde_json::json!({
-                        "item_id": se.item_id,
-                        "name": item.name,
-                        "price": std::cmp::max(price, 1),
-                        "stock": se.stock,
-                        "description": item.description,
-                    }))
-                }).collect();
-                Ok(ToolExecResult::Immediate(serde_json::json!({
-                    "shop_name": format!("{} General Store", county.name),
-                    "location": county.name,
-                    "items": items,
-                    "player_gold": state.character.gold,
-                })))
+                if let Some(shop_store) = shop_store {
+                    let q = state.world_position.county_q;
+                        let r = state.world_position.county_r;
+                    let shop_data = shop_store.with_mut(|reg: &mut crate::engine::shop::ShopRegistry| {
+                        match reg.get_or_create(q, r) {
+                            Some(shop) => {
+                                let items: Vec<serde_json::Value> = shop.items.values().filter_map(|si| {
+                                    let equip = super::equipment::get_item(&si.item_id)?;
+                                    Some(serde_json::json!({
+                                        "item_id": si.item_id,
+                                        "name": equip.name,
+                                        "description": equip.description,
+                                        "buy_price": si.buy_price(),
+                                        "sell_price": si.sell_price(),
+                                        "current_stock": si.current_stock,
+                                        "price_category": si.price_category(),
+                                        "tier": equip.tier,
+                                    }))
+                                }).collect();
+                                Some((shop.name.clone(), shop.tier, items))
+                            }
+                            None => None,
+                        }
+                    });
+                    match shop_data {
+                        Ok(Some((name, tier, items))) => {
+                            Ok(ToolExecResult::Immediate(serde_json::json!({
+                                "shop_name": name,
+                                "tier": tier,
+                                "location": county.name,
+                                "items": items,
+                                "player_gold": state.character.gold,
+                            })))
+                        }
+                        Ok(None) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "error": "No shop at this location.",
+                        }))),
+                        Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "error": format!("{}", e),
+                        }))),
+                    }
+                } else {
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "Shop system unavailable.",
+                    })))
+                }
             } else {
                 Ok(ToolExecResult::Immediate(serde_json::json!({
                     "error": "No shop at this location.",

@@ -9,6 +9,7 @@ pub mod dice;
 pub mod drops;
 pub mod dungeon;
 pub mod equipment;
+pub mod shop;
 pub mod exchange;
 pub mod executor;
 pub mod guild;

@@ -12,7 +12,8 @@ use crate::engine::adventure::AdventureState;
 use crate::engine::character::{Class, Race, Stats};
 use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
-use crate::engine::executor::{execute_tool_call, ToolExecResult};
+use crate::engine::executor::{execute_tool_call, execute_tool_call_with_shop, ToolExecResult};
+use crate::storage::shop_store::ShopStore;
 use crate::llm::client::XaiClient;
 use crate::llm::pricing::{SessionCost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
@@ -68,6 +69,7 @@ pub async fn handle_socket(
     xai_client: Arc<XaiClient>,
     data_dir: std::path::PathBuf,
     default_model: String,
+    shop_store: ShopStore,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let store = AdventureStore::new(&data_dir, &user.username);
@@ -123,7 +125,7 @@ pub async fn handle_socket(
             }
         };
 
-        let response = handle_client_msg(client_msg, &session, &xai_client, &mut sender).await;
+        let response = handle_client_msg(client_msg, &session, &xai_client, &mut sender, &shop_store).await;
 
         if let Err(e) = response {
             let err = ServerMsg::Error {
@@ -179,8 +181,94 @@ async fn handle_client_msg(
     session: &Arc<Mutex<Session>>,
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    shop_store: &ShopStore,
 ) -> anyhow::Result<()> {
     match msg {
+        ClientMsg::ViewShop => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                let args = serde_json::json!({});
+                match execute_tool_call_with_shop(&mut adv, "view_shop", &args, Some(shop_store)) {
+                    Ok(ToolExecResult::Immediate(result)) => {
+                        let shop_name = result.get("shop_name").and_then(|v| v.as_str()).unwrap_or("Shop").to_string();
+                        let tier = result.get("tier").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                        let items_val = result.get("items").cloned().unwrap_or(serde_json::json!([]));
+                        let items: Vec<crate::web::protocol::ShopItemInfo> = serde_json::from_value(items_val).unwrap_or_default();
+                        let player_gold = result.get("player_gold").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::ShopInventory { shop_name, tier, items, player_gold }).await;
+                    }
+                    Ok(_) => { sess.adventure = Some(adv); }
+                    Err(e) => {
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::Error { code: "shop_error".to_string(), message: e.to_string() }).await;
+                    }
+                }
+            } else {
+                send_msg(sender, &ServerMsg::Error { code: "no_adventure".to_string(), message: "No active adventure".to_string() }).await;
+            }
+        }
+
+        ClientMsg::ShopBuy { item_id, quantity } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                let args = serde_json::json!({"item_id": item_id, "quantity": quantity});
+                match execute_tool_call_with_shop(&mut adv, "buy_item", &args, Some(shop_store)) {
+                    Ok(ToolExecResult::Immediate(result)) => {
+                        let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let item_name = result.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let error = result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string());
+                        let price = result.get("price").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                        let gold_remaining = result.get("gold_remaining").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                        if success {
+                            sess.store.save_adventure(&adv).ok();
+                            let state_json = build_state_with_map(&adv);
+                            send_msg(sender, &ServerMsg::StateUpdate { state: state_json }).await;
+                        }
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::ShopBuyResult { success, item_name, price, gold_remaining, error }).await;
+                    }
+                    Ok(_) => { sess.adventure = Some(adv); }
+                    Err(e) => {
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::Error { code: "shop_error".to_string(), message: e.to_string() }).await;
+                    }
+                }
+            } else {
+                send_msg(sender, &ServerMsg::Error { code: "no_adventure".to_string(), message: "No active adventure".to_string() }).await;
+            }
+        }
+
+        ClientMsg::ShopSell { item_name } => {
+            let mut sess = session.lock().await;
+            if let Some(mut adv) = sess.adventure.take() {
+                let args = serde_json::json!({"item_name": item_name});
+                match execute_tool_call_with_shop(&mut adv, "sell_item", &args, Some(shop_store)) {
+                    Ok(ToolExecResult::Immediate(result)) => {
+                        let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let sold_name = result.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let error = result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string());
+                        let gold_earned = result.get("sell_price").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                        let gold_remaining = result.get("gold_remaining").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                        if success {
+                            sess.store.save_adventure(&adv).ok();
+                            let state_json = build_state_with_map(&adv);
+                            send_msg(sender, &ServerMsg::StateUpdate { state: state_json }).await;
+                        }
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::ShopSellResult { success, item_name: sold_name, gold_earned, gold_remaining, error }).await;
+                    }
+                    Ok(_) => { sess.adventure = Some(adv); }
+                    Err(e) => {
+                        sess.adventure = Some(adv);
+                        send_msg(sender, &ServerMsg::Error { code: "shop_error".to_string(), message: e.to_string() }).await;
+                    }
+                }
+            } else {
+                send_msg(sender, &ServerMsg::Error { code: "no_adventure".to_string(), message: "No active adventure".to_string() }).await;
+            }
+        }
+
         ClientMsg::ListAdventures => {
             let sess = session.lock().await;
             let adventures = sess.store.list_adventures()?;
@@ -230,7 +318,7 @@ async fn handle_client_msg(
             }
 
             send_msg(sender, &ServerMsg::AdventureCreated { adventure_id, state: state_json }).await;
-            start_adventure(session, xai_client, sender, &scenario).await?;
+            start_adventure(session, xai_client, sender, &scenario, shop_store).await?;
         }
 
         ClientMsg::LoadAdventure { adventure_id } => {
@@ -336,7 +424,7 @@ async fn handle_client_msg(
                     },
                 )?;
             }
-            continue_tool_loop(session, xai_client, sender).await?;
+            continue_tool_loop(session, xai_client, sender, shop_store).await?;
             } // end else (normal resume)
         }
 
@@ -357,7 +445,7 @@ async fn handle_client_msg(
         }
 
         ClientMsg::SendMessage { content } => {
-            run_game_turn(session, xai_client, sender, &content).await?;
+            run_game_turn(session, xai_client, sender, &content, shop_store).await?;
         }
 
         ClientMsg::SelectChoice { index: _, text } => {
@@ -392,9 +480,9 @@ async fn handle_client_msg(
                     });
                 }
                 drop(sess);
-                continue_tool_loop(session, xai_client, sender).await?;
+                continue_tool_loop(session, xai_client, sender, shop_store).await?;
             } else {
-                run_game_turn(session, xai_client, sender, &text).await?;
+                run_game_turn(session, xai_client, sender, &text, shop_store).await?;
             }
         }
 
@@ -511,7 +599,7 @@ async fn handle_client_msg(
                     }
                 } else {
                     drop(sess);
-                    continue_tool_loop(session, xai_client, sender).await?;
+                    continue_tool_loop(session, xai_client, sender, shop_store).await?;
                 }
             }
         }
@@ -525,7 +613,7 @@ async fn handle_client_msg(
         }
 
         ClientMsg::CombatAction { action_id, target, item_name } => {
-            handle_combat_action(session, xai_client, sender, &action_id, target.as_deref(), item_name.as_deref()).await?;
+            handle_combat_action(session, xai_client, sender, &action_id, target.as_deref(), item_name.as_deref(), shop_store).await?;
         }
 
         ClientMsg::SetModel { model } => {
@@ -747,6 +835,7 @@ async fn start_adventure(
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
     scenario: &Option<String>,
+    shop_store: &ShopStore,
 ) -> anyhow::Result<()> {
     {
         let mut sess = session.lock().await;
@@ -772,7 +861,7 @@ async fn start_adventure(
         )?;
     }
 
-    continue_tool_loop(session, xai_client, sender).await
+    continue_tool_loop(session, xai_client, sender, shop_store).await
 }
 
 async fn run_game_turn(
@@ -780,6 +869,7 @@ async fn run_game_turn(
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
     user_input: &str,
+    shop_store: &ShopStore,
 ) -> anyhow::Result<()> {
     {
         let mut sess = session.lock().await;
@@ -837,13 +927,14 @@ async fn run_game_turn(
         }
     }
 
-    continue_tool_loop(session, xai_client, sender).await
+    continue_tool_loop(session, xai_client, sender, shop_store).await
 }
 
 async fn continue_tool_loop(
     session: &Arc<Mutex<Session>>,
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
+    shop_store: &ShopStore,
 ) -> anyhow::Result<()> {
     let tools = build_tool_definitions();
     let max_iterations = 15;
@@ -941,7 +1032,7 @@ async fn continue_tool_loop(
                         None => continue,
                     };
 
-                    let exec_result = execute_tool_call(&mut adventure, &tc.function.name, &args);
+                    let exec_result = execute_tool_call_with_shop(&mut adventure, &tc.function.name, &args, Some(shop_store));
 
                     match exec_result {
                         Ok(ToolExecResult::Immediate(result)) => {
@@ -1234,6 +1325,7 @@ async fn handle_combat_action(
     action_id: &str,
     target: Option<&str>,
     _item_name: Option<&str>,
+    shop_store: &ShopStore,
 ) -> anyhow::Result<()> {
     let mut sess = session.lock().await;
     let mut adventure = match sess.adventure.take() {
@@ -1322,7 +1414,7 @@ async fn handle_combat_action(
                 sess.adventure = Some(adventure);
                 sess.messages.push(ChatMessage::user("Combat is over. All enemies defeated. Narrate the victory and present choices for what to do next."));
                 drop(sess);
-                continue_tool_loop(session, xai_client, sender).await?;
+                continue_tool_loop(session, xai_client, sender, shop_store).await?;
                 return Ok(());
             }
 
@@ -1487,7 +1579,7 @@ async fn handle_combat_action(
                 sess.adventure = Some(adventure);
                 sess.messages.push(ChatMessage::user("The player successfully fled from combat. Narrate their narrow escape and present choices for what to do next."));
                 drop(sess);
-                continue_tool_loop(session, xai_client, sender).await?;
+                continue_tool_loop(session, xai_client, sender, shop_store).await?;
                 return Ok(());
             } else {
                 adventure.combat.flee_attempts += 1;

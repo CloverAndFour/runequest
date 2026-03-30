@@ -72,6 +72,16 @@ pub enum ClientMsg {
         slot: String,
     },
     GetSkills,
+    // Shop
+    ViewShop,
+    ShopBuy {
+        item_id: String,
+        #[serde(default = "default_quantity")]
+        quantity: u32,
+    },
+    ShopSell {
+        item_name: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +222,29 @@ pub enum ServerMsg {
     SkillList {
         skills: Vec<serde_json::Value>,
     },
+    // Shop results
+    ShopInventory {
+        shop_name: String,
+        tier: u8,
+        items: Vec<ShopItemInfo>,
+        player_gold: u32,
+    },
+    ShopBuyResult {
+        success: bool,
+        item_name: String,
+        price: u32,
+        gold_remaining: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+    ShopSellResult {
+        success: bool,
+        item_name: String,
+        gold_earned: u32,
+        gold_remaining: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     StateChanges {
         #[serde(skip_serializing_if = "Option::is_none")]
         gold_delta: Option<i64>,
@@ -261,4 +294,18 @@ pub struct EnemyInfo {
     pub max_hp: i32,
     pub ac: i32,
     pub alive: bool,
+}
+
+fn default_quantity() -> u32 { 1 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShopItemInfo {
+    pub item_id: String,
+    pub name: String,
+    pub description: String,
+    pub buy_price: u32,
+    pub sell_price: u32,
+    pub current_stock: u32,
+    pub price_category: String,
+    pub tier: u8,
 }

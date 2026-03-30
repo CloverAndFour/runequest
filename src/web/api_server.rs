@@ -21,7 +21,8 @@ use crate::engine::combat::{CombatantId, Enemy, EnemyAttack};
 use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::equipment;
-use crate::engine::executor::{execute_tool_call, ToolExecResult};
+use crate::engine::executor::{execute_tool_call, execute_tool_call_with_shop, ToolExecResult};
+use crate::storage::shop_store::ShopStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
 use crate::llm::client::XaiClient;
 use crate::llm::pricing::{model_cost, TokenUsage};
@@ -42,6 +43,7 @@ pub struct ApiState {
     pub auth_mode: AuthMode,
     pub user_store: Arc<UserStore>,
     pub jwt_manager: Arc<JwtManager>,
+    pub shop_store: ShopStore,
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +347,7 @@ pub async fn run_api_server(
     auth_mode: AuthMode,
     user_store: Arc<UserStore>,
     jwt_manager: Arc<JwtManager>,
+    shop_store: ShopStore,
 ) -> anyhow::Result<()> {
     let api_state = Arc::new(ApiState {
         data_dir,
@@ -353,6 +356,7 @@ pub async fn run_api_server(
         auth_mode: auth_mode.clone(),
         user_store,
         jwt_manager: jwt_manager.clone(),
+        shop_store,
     });
 
     let auth_state = Arc::new(AuthState {
@@ -403,8 +407,13 @@ pub async fn run_api_server(
         .route("/api/recipes/:recipe_id", get(get_recipe))
         .route("/api/materials", get(list_materials))
         .route("/api/adventures/:id/craft", post(craft_item))
+        .route("/api/adventures/:id/gather", post(gather_materials))
         // Skills
         .route("/api/adventures/:id/engine/skill", post(engine_skill))
+        // Shop
+        .route("/api/adventures/:id/shop", get(shop_view))
+        .route("/api/adventures/:id/shop/buy", post(shop_buy))
+        .route("/api/adventures/:id/shop/sell", post(shop_sell))
         // Backgrounds
         .route("/api/backgrounds", get(list_backgrounds))
         .layer(axum_mw::from_fn_with_state(
@@ -425,6 +434,96 @@ pub async fn run_api_server(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Shop endpoints
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct ShopBuyRequest {
+    item_id: String,
+    #[serde(default = "default_shop_quantity")]
+    quantity: u32,
+}
+
+#[derive(Deserialize)]
+struct ShopSellRequest {
+    item_name: String,
+}
+
+fn default_shop_quantity() -> u32 { 1 }
+
+async fn shop_view(
+    Path(id): Path<String>,
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
+    };
+
+    let args = serde_json::json!({});
+    let mut adv = adventure.clone();
+    match execute_tool_call_with_shop(&mut adv, "view_shop", &args, Some(&state.shop_store)) {
+        Ok(ToolExecResult::Immediate(result)) => Json(result).into_response(),
+        Ok(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Unexpected result type"}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn shop_buy(
+    Path(id): Path<String>,
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(body): Json<ShopBuyRequest>,
+) -> impl IntoResponse {
+    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
+    };
+
+    let args = serde_json::json!({"item_id": body.item_id, "quantity": body.quantity});
+    match execute_tool_call_with_shop(&mut adventure, "buy_item", &args, Some(&state.shop_store)) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+            if success {
+                store.save_adventure(&adventure).ok();
+            }
+            Json(result).into_response()
+        }
+        Ok(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Unexpected result type"}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn shop_sell(
+    Path(id): Path<String>,
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(body): Json<ShopSellRequest>,
+) -> impl IntoResponse {
+    let store = AdventureStore::new(&state.data_dir, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Adventure not found"}))).into_response(),
+    };
+
+    let args = serde_json::json!({"item_name": body.item_name});
+    match execute_tool_call_with_shop(&mut adventure, "sell_item", &args, Some(&state.shop_store)) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+            if success {
+                store.save_adventure(&adventure).ok();
+            }
+            Json(result).into_response()
+        }
+        Ok(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Unexpected result type"}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2034,6 +2133,35 @@ async fn craft_item(
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Gather endpoint
+// ---------------------------------------------------------------------------
+
+async fn gather_materials(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let args = serde_json::json!({});
+    match execute_tool_call(&mut adventure, "gather", &args) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            store.save_adventure(&adventure).ok();
+            Json(serde_json::json!({
+                "result": result,
+                "state": build_state_with_map(&adventure),
+            }))
+            .into_response()
+        }
+        _ => err_internal("Gathering failed").into_response(),
+    }
+}
 // ---------------------------------------------------------------------------
 // Skill endpoint
 // ---------------------------------------------------------------------------

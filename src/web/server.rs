@@ -15,6 +15,7 @@ use tower_http::services::ServeDir;
 
 use crate::auth::middleware::{require_auth, AuthMode, AuthState, AuthUser};
 use crate::auth::{JwtManager, UserStore};
+use crate::storage::shop_store::ShopStore;
 use crate::llm::client::XaiClient;
 
 use super::static_files::{FAVICON_SVG, INDEX_HTML, LOGIN_HTML};
@@ -27,6 +28,7 @@ pub struct AppState {
     pub auth_mode: AuthMode,
     pub user_store: Arc<UserStore>,
     pub jwt_manager: Arc<JwtManager>,
+    pub shop_store: ShopStore,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +55,7 @@ pub async fn run_server(
     bind_address: &str,
     data_dir: PathBuf,
     require_auth_flag: bool,
+    shop_store: ShopStore,
 ) -> anyhow::Result<()> {
     let api_key = std::env::var("XAI_API_KEY").map_err(|_| {
         anyhow::anyhow!(
@@ -79,6 +82,7 @@ pub async fn run_server(
         auth_mode: auth_mode.clone(),
         user_store: user_store.clone(),
         jwt_manager: jwt_manager.clone(),
+        shop_store,
     });
 
     let auth_state = Arc::new(AuthState {
@@ -184,6 +188,7 @@ async fn ws_handler(
             state.xai_client.clone(),
             state.data_dir.clone(),
             default_model,
+            state.shop_store.clone(),
         )
     })
 }

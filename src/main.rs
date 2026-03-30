@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use runequest::auth::{AuthMode, JwtManager, UserRole, UserStore};
+use runequest::storage::shop_store::ShopStore;
 use runequest::llm::client::XaiClient;
 
 #[derive(Parser)]
@@ -98,11 +99,16 @@ async fn main() -> Result<()> {
             let user_store = Arc::new(UserStore::new(&base_path));
             let jwt_manager = Arc::new(JwtManager::new(&base_path)?);
 
+            let shop_store = ShopStore::new(&base_path);
+
             let auth_mode = if require_auth || user_store.has_users() {
                 AuthMode::Enabled
             } else {
                 AuthMode::Disabled
             };
+
+            let shop_store_web = shop_store.clone();
+            let shop_store_api = shop_store.clone();
 
             let bind_addr_web = bind_address.clone();
             let bind_addr_api = bind_address.clone();
@@ -115,7 +121,7 @@ async fn main() -> Result<()> {
             let auth_mode_api = auth_mode.clone();
 
             let web_handle = tokio::spawn(async move {
-                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth).await
+                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth, shop_store_web).await
             });
 
             let api_handle = tokio::spawn(async move {
@@ -128,6 +134,7 @@ async fn main() -> Result<()> {
                     auth_mode_api,
                     user_store_api,
                     jwt_api,
+                    shop_store_api,
                 )
                 .await
             });
