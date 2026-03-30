@@ -21,6 +21,8 @@ use crate::engine::combat::{CombatantId, Enemy, EnemyAttack};
 use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::equipment;
+use crate::engine::dungeon::generate_tiered_dungeon;
+use crate::engine::tower::{tower_definitions, generate_floor, floor_summary, checkpoint_teleport_cost, meets_entry_requirement};
 use crate::engine::executor::{execute_tool_call, execute_tool_call_with_shop, ToolExecResult};
 use crate::storage::shop_store::ShopStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
@@ -414,6 +416,21 @@ pub async fn run_api_server(
         .route("/api/adventures/:id/shop", get(shop_view))
         .route("/api/adventures/:id/shop/buy", post(shop_buy))
         .route("/api/adventures/:id/shop/sell", post(shop_sell))
+        // Dungeon
+        .route("/api/adventures/:id/dungeon/enter", post(dungeon_enter))
+        .route("/api/adventures/:id/dungeon/move", post(dungeon_move))
+        .route("/api/adventures/:id/dungeon/skill-check", post(dungeon_skill_check))
+        .route("/api/adventures/:id/dungeon/activate-point", post(dungeon_activate_point))
+        .route("/api/adventures/:id/dungeon/retreat", post(dungeon_retreat))
+        .route("/api/adventures/:id/dungeon/status", get(dungeon_status))
+        // Tower
+        .route("/api/towers", get(tower_list))
+        .route("/api/towers/:tower_id/floor/:floor_num", get(tower_floor_status))
+        .route("/api/adventures/:id/tower/enter", post(tower_enter))
+        .route("/api/adventures/:id/tower/move", post(tower_move))
+        .route("/api/adventures/:id/tower/ascend", post(tower_ascend))
+        .route("/api/adventures/:id/tower/checkpoint", post(tower_checkpoint))
+        .route("/api/adventures/:id/tower/teleport", post(tower_teleport))
         // Backgrounds
         .route("/api/backgrounds", get(list_backgrounds))
         .layer(axum_mw::from_fn_with_state(
@@ -2232,6 +2249,648 @@ async fn list_backgrounds() -> impl IntoResponse {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// Dungeon endpoints
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct DungeonEnterRequest {
+    seed: Option<u64>,
+    tier: Option<u32>,
+}
+
+async fn dungeon_enter(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<DungeonEnterRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    if adventure.dungeon.is_some() {
+        return err_json("already_in_dungeon", "Already in a dungeon. Leave first.").into_response();
+    }
+
+    let seed = req.seed.unwrap_or_else(|| {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    });
+    let tier = req.tier.unwrap_or(0).min(10);
+
+    let dungeon = generate_tiered_dungeon(seed, tier);
+    let summary = serde_json::json!({
+        "name": dungeon.name,
+        "tier": dungeon.tier,
+        "floors": dungeon.floors.len(),
+        "current_floor": dungeon.current_floor,
+        "current_room": dungeon.current_room,
+        "room": dungeon.current_room().map(|r| serde_json::json!({
+            "name": r.name,
+            "type": format!("{}", r.room_type),
+            "description": r.description,
+            "exits": r.exits.iter().map(|e| serde_json::json!({
+                "direction": e.direction,
+                "locked": e.locked,
+            })).collect::<Vec<_>>(),
+            "has_enemies": !r.enemies.is_empty() && !r.cleared,
+        })),
+    });
+
+    adventure.dungeon = Some(dungeon);
+    store.save_adventure(&adventure).ok();
+
+    Json(serde_json::json!({
+        "result": "dungeon_entered",
+        "dungeon": summary,
+    })).into_response()
+}
+
+#[derive(Deserialize)]
+struct DungeonMoveRequest {
+    direction: String,
+}
+
+async fn dungeon_move(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<DungeonMoveRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match adventure.dungeon.as_mut() {
+        Some(d) => d,
+        None => return err_json("not_in_dungeon", "Not currently in a dungeon").into_response(),
+    };
+
+    // Check if exit is skill-gated
+    let current_floor_idx = dungeon.current_floor;
+    let current_room_id = dungeon.current_room;
+    if let Some(floor) = dungeon.floors.get(current_floor_idx) {
+        if let Some(room) = floor.rooms.get(current_room_id) {
+            if let Some(exit_idx) = room.exits.iter().position(|e| e.direction.to_lowercase() == req.direction.to_lowercase()) {
+                // Check for skill gate on this exit
+                for gate in &floor.skill_gates {
+                    if gate.room_id == current_room_id && gate.exit_index == exit_idx {
+                        return err_json("skill_gate_locked",
+                            &format!("Exit requires {} skill at rank {} (DC {}). Use /dungeon/skill-check to attempt.",
+                                gate.required_skill, gate.required_rank, gate.dc)
+                        ).into_response();
+                    }
+                }
+            }
+        }
+    }
+
+    match dungeon.move_to_room(&req.direction) {
+        Ok(result) => {
+            let response = serde_json::json!({
+                "result": "moved",
+                "room": {
+                    "name": result.room_name,
+                    "type": format!("{}", result.room_type),
+                    "description": result.description,
+                    "has_enemies": result.has_enemies,
+                    "has_trap": result.has_trap,
+                    "exits": result.exits,
+                    "floor": result.floor,
+                    "room_id": result.room_id,
+                },
+            });
+            store.save_adventure(&adventure).ok();
+            Json(response).into_response()
+        }
+        Err(e) => err_json("move_failed", &e).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct SkillCheckRequest {
+    direction: String,
+    skill_id: String,
+}
+
+async fn dungeon_skill_check(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<SkillCheckRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match adventure.dungeon.as_mut() {
+        Some(d) => d,
+        None => return err_json("not_in_dungeon", "Not currently in a dungeon").into_response(),
+    };
+
+    let current_floor_idx = dungeon.current_floor;
+    let current_room_id = dungeon.current_room;
+
+    // Find the skill gate for the given direction
+    let floor = match dungeon.floors.get(current_floor_idx) {
+        Some(f) => f,
+        None => return err_json("invalid_floor", "Current floor not found").into_response(),
+    };
+
+    let room = match floor.rooms.get(current_room_id) {
+        Some(r) => r,
+        None => return err_json("invalid_room", "Current room not found").into_response(),
+    };
+
+    let exit_idx = match room.exits.iter().position(|e| e.direction.to_lowercase() == req.direction.to_lowercase()) {
+        Some(i) => i,
+        None => return err_json("no_exit", "No exit in that direction").into_response(),
+    };
+
+    let gate = match floor.skill_gates.iter().find(|g| g.room_id == current_room_id && g.exit_index == exit_idx) {
+        Some(g) => g.clone(),
+        None => return err_json("no_gate", "No skill gate on that exit").into_response(),
+    };
+
+    // Check player has the skill at required rank
+    let player_rank = adventure.skills.get(&req.skill_id).map(|s| s.rank).unwrap_or(0);
+    if player_rank < gate.required_rank {
+        return err_json("insufficient_rank",
+            &format!("Need {} rank {} but you have rank {}", gate.required_skill, gate.required_rank, player_rank)
+        ).into_response();
+    }
+
+    // Roll skill check: d20 + rank vs DC
+    let roll = DiceRoller::roll("1d20", 1, player_rank as i32);
+    let success = roll.total >= gate.dc;
+
+    if success {
+        // Remove the skill gate (it's consumed)
+        if let Some(floor) = dungeon.floors.get_mut(current_floor_idx) {
+            floor.skill_gates.retain(|g| !(g.room_id == current_room_id && g.exit_index == exit_idx));
+        }
+    }
+
+    store.save_adventure(&adventure).ok();
+
+    Json(serde_json::json!({
+        "result": if success { "skill_check_passed" } else { "skill_check_failed" },
+        "skill": req.skill_id,
+        "rank": player_rank,
+        "roll": roll.total,
+        "dc": gate.dc,
+        "success": success,
+    })).into_response()
+}
+
+#[derive(Deserialize)]
+struct ActivatePointRequest {
+    puzzle_id: String,
+    room_id: usize,
+}
+
+async fn dungeon_activate_point(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<ActivatePointRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match adventure.dungeon.as_mut() {
+        Some(d) => d,
+        None => return err_json("not_in_dungeon", "Not currently in a dungeon").into_response(),
+    };
+
+    let current_floor_idx = dungeon.current_floor;
+    let floor = match dungeon.floors.get_mut(current_floor_idx) {
+        Some(f) => f,
+        None => return err_json("invalid_floor", "Current floor not found").into_response(),
+    };
+
+    // Find the puzzle
+    let puzzle = match floor.simultaneous_puzzles.iter_mut().find(|p| p.id == req.puzzle_id) {
+        Some(p) => p,
+        None => return err_json("puzzle_not_found", "No such puzzle on this floor").into_response(),
+    };
+
+    if puzzle.solved {
+        return err_json("already_solved", "Puzzle already solved").into_response();
+    }
+
+    // Find the activation point in the given room
+    let point = match puzzle.activation_points.iter_mut().find(|ap| ap.room_id == req.room_id) {
+        Some(p) => p,
+        None => return err_json("no_point", "No activation point in that room for this puzzle").into_response(),
+    };
+
+    if point.activated_by.is_some() {
+        return err_json("already_activated", "This point is already activated").into_response();
+    }
+
+    // Activate it
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    point.activated_by = Some(adventure.character.name.clone());
+    point.activated_at = Some(now);
+
+    // Check if all points are activated within the timer window
+    let activated: Vec<u64> = puzzle.activation_points.iter()
+        .filter_map(|ap| ap.activated_at)
+        .collect();
+    let all_activated = activated.len() >= puzzle.required_count as usize;
+    let within_window = if all_activated && activated.len() >= 2 {
+        let min_t = activated.iter().min().unwrap();
+        let max_t = activated.iter().max().unwrap();
+        (max_t - min_t) <= puzzle.timer_window_ms as u64
+    } else {
+        all_activated // single point = always within window
+    };
+
+    let solved = all_activated && within_window;
+    if solved {
+        puzzle.solved = true;
+    }
+    let required_count = puzzle.required_count;
+    let activated_count = activated.len();
+
+    store.save_adventure(&adventure).ok();
+
+    Json(serde_json::json!({
+        "result": if solved { "puzzle_solved" } else { "point_activated" },
+        "puzzle_id": req.puzzle_id,
+        "activated_count": activated_count,
+        "required_count": required_count,
+        "solved": solved,
+    })).into_response()
+}
+
+async fn dungeon_retreat(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    if adventure.dungeon.is_none() {
+        return err_json("not_in_dungeon", "Not currently in a dungeon").into_response();
+    }
+
+    if adventure.combat.active {
+        return err_json("in_combat", "Cannot retreat while in combat. Flee first.").into_response();
+    }
+
+    let dungeon_name = adventure.dungeon.as_ref().map(|d| d.name.clone()).unwrap_or_default();
+    adventure.dungeon = None;
+    store.save_adventure(&adventure).ok();
+
+    Json(serde_json::json!({
+        "result": "retreated",
+        "message": format!("You retreat from {}.", dungeon_name),
+    })).into_response()
+}
+
+async fn dungeon_status(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match &adventure.dungeon {
+        Some(d) => d,
+        None => return Json(serde_json::json!({
+            "in_dungeon": false,
+        })).into_response(),
+    };
+
+    let room = dungeon.current_room();
+    let floor = dungeon.current_floor();
+
+    Json(serde_json::json!({
+        "in_dungeon": true,
+        "name": dungeon.name,
+        "tier": dungeon.tier,
+        "seed": dungeon.seed,
+        "total_floors": dungeon.floors.len(),
+        "current_floor": dungeon.current_floor,
+        "current_room": dungeon.current_room,
+        "room": room.map(|r| serde_json::json!({
+            "id": r.id,
+            "name": r.name,
+            "type": format!("{}", r.room_type),
+            "description": r.description,
+            "discovered": r.discovered,
+            "cleared": r.cleared,
+            "has_enemies": !r.enemies.is_empty() && !r.cleared,
+            "has_trap": r.trap.is_some() && !r.cleared,
+            "exits": r.exits.iter().map(|e| serde_json::json!({
+                "direction": e.direction,
+                "locked": e.locked,
+                "target_floor": e.target_floor,
+            })).collect::<Vec<_>>(),
+            "treasure": {
+                "gold": r.treasure.gold,
+                "items": r.treasure.item_ids,
+            },
+        })),
+        "floor": floor.map(|f| serde_json::json!({
+            "level": f.level,
+            "rooms_total": f.rooms.len(),
+            "rooms_discovered": f.rooms.iter().filter(|r| r.discovered).count(),
+            "rooms_cleared": f.rooms.iter().filter(|r| r.cleared).count(),
+            "skill_gates": f.skill_gates.iter().map(|g| serde_json::json!({
+                "room_id": g.room_id,
+                "exit_index": g.exit_index,
+                "skill": g.required_skill,
+                "rank": g.required_rank,
+                "dc": g.dc,
+            })).collect::<Vec<_>>(),
+            "puzzles": f.simultaneous_puzzles.iter().map(|p| serde_json::json!({
+                "id": p.id,
+                "required_count": p.required_count,
+                "timer_window_ms": p.timer_window_ms,
+                "solved": p.solved,
+                "activated": p.activation_points.iter().filter(|ap| ap.activated_by.is_some()).count(),
+            })).collect::<Vec<_>>(),
+            "corruption_enabled": f.corruption_enabled,
+            "corruption_rate": f.corruption_rate,
+            "split_paths": f.split_paths.as_ref().map(|sp| serde_json::json!({
+                "path_count": sp.paths.len(),
+                "convergence_room": sp.convergence_room,
+                "unlocked": sp.unlocked,
+                "paths": sp.paths.iter().map(|p| serde_json::json!({
+                    "entry_room": p.entry_room,
+                    "rooms": p.rooms,
+                    "mini_boss_room": p.mini_boss_room,
+                    "cleared": p.cleared,
+                })).collect::<Vec<_>>(),
+            })),
+        })),
+    })).into_response()
+}
+
+// ---------------------------------------------------------------------------
+// Tower endpoints
+// ---------------------------------------------------------------------------
+
+async fn tower_list() -> impl IntoResponse {
+    let towers = tower_definitions();
+    Json(serde_json::json!({
+        "towers": towers.iter().map(|t| serde_json::json!({
+            "id": t.id,
+            "name": t.name,
+            "base_tier": t.base_tier,
+            "entry_skill_rank": t.entry_skill_rank,
+            "description": t.description,
+        })).collect::<Vec<_>>(),
+    })).into_response()
+}
+
+async fn tower_floor_status(
+    Path((tower_id, floor_num)): Path<(String, u32)>,
+) -> impl IntoResponse {
+    let towers = tower_definitions();
+    let tower = match towers.iter().find(|t| t.id == tower_id) {
+        Some(t) => t,
+        None => return err_not_found("Tower not found").into_response(),
+    };
+
+    let floor = generate_floor(tower, floor_num);
+    let summary = floor_summary(&floor);
+
+    Json(serde_json::json!({
+        "tower": tower.name,
+        "floor": summary,
+        "guard_floor": floor.guard_floor,
+        "guard_tier": floor.guard_tier,
+        "skill_gates": floor.skill_gates.len(),
+        "boss_killed": floor.boss_killed,
+        "first_clear_claimed": floor.first_clear_claimed,
+    })).into_response()
+}
+
+#[derive(Deserialize)]
+struct TowerEnterRequest {
+    tower_id: String,
+}
+
+async fn tower_enter(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<TowerEnterRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    if adventure.dungeon.is_some() {
+        return err_json("already_in_dungeon", "Already in a dungeon/tower. Leave first.").into_response();
+    }
+
+    let towers = tower_definitions();
+    let tower = match towers.iter().find(|t| t.id == req.tower_id) {
+        Some(t) => t,
+        None => return err_not_found("Tower not found").into_response(),
+    };
+
+    // Check entry requirement
+    let max_rank = adventure.skills.skills.iter().map(|s| s.rank).max().unwrap_or(0);
+    if !meets_entry_requirement(tower, max_rank) {
+        return err_json("entry_denied",
+            &format!("{} requires at least one skill at rank {}. Your highest is rank {}.",
+                tower.name, tower.entry_skill_rank, max_rank)
+        ).into_response();
+    }
+
+    // Generate floor 0 as a dungeon (using tower seed for determinism)
+    let floor = generate_floor(tower, 0);
+    let tier = floor.tier.round() as u32;
+
+    // Create a dungeon representation from the tower floor
+    let dungeon = generate_tiered_dungeon(tower.seed, tier);
+    let mut tower_dungeon = dungeon;
+    tower_dungeon.name = format!("{} — Floor 0", tower.name);
+
+    adventure.dungeon = Some(tower_dungeon);
+    store.save_adventure(&adventure).ok();
+
+    Json(serde_json::json!({
+        "result": "tower_entered",
+        "tower": tower.name,
+        "floor": 0,
+        "tier": format!("{:.1}", floor.tier),
+        "guard_floor": floor.guard_floor,
+    })).into_response()
+}
+
+#[derive(Deserialize)]
+struct TowerMoveRequest {
+    direction: String,
+}
+
+async fn tower_move(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<TowerMoveRequest>,
+) -> impl IntoResponse {
+    // Tower move is the same as dungeon move
+    dungeon_move(
+        Extension(user),
+        State(state),
+        Path(id),
+        Json(DungeonMoveRequest { direction: req.direction }),
+    ).await
+}
+
+async fn tower_ascend(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match adventure.dungeon.as_ref() {
+        Some(d) => d,
+        None => return err_json("not_in_tower", "Not currently in a tower").into_response(),
+    };
+
+    // Check if current room has a Descend exit (stairs to next floor)
+    let room = match dungeon.current_room() {
+        Some(r) => r,
+        None => return err_json("invalid_room", "Current room not found").into_response(),
+    };
+
+    let has_stairs = room.exits.iter().any(|e| e.direction == "Descend");
+    if !has_stairs {
+        return err_json("no_stairs", "No stairs to ascend from this room").into_response();
+    }
+
+    // Move to the next floor via Descend
+    let dungeon = adventure.dungeon.as_mut().unwrap();
+    match dungeon.move_to_room("Descend") {
+        Ok(result) => {
+            store.save_adventure(&adventure).ok();
+            Json(serde_json::json!({
+                "result": "ascended",
+                "floor": result.floor,
+                "room": {
+                    "name": result.room_name,
+                    "type": format!("{}", result.room_type),
+                    "description": result.description,
+                    "exits": result.exits,
+                },
+            })).into_response()
+        }
+        Err(e) => err_json("ascend_failed", &e).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct TowerCheckpointRequest {
+    floor: u32,
+}
+
+async fn tower_checkpoint(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(_req): Json<TowerCheckpointRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let dungeon = match &adventure.dungeon {
+        Some(d) => d,
+        None => return err_json("not_in_tower", "Not currently in a tower").into_response(),
+    };
+
+    // Verify we're on a guard floor (every 10 floors)
+    let current_floor = dungeon.current_floor as u32;
+    if current_floor == 0 || current_floor % 10 != 0 {
+        return err_json("not_guard_floor", "Can only attune to checkpoints on guard floors (every 10 floors)").into_response();
+    }
+
+    // In a full implementation this would save checkpoint to player state.
+    // For now, acknowledge the attunement.
+    Json(serde_json::json!({
+        "result": "checkpoint_attuned",
+        "floor": current_floor,
+        "teleport_cost": checkpoint_teleport_cost(current_floor),
+    })).into_response()
+}
+
+#[derive(Deserialize)]
+struct TowerTeleportRequest {
+    target_floor: u32,
+}
+
+async fn tower_teleport(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<TowerTeleportRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    if adventure.dungeon.is_none() {
+        return err_json("not_in_tower", "Not currently in a tower").into_response();
+    }
+
+    let cost = checkpoint_teleport_cost(req.target_floor);
+    if adventure.character.gold < cost {
+        return err_json("insufficient_gold",
+            &format!("Need {} gold to teleport to floor {}. You have {}.",
+                cost, req.target_floor, adventure.character.gold)
+        ).into_response();
+    }
+
+    // In a full implementation, deduct gold and move to the target floor.
+    // For now, return the cost and acknowledge.
+    Json(serde_json::json!({
+        "result": "teleport_available",
+        "target_floor": req.target_floor,
+        "cost": cost,
+        "player_gold": adventure.character.gold,
+    })).into_response()
+}
+
 
 fn parse_race(s: &str) -> Race {
     match s.to_lowercase().as_str() {
