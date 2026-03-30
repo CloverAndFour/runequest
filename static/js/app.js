@@ -125,6 +125,12 @@ function handleServerMsg(msg) {
         case 'older_history':
             prependOlderHistory(msg.entries, msg.has_more);
             break;
+        case 'recipe_list':
+            showCraftingPanel(msg.recipes);
+            break;
+        case 'craft_result':
+            showCraftResult(msg);
+            break;
         case 'narrative_chunk':
             appendNarrativeChunk(msg.text);
             break;
@@ -999,6 +1005,7 @@ function renderFixedActions() {
             if (current.has_tower) buttons.push({ label: 'Enter ' + (current.tower_name || 'Tower'), icon: '\u{1F3F0}', action: 'tower', type: 'tower' });
             if (current.has_exchange) buttons.push({ label: 'Exchange', icon: '\u{1FA99}', action: 'exchange', type: 'exchange' });
             if (current.has_guild_hall) buttons.push({ label: 'Guild Hall', icon: '\u2694', action: 'guild_hall', type: 'guild_hall' });
+            if (current.stations && current.stations.length > 0) buttons.push({ label: 'Craft', icon: '\uD83D\uDD28', action: 'open_crafting', type: 'crafting' });
             // Gather is always available — every biome has resources
             buttons.push({ label: 'Gather Resources', icon: '\u{1FAB5}', action: 'gather', type: 'gather' });
         }
@@ -1047,7 +1054,7 @@ function renderFixedActions() {
 }
 
 function handleFixedAction(action, type) {
-    var mechanical = (type === "gather" || type === "shop");
+    var mechanical = (type === "gather" || type === "shop" || type === "crafting");
     if (mechanical) {
         document.querySelectorAll('.fixed-choices-section, .choices-separator').forEach(function(el) { el.remove(); });
     } else {
@@ -1071,6 +1078,8 @@ function handleFixedAction(action, type) {
     } else if (type === 'gather') {
         showLoadingSpinner();
         ws.send({ type: 'gather' });
+    } else if (type === 'crafting') {
+        ws.send({ type: 'list_recipes' });
     } else if (type === 'guild_hall') {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Visit the guild hall' });
@@ -1079,6 +1088,103 @@ function handleFixedAction(action, type) {
         showLoadingSpinner();
         ws.send({ type: 'send_message', content: 'Talk to ' + npcName });
     }
+}
+
+function showCraftingPanel(recipes) {
+    var storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    // Remove any existing crafting panel
+    var existing = storyContent.querySelector('.crafting-panel');
+    if (existing) existing.remove();
+
+    var panel = document.createElement('div');
+    panel.className = 'crafting-panel';
+
+    // Get station names at current location
+    var stations = (gameState && gameState.map_view && gameState.map_view.current && gameState.map_view.current.stations) || [];
+    var stationNames = stations.map(function(s) { return s.name; }).join(', ');
+
+    var html = '<div class="crafting-header"><strong>\uD83D\uDD28 Crafting</strong>';
+    if (stationNames) html += ' <span style="font-size:12px;color:var(--text-muted)">(' + escapeHtml(stationNames) + ')</span>';
+    html += '<button class="crafting-close" style="float:right;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">\u2715</button></div>';
+
+    if (!recipes || recipes.length === 0) {
+        html += '<p style="color:var(--text-muted);padding:8px">No recipes available here. You may need higher skill ranks or different stations.</p>';
+    } else {
+        html += '<div class="recipe-list">';
+        recipes.forEach(function(r) {
+            var mats = (r.inputs || []).map(function(inp) {
+                return (inp.quantity || 1) + 'x ' + (inp.name || inp.material_id);
+            }).join(', ');
+            var canCraft = r.can_craft !== false;
+            var reason = r.reason || '';
+            html += '<div class="recipe-item' + (canCraft ? '' : ' recipe-locked') + '">';
+            html += '<div class="recipe-name">' + escapeHtml(r.name || r.recipe_id) + ' <span class="recipe-tier">T' + (r.tier || '?') + '</span></div>';
+            html += '<div class="recipe-mats" style="font-size:12px;color:var(--text-muted)">' + escapeHtml(mats) + ' \u2192 ' + escapeHtml(r.output_name || r.output || '?') + '</div>';
+            if (r.skill) html += '<div class="recipe-skill" style="font-size:11px;color:var(--text-muted)">' + escapeHtml(r.skill) + ' (rank ' + (r.min_rank || '?') + '+)</div>';
+            if (!canCraft && reason) html += '<div class="recipe-reason" style="font-size:11px;color:#c44">' + escapeHtml(reason) + '</div>';
+            if (canCraft) html += '<button class="choice-btn craft-btn" data-recipe="' + escapeHtml(r.recipe_id || r.id) + '" style="margin-top:4px;padding:4px 12px;font-size:12px">Craft</button>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    panel.innerHTML = html;
+
+    // Insert before choices
+    var choicesAnchor = storyContent.querySelector('.fixed-choices-section') ||
+                        storyContent.querySelector('.llm-choices-section');
+    if (choicesAnchor) {
+        storyContent.insertBefore(panel, choicesAnchor);
+    } else {
+        storyContent.appendChild(panel);
+    }
+    storyContent.scrollTop = storyContent.scrollHeight;
+
+    // Wire up close button
+    panel.querySelector('.crafting-close').addEventListener('click', function() {
+        panel.remove();
+    });
+
+    // Wire up craft buttons
+    panel.querySelectorAll('.craft-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btn.disabled = true;
+            btn.textContent = 'Crafting...';
+            ws.send({ type: 'craft_item', recipe_id: btn.dataset.recipe });
+        });
+    });
+}
+
+function showCraftResult(msg) {
+    var storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+
+    // Remove crafting panel
+    var panel = storyContent.querySelector('.crafting-panel');
+    if (panel) panel.remove();
+
+    var div = document.createElement('div');
+    div.className = 'narrative-block craft-result';
+    var text = '\uD83D\uDD28 Crafted: ' + escapeHtml(msg.output || 'item');
+    if (msg.quantity > 1) text += ' x' + msg.quantity;
+    if (msg.skill_progress) {
+        var sp = msg.skill_progress;
+        if (sp.skill) text += ' \u2014 ' + sp.skill;
+        if (sp.xp) text += ' +' + sp.xp + ' XP';
+        if (sp.rank_up) text += ' (Rank up!)';
+    }
+    div.innerHTML = '<p>' + text + '</p>';
+
+    var choicesAnchor = storyContent.querySelector('.fixed-choices-section') ||
+                        storyContent.querySelector('.llm-choices-section');
+    if (choicesAnchor) {
+        storyContent.insertBefore(div, choicesAnchor);
+    } else {
+        storyContent.appendChild(div);
+    }
+    storyContent.scrollTop = storyContent.scrollHeight;
+    renderFixedActions();
 }
 
 init();

@@ -337,3 +337,44 @@
     word-break: break-all;
     user-select: all;
 }
+
+/* Crafting panel */
+.crafting-panel {
+    background: var(--bg-darker, #1a1a2e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
+}
+.crafting-header {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+.recipe-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.recipe-item {
+    background: var(--bg-card, #16213e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    padding: 8px;
+}
+.recipe-item.recipe-locked {
+    opacity: 0.5;
+}
+.recipe-name {
+    font-weight: bold;
+}
+.recipe-tier {
+    font-size: 11px;
+    color: var(--text-gold, #c8a84e);
+}
+.craft-result {
+    border-left: 3px solid var(--text-gold, #c8a84e);
+    padding-left: 8px;
+}
