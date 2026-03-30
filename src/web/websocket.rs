@@ -24,13 +24,24 @@ use crate::llm::types::*;
 use crate::storage::adventure_store::{AdventureStore, DisplayEvent, HistoryMessage};
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 use crate::engine::combat::CombatantId;
-use crate::web::protocol::{ActionInfo, ClientMsg, EnemyInfo, InitiativeInfo, ServerMsg};
+use crate::web::protocol::{ActionInfo, ChatMessageInfo, ClientMsg, EnemyInfo, FriendInfoMsg, FriendRequestInfo, InitiativeInfo, ServerMsg};
+use crate::web::presence::{FriendEvent, PresenceRegistry};
+use crate::storage::friends_store::FriendsStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
     "grok-4-1-fast-non-reasoning",
 ];
+
+fn generate_friend_code(username: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    username.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("{:06}", hash % 1_000_000)
+}
 
 struct Session {
     username: String,
@@ -72,10 +83,15 @@ pub async fn handle_socket(
     data_dir: std::path::PathBuf,
     default_model: String,
     shop_store: ShopStore,
+    presence: PresenceRegistry,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let store = AdventureStore::new(&data_dir, &user.username);
     let usage_logger = UsageLogger::new(&data_dir);
+
+    let friends_store = FriendsStore::new(&data_dir);
+    let friend_code = generate_friend_code(&user.username);
+    let mut friend_rx = presence.connect(user.username.clone(), friend_code.clone()).await;
 
     let session = Arc::new(Mutex::new(Session {
         username: user.username.clone(),
@@ -89,6 +105,20 @@ pub async fn handle_socket(
         session_cost: SessionCost::new(),
         precomputed: None,
     }));
+
+    // Broadcast presence to friends
+    {
+        let data = friends_store.load(&user.username).unwrap_or_default();
+        let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+        presence.broadcast_to_friends(&friend_names, FriendEvent::FriendPresence {
+            username: user.username.clone(),
+            friend_code: friend_code.clone(),
+            online: true,
+            character_name: None,
+            character_class: None,
+            location: None,
+        }).await;
+    }
 
     let connected = ServerMsg::Connected {
         username: user.username.clone(),
@@ -106,39 +136,86 @@ pub async fn handle_socket(
         .send(Message::Text(serde_json::to_string(&model_info).unwrap().into()))
         .await;
 
-    while let Some(Ok(msg)) = receiver.next().await {
-        let text = match msg {
-            Message::Text(t) => t.to_string(),
-            Message::Close(_) => break,
-            _ => continue,
-        };
+    loop {
+        tokio::select! {
+            ws_msg = receiver.next() => {
+                match ws_msg {
+                    Some(Ok(msg)) => {
+                        let text = match msg {
+                            Message::Text(t) => t.to_string(),
+                            Message::Close(_) => break,
+                            _ => continue,
+                        };
 
-        let client_msg: ClientMsg = match serde_json::from_str(&text) {
-            Ok(m) => m,
-            Err(e) => {
-                let err = ServerMsg::Error {
-                    code: "parse_error".to_string(),
-                    message: format!("Invalid message: {}", e),
-                };
-                let _ = sender
-                    .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
-                    .await;
-                continue;
+                        let client_msg: ClientMsg = match serde_json::from_str(&text) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                let err = ServerMsg::Error {
+                                    code: "parse_error".to_string(),
+                                    message: format!("Invalid message: {}", e),
+                                };
+                                let _ = sender
+                                    .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
+                                    .await;
+                                continue;
+                            }
+                        };
+
+                        let response = handle_client_msg(
+                            client_msg, &session, &xai_client, &mut sender,
+                            &shop_store, &friends_store, &presence,
+                        ).await;
+
+                        if let Err(e) = response {
+                            let err = ServerMsg::Error {
+                                code: "internal_error".to_string(),
+                                message: e.to_string(),
+                            };
+                            let _ = sender
+                                .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
+                                .await;
+                        }
+                    }
+                    _ => break,
+                }
             }
-        };
-
-        let response = handle_client_msg(client_msg, &session, &xai_client, &mut sender, &shop_store).await;
-
-        if let Err(e) = response {
-            let err = ServerMsg::Error {
-                code: "internal_error".to_string(),
-                message: e.to_string(),
-            };
-            let _ = sender
-                .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
-                .await;
+            event = friend_rx.recv() => {
+                if let Ok(event) = event {
+                    let server_msg = match event {
+                        FriendEvent::FriendPresence { username, friend_code: _, online, character_name, character_class, location } => {
+                            ServerMsg::FriendPresence { username, online, character_name, character_class, location }
+                        }
+                        FriendEvent::FriendChat { from, text, ts } => {
+                            ServerMsg::FriendChat { from, text, ts }
+                        }
+                        FriendEvent::FriendRequestReceived { from_username, from_tag } => {
+                            ServerMsg::FriendRequestReceived { from_username, from_tag }
+                        }
+                        FriendEvent::FriendRequestAccepted { username, friend_code } => {
+                            ServerMsg::FriendRequestAccepted { username, friend_code }
+                        }
+                        _ => continue,
+                    };
+                    send_msg(&mut sender, &server_msg).await;
+                }
+            }
         }
     }
+
+    // Disconnect: broadcast offline presence to friends
+    {
+        let data = friends_store.load(&user.username).unwrap_or_default();
+        let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+        presence.broadcast_to_friends(&friend_names, FriendEvent::FriendPresence {
+            username: user.username.clone(),
+            friend_code: friend_code.clone(),
+            online: false,
+            character_name: None,
+            character_class: None,
+            location: None,
+        }).await;
+    }
+    presence.disconnect(&user.username).await;
 }
 
 async fn send_msg(
@@ -184,6 +261,8 @@ async fn handle_client_msg(
     xai_client: &Arc<XaiClient>,
     sender: &mut (impl SinkExt<Message, Error = axum::Error> + Unpin),
     shop_store: &ShopStore,
+    friends_store: &FriendsStore,
+    presence: &PresenceRegistry,
 ) -> anyhow::Result<()> {
     match msg {
         ClientMsg::ViewShop => {
@@ -333,10 +412,47 @@ async fn handle_client_msg(
                                     "description": result.description, "has_enemies": result.has_enemies,
                                     "has_trap": result.has_trap, "exits": result.exits,
                                 });
+
+                                // Trigger combat if the room has enemies
+                                let trigger_combat = result.has_enemies;
+                                if trigger_combat {
+                                    let enemies: Vec<crate::engine::combat::Enemy> = {
+                                        let room = dungeon.current_room().unwrap();
+                                        room.enemies.iter().map(|t| t.to_enemy()).collect()
+                                    };
+                                    if let Some(room) = dungeon.current_room_mut() {
+                                        room.cleared = true;
+                                    }
+                                    let dex_mod = adv.character.stats.modifier_for("dex").unwrap_or(0);
+                                    adv.combat.start(enemies, dex_mod);
+                                }
+
                                 sess.store.save_adventure(&adv).ok();
                                 send_msg(sender, &ServerMsg::DungeonRoomChanged { room: room_json, floor: result.floor, room_id: result.room_id }).await;
+
+                                if trigger_combat {
+                                    let init_order: Vec<InitiativeInfo> = adv.combat.initiative.iter().map(|e| {
+                                        InitiativeInfo {
+                                            name: e.name.clone(),
+                                            roll: e.roll,
+                                            is_player: e.combatant == CombatantId::Player,
+                                        }
+                                    }).collect();
+                                    send_msg(sender, &ServerMsg::CombatStarted {
+                                        initiative_order: init_order,
+                                        round: adv.combat.round,
+                                    }).await;
+                                }
+
                                 let state = build_state_with_map(&adv);
                                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+
+                                if trigger_combat {
+                                    sess.adventure = Some(adv);
+                                    drop(sess);
+                                    handle_combat_turn_start(session, sender).await?;
+                                    return Ok(());
+                                }
                             }
                             Err(e) => {
                                 send_msg(sender, &ServerMsg::Error { code: "move_failed".into(), message: e }).await;
@@ -547,8 +663,43 @@ async fn handle_client_msg(
                                 "description": result.description, "has_enemies": result.has_enemies,
                                 "exits": result.exits,
                             });
+
+                            // Trigger combat if the room has enemies
+                            let trigger_combat = result.has_enemies;
+                            if trigger_combat {
+                                let enemies: Vec<crate::engine::combat::Enemy> = {
+                                    let room = dungeon.current_room().unwrap();
+                                    room.enemies.iter().map(|t| t.to_enemy()).collect()
+                                };
+                                if let Some(room) = dungeon.current_room_mut() {
+                                    room.cleared = true;
+                                }
+                                let dex_mod = adv.character.stats.modifier_for("dex").unwrap_or(0);
+                                adv.combat.start(enemies, dex_mod);
+                            }
+
                             sess.store.save_adventure(&adv).ok();
                             send_msg(sender, &ServerMsg::DungeonRoomChanged { room: room_json, floor: result.floor, room_id: result.room_id }).await;
+
+                            if trigger_combat {
+                                let init_order: Vec<InitiativeInfo> = adv.combat.initiative.iter().map(|e| {
+                                    InitiativeInfo {
+                                        name: e.name.clone(),
+                                        roll: e.roll,
+                                        is_player: e.combatant == CombatantId::Player,
+                                    }
+                                }).collect();
+                                send_msg(sender, &ServerMsg::CombatStarted {
+                                    initiative_order: init_order,
+                                    round: adv.combat.round,
+                                }).await;
+                                let state = build_state_with_map(&adv);
+                                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                                sess.adventure = Some(adv);
+                                drop(sess);
+                                handle_combat_turn_start(session, sender).await?;
+                                return Ok(());
+                            }
                         }
                         Err(e) => send_msg(sender, &ServerMsg::Error { code: "move_failed".into(), message: e }).await,
                     }
@@ -1176,6 +1327,229 @@ async fn handle_client_msg(
                     message: "Failed to unequip item".to_string(),
                 }).await;
             }
+        }
+
+        // ----- Friends -----
+        ClientMsg::GetFriends => {
+            let username = session.lock().await.username.clone();
+            let data = friends_store.load(&username).unwrap_or_default();
+            let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+            let bulk_presence = presence.get_bulk(&friend_names).await;
+
+            let friends: Vec<FriendInfoMsg> = bulk_presence.iter().map(|(name, entry)| {
+                FriendInfoMsg {
+                    username: name.clone(),
+                    friend_code: generate_friend_code(name),
+                    online: entry.is_some(),
+                    character_name: entry.as_ref().and_then(|e| e.character_name.clone()),
+                    character_class: entry.as_ref().and_then(|e| e.character_class.clone()),
+                    location: entry.as_ref().and_then(|e| e.location.clone()),
+                }
+            }).collect();
+
+            let incoming: Vec<FriendRequestInfo> = data.incoming_requests.iter().map(|u| {
+                FriendRequestInfo {
+                    username: u.clone(),
+                    friend_code: generate_friend_code(u),
+                }
+            }).collect();
+
+            let outgoing: Vec<String> = data.outgoing_requests.iter().cloned().collect();
+
+            send_msg(sender, &ServerMsg::FriendsList { friends, incoming_requests: incoming, outgoing_requests: outgoing }).await;
+        }
+
+        ClientMsg::GetFriendCode => {
+            let username = session.lock().await.username.clone();
+            let code = generate_friend_code(&username);
+            send_msg(sender, &ServerMsg::FriendCode { tag: format!("{}#{}", username, code) }).await;
+        }
+
+        ClientMsg::SendFriendRequest { friend_tag } => {
+            let username = session.lock().await.username.clone();
+
+            // Parse "username#code"
+            let parts: Vec<&str> = friend_tag.splitn(2, '#').collect();
+            if parts.len() != 2 {
+                send_msg(sender, &ServerMsg::FriendRequestSent {
+                    success: false,
+                    message: "Invalid friend tag format. Use username#code".to_string(),
+                }).await;
+                return Ok(());
+            }
+
+            let target_username = parts[0];
+            let target_code = parts[1];
+
+            if target_username == username {
+                send_msg(sender, &ServerMsg::FriendRequestSent {
+                    success: false,
+                    message: "You cannot add yourself as a friend.".to_string(),
+                }).await;
+                return Ok(());
+            }
+
+            let expected_code = generate_friend_code(target_username);
+            if target_code != expected_code {
+                send_msg(sender, &ServerMsg::FriendRequestSent {
+                    success: false,
+                    message: "Invalid friend code.".to_string(),
+                }).await;
+                return Ok(());
+            }
+
+            if let Err(e) = friends_store.send_request(&username, target_username) {
+                send_msg(sender, &ServerMsg::FriendRequestSent {
+                    success: false,
+                    message: format!("Failed to send request: {}", e),
+                }).await;
+                return Ok(());
+            }
+
+            send_msg(sender, &ServerMsg::FriendRequestSent {
+                success: true,
+                message: format!("Friend request sent to {}", target_username),
+            }).await;
+
+            // Notify target if online
+            let my_code = generate_friend_code(&username);
+            presence.send_to(target_username, FriendEvent::FriendRequestReceived {
+                from_username: username.clone(),
+                from_tag: format!("{}#{}", username, my_code),
+            }).await;
+        }
+
+        ClientMsg::AcceptFriendRequest { username: from } => {
+            let my_username = session.lock().await.username.clone();
+
+            match friends_store.accept_request(&my_username, &from) {
+                Ok(true) => {
+                    // Notify the requester if online
+                    let my_code = generate_friend_code(&my_username);
+                    presence.send_to(&from, FriendEvent::FriendRequestAccepted {
+                        username: my_username.clone(),
+                        friend_code: my_code,
+                    }).await;
+
+                    // Send updated friends list to self
+                    let data = friends_store.load(&my_username).unwrap_or_default();
+                    let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+                    let bulk = presence.get_bulk(&friend_names).await;
+                    let friends: Vec<FriendInfoMsg> = bulk.iter().map(|(name, entry)| {
+                        FriendInfoMsg {
+                            username: name.clone(),
+                            friend_code: generate_friend_code(name),
+                            online: entry.is_some(),
+                            character_name: entry.as_ref().and_then(|e| e.character_name.clone()),
+                            character_class: entry.as_ref().and_then(|e| e.character_class.clone()),
+                            location: entry.as_ref().and_then(|e| e.location.clone()),
+                        }
+                    }).collect();
+                    let incoming: Vec<FriendRequestInfo> = data.incoming_requests.iter().map(|u| {
+                        FriendRequestInfo { username: u.clone(), friend_code: generate_friend_code(u) }
+                    }).collect();
+                    let outgoing: Vec<String> = data.outgoing_requests.iter().cloned().collect();
+                    send_msg(sender, &ServerMsg::FriendsList { friends, incoming_requests: incoming, outgoing_requests: outgoing }).await;
+                }
+                Ok(false) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "no_request".to_string(),
+                        message: "No pending friend request from that user.".to_string(),
+                    }).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "accept_failed".to_string(),
+                        message: format!("Failed to accept: {}", e),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::DeclineFriendRequest { username: from } => {
+            let my_username = session.lock().await.username.clone();
+            let _ = friends_store.decline_request(&my_username, &from);
+
+            // Send updated friends list
+            let data = friends_store.load(&my_username).unwrap_or_default();
+            let incoming: Vec<FriendRequestInfo> = data.incoming_requests.iter().map(|u| {
+                FriendRequestInfo { username: u.clone(), friend_code: generate_friend_code(u) }
+            }).collect();
+            let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+            let bulk = presence.get_bulk(&friend_names).await;
+            let friends: Vec<FriendInfoMsg> = bulk.iter().map(|(name, entry)| {
+                FriendInfoMsg {
+                    username: name.clone(),
+                    friend_code: generate_friend_code(name),
+                    online: entry.is_some(),
+                    character_name: entry.as_ref().and_then(|e| e.character_name.clone()),
+                    character_class: entry.as_ref().and_then(|e| e.character_class.clone()),
+                    location: entry.as_ref().and_then(|e| e.location.clone()),
+                }
+            }).collect();
+            let outgoing: Vec<String> = data.outgoing_requests.iter().cloned().collect();
+            send_msg(sender, &ServerMsg::FriendsList { friends, incoming_requests: incoming, outgoing_requests: outgoing }).await;
+        }
+
+        ClientMsg::RemoveFriend { username: friend } => {
+            let my_username = session.lock().await.username.clone();
+            let _ = friends_store.remove_friend(&my_username, &friend);
+            send_msg(sender, &ServerMsg::FriendRemoved { username: friend }).await;
+        }
+
+        ClientMsg::SendChat { to, text } => {
+            let my_username = session.lock().await.username.clone();
+
+            // Verify they are friends
+            let data = friends_store.load(&my_username).unwrap_or_default();
+            if !data.friends.contains(&to) {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "not_friends".to_string(),
+                    message: "You can only chat with friends.".to_string(),
+                }).await;
+                return Ok(());
+            }
+
+            match friends_store.append_chat(&my_username, &to, &text) {
+                Ok(chat_msg) => {
+                    let ts = chat_msg.ts.to_rfc3339();
+
+                    // Echo to sender
+                    send_msg(sender, &ServerMsg::FriendChatSent {
+                        from: my_username.clone(),
+                        text: text.clone(),
+                        ts: ts.clone(),
+                    }).await;
+
+                    // Push to recipient if online
+                    presence.send_to(&to, FriendEvent::FriendChat {
+                        from: my_username,
+                        text,
+                        ts,
+                    }).await;
+                }
+                Err(e) => {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "chat_failed".to_string(),
+                        message: format!("Failed to send message: {}", e),
+                    }).await;
+                }
+            }
+        }
+
+        ClientMsg::GetChatHistory { friend, limit } => {
+            let my_username = session.lock().await.username.clone();
+
+            let messages = friends_store.load_chat(&my_username, &friend, limit)
+                .unwrap_or_default();
+
+            let msgs: Vec<ChatMessageInfo> = messages.iter().map(|m| ChatMessageInfo {
+                from: m.from.clone(),
+                text: m.text.clone(),
+                ts: m.ts.to_rfc3339(),
+            }).collect();
+
+            send_msg(sender, &ServerMsg::FriendChatHistory { friend, messages: msgs }).await;
         }
     }
 

@@ -121,6 +121,30 @@ pub enum ClientMsg {
         tower_id: String,
         floor: u32,
     },
+    // Friends
+    GetFriends,
+    GetFriendCode,
+    SendFriendRequest {
+        friend_tag: String,
+    },
+    AcceptFriendRequest {
+        username: String,
+    },
+    DeclineFriendRequest {
+        username: String,
+    },
+    RemoveFriend {
+        username: String,
+    },
+    SendChat {
+        to: String,
+        text: String,
+    },
+    GetChatHistory {
+        friend: String,
+        #[serde(default = "default_chat_limit")]
+        limit: usize,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -369,6 +393,51 @@ pub enum ServerMsg {
         #[serde(default)]
         conditions_removed: Vec<String>,
     },
+    // Friends
+    FriendCode {
+        tag: String,
+    },
+    FriendsList {
+        friends: Vec<FriendInfoMsg>,
+        incoming_requests: Vec<FriendRequestInfo>,
+        outgoing_requests: Vec<String>,
+    },
+    FriendPresence {
+        username: String,
+        online: bool,
+        character_name: Option<String>,
+        character_class: Option<String>,
+        location: Option<String>,
+    },
+    FriendRequestReceived {
+        from_username: String,
+        from_tag: String,
+    },
+    FriendRequestAccepted {
+        username: String,
+        friend_code: String,
+    },
+    FriendRequestSent {
+        success: bool,
+        message: String,
+    },
+    FriendChat {
+        from: String,
+        text: String,
+        ts: String,
+    },
+    FriendChatSent {
+        from: String,
+        text: String,
+        ts: String,
+    },
+    FriendChatHistory {
+        friend: String,
+        messages: Vec<ChatMessageInfo>,
+    },
+    FriendRemoved {
+        username: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -414,4 +483,36 @@ pub struct ShopItemInfo {
     pub current_stock: u32,
     pub price_category: String,
     pub tier: u8,
+}
+
+fn default_chat_limit() -> usize { 50 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendInfoMsg {
+    pub username: String,
+    pub friend_code: String,
+    pub online: bool,
+    pub character_name: Option<String>,
+    pub character_class: Option<String>,
+    pub location: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendRequestInfo {
+    pub username: String,
+    pub friend_code: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ChatMessageInfo {
+    pub from: String,
+    pub text: String,
+    pub ts: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationPlayerInfo {
+    pub username: String,
+    pub character_name: String,
+    pub level: u32,
 }

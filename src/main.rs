@@ -6,6 +6,7 @@ use std::sync::Arc;
 use runequest::auth::{AuthMode, JwtManager, UserRole, UserStore};
 use runequest::storage::shop_store::ShopStore;
 use runequest::llm::client::XaiClient;
+use runequest::web::presence::PresenceRegistry;
 
 #[derive(Parser)]
 #[command(name = "runequest")]
@@ -38,7 +39,7 @@ enum Commands {
         #[arg(long, default_value = "2997", env = "RUNEQUEST_WIKI_PORT")]
         wiki_port: u16,
 
-        #[arg(long, default_value = "100.64.0.10", env = "RUNEQUEST_WIKI_BIND_ADDR")]
+        #[arg(long, default_value = "0.0.0.0", env = "RUNEQUEST_WIKI_BIND_ADDR")]
         wiki_bind_address: String,
 
         #[arg(long, default_value = "wiki", env = "RUNEQUEST_WIKI_DIR")]
@@ -100,6 +101,7 @@ async fn main() -> Result<()> {
             let jwt_manager = Arc::new(JwtManager::new(&base_path)?);
 
             let shop_store = ShopStore::new(&base_path);
+            let presence = PresenceRegistry::new();
 
             let auth_mode = if require_auth || user_store.has_users() {
                 AuthMode::Enabled
@@ -109,6 +111,8 @@ async fn main() -> Result<()> {
 
             let shop_store_web = shop_store.clone();
             let shop_store_api = shop_store.clone();
+            let presence_web = presence.clone();
+            let presence_api = presence.clone();
 
             let bind_addr_web = bind_address.clone();
             let bind_addr_api = bind_address.clone();
@@ -121,7 +125,7 @@ async fn main() -> Result<()> {
             let auth_mode_api = auth_mode.clone();
 
             let web_handle = tokio::spawn(async move {
-                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth, shop_store_web).await
+                runequest::web::run_server(port, &bind_addr_web, data_dir_web, require_auth, shop_store_web, presence_web).await
             });
 
             let api_handle = tokio::spawn(async move {
@@ -135,6 +139,7 @@ async fn main() -> Result<()> {
                     user_store_api,
                     jwt_api,
                     shop_store_api,
+                    presence_api,
                 )
                 .await
             });

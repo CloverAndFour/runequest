@@ -26,6 +26,8 @@ use crate::engine::tower::{tower_definitions, generate_floor, floor_summary, che
 use crate::engine::executor::{execute_tool_call, execute_tool_call_with_shop, ToolExecResult};
 use crate::storage::shop_store::ShopStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
+use crate::web::presence::PresenceRegistry;
+use crate::storage::friends_store::FriendsStore;
 use crate::llm::client::XaiClient;
 use crate::llm::pricing::{model_cost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
@@ -46,6 +48,7 @@ pub struct ApiState {
     pub user_store: Arc<UserStore>,
     pub jwt_manager: Arc<JwtManager>,
     pub shop_store: ShopStore,
+    pub presence: PresenceRegistry,
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +353,7 @@ pub async fn run_api_server(
     user_store: Arc<UserStore>,
     jwt_manager: Arc<JwtManager>,
     shop_store: ShopStore,
+    presence: PresenceRegistry,
 ) -> anyhow::Result<()> {
     let api_state = Arc::new(ApiState {
         data_dir,
@@ -359,6 +363,7 @@ pub async fn run_api_server(
         user_store,
         jwt_manager: jwt_manager.clone(),
         shop_store,
+        presence,
     });
 
     let auth_state = Arc::new(AuthState {
@@ -433,6 +438,15 @@ pub async fn run_api_server(
         .route("/api/adventures/:id/tower/teleport", post(tower_teleport))
         // Backgrounds
         .route("/api/backgrounds", get(list_backgrounds))
+        // Friends
+        .route("/api/friends", get(api_get_friends))
+        .route("/api/friends/code", get(api_get_friend_code))
+        .route("/api/friends/request", post(api_send_friend_request))
+        .route("/api/friends/accept", post(api_accept_friend_request))
+        .route("/api/friends/decline", post(api_decline_friend_request))
+        .route("/api/friends/remove", post(api_remove_friend))
+        .route("/api/friends/chat", post(api_send_friend_chat))
+        .route("/api/friends/chat/:username", get(api_get_friend_chat))
         .layer(axum_mw::from_fn_with_state(
             auth_state.clone(),
             require_auth,
@@ -2354,8 +2368,22 @@ async fn dungeon_move(
 
     match dungeon.move_to_room(&req.direction) {
         Ok(result) => {
+            // Trigger combat if the room has enemies
+            if result.has_enemies {
+                let enemies: Vec<Enemy> = {
+                    let room = dungeon.current_room().unwrap();
+                    room.enemies.iter().map(|t| t.to_enemy()).collect()
+                };
+                if let Some(room) = dungeon.current_room_mut() {
+                    room.cleared = true;
+                }
+                let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+                adventure.combat.start(enemies, dex_mod);
+                run_enemy_turns(&mut adventure);
+            }
+
             let response = serde_json::json!({
-                "result": "moved",
+                "result": if adventure.combat.active { "combat_started" } else { "moved" },
                 "room": {
                     "name": result.room_name,
                     "type": format!("{}", result.room_type),
@@ -2368,7 +2396,7 @@ async fn dungeon_move(
                 },
             });
             store.save_adventure(&adventure).ok();
-            Json(response).into_response()
+            Json(game_response(&adventure, Some(if adventure.combat.active { "Combat started!".to_string() } else { "Moved.".to_string() }), None, None)).into_response()
         }
         Err(e) => err_json("move_failed", &e).into_response(),
     }
@@ -2911,3 +2939,264 @@ fn parse_class(s: &str) -> Class {
         _ => Class::Warrior,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Friends endpoints
+// ---------------------------------------------------------------------------
+
+fn generate_friend_code(username: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    username.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("{:06}", hash % 1_000_000)
+}
+
+#[derive(Serialize)]
+struct ApiFriendCode {
+    tag: String,
+    username: String,
+    code: String,
+}
+
+#[derive(Serialize)]
+struct ApiFriendInfo {
+    username: String,
+    friend_code: String,
+    online: bool,
+    character_name: Option<String>,
+    character_class: Option<String>,
+    location: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ApiFriendRequest {
+    username: String,
+    friend_code: String,
+}
+
+#[derive(Serialize)]
+struct ApiFriendsResponse {
+    friends: Vec<ApiFriendInfo>,
+    incoming_requests: Vec<ApiFriendRequest>,
+    outgoing_requests: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct FriendTagRequest {
+    friend_tag: String,
+}
+
+#[derive(Deserialize)]
+struct FriendUsernameRequest {
+    username: String,
+}
+
+#[derive(Deserialize)]
+struct FriendChatRequest {
+    to: String,
+    text: String,
+}
+
+#[derive(Serialize)]
+struct ApiChatMsg {
+    from: String,
+    text: String,
+    ts: String,
+}
+
+#[derive(Serialize)]
+struct ApiChatHistoryResponse {
+    friend: String,
+    messages: Vec<ApiChatMsg>,
+}
+
+#[derive(Serialize)]
+struct ApiResult {
+    success: bool,
+    message: String,
+}
+
+async fn api_get_friend_code(
+    Extension(user): Extension<AuthUser>,
+) -> Json<ApiFriendCode> {
+    let code = generate_friend_code(&user.username);
+    Json(ApiFriendCode {
+        tag: format!("{}#{}", user.username, code),
+        username: user.username,
+        code,
+    })
+}
+
+async fn api_get_friends(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    let store = FriendsStore::new(&state.data_dir);
+    let data = match store.load(&user.username) {
+        Ok(d) => d,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
+    let friend_names: Vec<String> = data.friends.iter().cloned().collect();
+    let bulk = state.presence.get_bulk(&friend_names).await;
+
+    let friends: Vec<ApiFriendInfo> = bulk.iter().map(|(name, entry)| {
+        ApiFriendInfo {
+            username: name.clone(),
+            friend_code: generate_friend_code(name),
+            online: entry.is_some(),
+            character_name: entry.as_ref().and_then(|e| e.character_name.clone()),
+            character_class: entry.as_ref().and_then(|e| e.character_class.clone()),
+            location: entry.as_ref().and_then(|e| e.location.clone()),
+        }
+    }).collect();
+
+    let incoming: Vec<ApiFriendRequest> = data.incoming_requests.iter().map(|u| {
+        ApiFriendRequest { username: u.clone(), friend_code: generate_friend_code(u) }
+    }).collect();
+
+    let outgoing: Vec<String> = data.outgoing_requests.iter().cloned().collect();
+
+    Json(ApiFriendsResponse { friends, incoming_requests: incoming, outgoing_requests: outgoing }).into_response()
+}
+
+async fn api_send_friend_request(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<FriendTagRequest>,
+) -> impl IntoResponse {
+    let parts: Vec<&str> = req.friend_tag.splitn(2, '#').collect();
+    if parts.len() != 2 {
+        return Json(ApiResult { success: false, message: "Invalid format. Use username#code".into() });
+    }
+
+    let target = parts[0];
+    let code = parts[1];
+
+    if target == user.username {
+        return Json(ApiResult { success: false, message: "Cannot add yourself.".into() });
+    }
+
+    if code != generate_friend_code(target) {
+        return Json(ApiResult { success: false, message: "Invalid friend code.".into() });
+    }
+
+    let store = FriendsStore::new(&state.data_dir);
+    if let Err(e) = store.send_request(&user.username, target) {
+        return Json(ApiResult { success: false, message: format!("Failed: {}", e) });
+    }
+
+    let my_code = generate_friend_code(&user.username);
+    state.presence.send_to(target, crate::web::presence::FriendEvent::FriendRequestReceived {
+        from_username: user.username.clone(),
+        from_tag: format!("{}#{}", user.username, my_code),
+    }).await;
+
+    Json(ApiResult { success: true, message: format!("Request sent to {}", target) })
+}
+
+async fn api_accept_friend_request(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<FriendUsernameRequest>,
+) -> Json<ApiResult> {
+    let store = FriendsStore::new(&state.data_dir);
+    match store.accept_request(&user.username, &req.username) {
+        Ok(true) => {
+            let my_code = generate_friend_code(&user.username);
+            state.presence.send_to(&req.username, crate::web::presence::FriendEvent::FriendRequestAccepted {
+                username: user.username.clone(),
+                friend_code: my_code,
+            }).await;
+            Json(ApiResult { success: true, message: "Accepted".into() })
+        }
+        Ok(false) => Json(ApiResult { success: false, message: "No pending request from that user.".into() }),
+        Err(e) => Json(ApiResult { success: false, message: format!("Failed: {}", e) }),
+    }
+}
+
+async fn api_decline_friend_request(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<FriendUsernameRequest>,
+) -> Json<ApiResult> {
+    let store = FriendsStore::new(&state.data_dir);
+    match store.decline_request(&user.username, &req.username) {
+        Ok(true) => Json(ApiResult { success: true, message: "Declined".into() }),
+        Ok(false) => Json(ApiResult { success: false, message: "No pending request.".into() }),
+        Err(e) => Json(ApiResult { success: false, message: format!("Failed: {}", e) }),
+    }
+}
+
+async fn api_remove_friend(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<FriendUsernameRequest>,
+) -> Json<ApiResult> {
+    let store = FriendsStore::new(&state.data_dir);
+    match store.remove_friend(&user.username, &req.username) {
+        Ok(true) => Json(ApiResult { success: true, message: "Removed".into() }),
+        Ok(false) => Json(ApiResult { success: false, message: "Not friends.".into() }),
+        Err(e) => Json(ApiResult { success: false, message: format!("Failed: {}", e) }),
+    }
+}
+
+async fn api_send_friend_chat(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<FriendChatRequest>,
+) -> impl IntoResponse {
+    let store = FriendsStore::new(&state.data_dir);
+    let data = match store.load(&user.username) {
+        Ok(d) => d,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
+    if !data.friends.contains(&req.to) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Not friends"}))).into_response();
+    }
+
+    match store.append_chat(&user.username, &req.to, &req.text) {
+        Ok(msg) => {
+            let ts = msg.ts.to_rfc3339();
+            state.presence.send_to(&req.to, crate::web::presence::FriendEvent::FriendChat {
+                from: user.username.clone(),
+                text: req.text.clone(),
+                ts: ts.clone(),
+            }).await;
+            Json(serde_json::json!({
+                "from": user.username,
+                "to": req.to,
+                "text": req.text,
+                "ts": ts,
+            })).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn api_get_friend_chat(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(username): Path<String>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let limit: usize = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50);
+    let store = FriendsStore::new(&state.data_dir);
+
+    let messages = match store.load_chat(&user.username, &username, limit) {
+        Ok(m) => m,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
+    let msgs: Vec<ApiChatMsg> = messages.iter().map(|m| ApiChatMsg {
+        from: m.from.clone(),
+        text: m.text.clone(),
+        ts: m.ts.to_rfc3339(),
+    }).collect();
+
+    Json(ApiChatHistoryResponse { friend: username, messages: msgs }).into_response()
+}
+
