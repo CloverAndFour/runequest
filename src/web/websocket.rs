@@ -3,6 +3,7 @@
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
+fn build_state_with_map(adventure: &crate::engine::adventure::AdventureState) -> serde_json::Value {    let mut state = serde_json::to_value(adventure).unwrap_or_default();    if let serde_json::Value::Object(ref mut map) = state {        map.insert("map_view".to_string(),            crate::engine::world_map::build_map_view(&adventure.world_position, &adventure.discovery, false));    }    state}
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
@@ -21,6 +22,7 @@ use crate::storage::adventure_store::{AdventureStore, DisplayEvent, HistoryMessa
 use crate::storage::usage_logger::{UsageEntry, UsageLogger};
 use crate::engine::combat::CombatantId;
 use crate::web::protocol::{ActionInfo, ClientMsg, EnemyInfo, InitiativeInfo, ServerMsg};
+use crate::engine::crafting::CRAFTING_GRAPH;
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -190,23 +192,35 @@ async fn handle_client_msg(
             character_name,
             race,
             class,
+            background,
+            backstory,
             scenario,
             stats,
         } => {
             let race = parse_race(&race);
-            let class = parse_class(&class);
-            let stats = Stats {
-                strength: stats.strength,
-                dexterity: stats.dexterity,
-                constitution: stats.constitution,
-                intelligence: stats.intelligence,
-                wisdom: stats.wisdom,
-                charisma: stats.charisma,
+            let class = parse_class(class.as_deref().unwrap_or("warrior"));
+            let stats = if let Some(s) = stats {
+                Stats {
+                    strength: s.strength,
+                    dexterity: s.dexterity,
+                    constitution: s.constitution,
+                    intelligence: s.intelligence,
+                    wisdom: s.wisdom,
+                    charisma: s.charisma,
+                }
+            } else {
+                Stats { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 }
             };
 
-            let adventure = AdventureState::new(name, character_name, race, class, stats, &scenario);
+            let adventure = if let Some(ref bg_str) = background {
+                let bg = crate::engine::backgrounds::Background::from_str(bg_str)
+                    .unwrap_or_default();
+                AdventureState::new_with_background(name, character_name, race, bg, &scenario)
+            } else {
+                AdventureState::new(name, character_name, race, class, stats, &scenario)
+            };
             let adventure_id = adventure.id.clone();
-            let state_json = serde_json::to_value(&adventure)?;
+            let state_json = build_state_with_map(&adventure);
 
             {
                 let mut sess = session.lock().await;
@@ -239,7 +253,7 @@ async fn handle_client_msg(
                 });
             }
 
-            let state_json = serde_json::to_value(&adventure)?;
+            let state_json = build_state_with_map(&adventure);
             let adv_id = adventure.id.clone();
 
             // Build narrative events from LLM history
@@ -492,7 +506,7 @@ async fn handle_client_msg(
                     send_cost_update(sender, &sess).await;
 
                     if let Some(ref adv) = sess.adventure {
-                        let state = serde_json::to_value(adv)?;
+                        let state = build_state_with_map(adv);
                         send_msg(sender, &ServerMsg::StateUpdate { state }).await;
                     }
                 } else {
@@ -505,7 +519,7 @@ async fn handle_client_msg(
         ClientMsg::GetCharacterSheet | ClientMsg::GetInventory | ClientMsg::GetQuests => {
             let sess = session.lock().await;
             if let Some(ref adv) = sess.adventure {
-                let state = serde_json::to_value(adv)?;
+                let state = build_state_with_map(adv);
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
             }
         }
@@ -527,6 +541,199 @@ async fn handle_client_msg(
                 send_msg(sender, &ServerMsg::Error {
                     code: "invalid_model".to_string(),
                     message: format!("Model '{}' not available", model),
+                }).await;
+            }
+        }
+
+        ClientMsg::GetNpcs => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let state = build_state_with_map(adv);
+                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+            }
+        }
+
+        ClientMsg::CraftItem { recipe_id } => {
+            let (result_opt, state_opt) = {
+                let mut sess = session.lock().await;
+                if let Some(ref mut adv) = sess.adventure {
+                    let args = serde_json::json!({"recipe_id": recipe_id});
+                    match execute_tool_call(adv, "craft_item", &args) {
+                        Ok(ToolExecResult::Immediate(result)) => {
+                            let adv_clone = adv.clone();
+                            let _ = sess.store.save_adventure(&adv_clone);
+                            let state = serde_json::to_value(&adv_clone).ok();
+                            (Some(result), state)
+                        }
+                        _ => (None, None)
+                    }
+                } else {
+                    (None, None)
+                }
+            };
+            if let Some(result) = result_opt {
+                let crafted = result["crafted"].as_bool().unwrap_or(false);
+                if crafted {
+                    send_msg(sender, &ServerMsg::CraftResult {
+                        recipe_name: result["recipe"].as_str().unwrap_or("").to_string(),
+                        output: result["output"].as_str().unwrap_or("").to_string(),
+                        quantity: result["quantity"].as_u64().unwrap_or(1) as u32,
+                        skill_progress: result.get("skill_progress").cloned(),
+                    }).await;
+                } else {
+                    send_msg(sender, &ServerMsg::Error {
+                        code: "craft_failed".to_string(),
+                        message: result["error"].as_str().unwrap_or("Crafting failed").to_string(),
+                    }).await;
+                }
+                if let Some(state) = state_opt {
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                }
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "craft_error".to_string(),
+                    message: "Internal crafting error".to_string(),
+                }).await;
+            }
+        }
+
+        ClientMsg::ListRecipes { skill, tier } => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let mut args = serde_json::json!({});
+                if let Some(s) = skill { args["skill"] = serde_json::json!(s); }
+                if let Some(t) = tier { args["tier"] = serde_json::json!(t); }
+                match execute_tool_call(&mut adv.clone(), "list_recipes", &args) {
+                    Ok(ToolExecResult::Immediate(result)) => {
+                        let recipes = result["recipes"].as_array()
+                            .map(|a| a.clone())
+                            .unwrap_or_default();
+                        send_msg(sender, &ServerMsg::RecipeList { recipes }).await;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        ClientMsg::ListMaterials => {
+            let graph = &*CRAFTING_GRAPH;
+            let materials: Vec<serde_json::Value> = graph.materials.values()
+                .map(|m| serde_json::json!({
+                    "id": m.id,
+                    "name": m.name,
+                    "tier": m.tier,
+                    "source": format!("{:?}", m.source),
+                }))
+                .collect();
+            send_msg(sender, &ServerMsg::MaterialList { materials }).await;
+        }
+
+        ClientMsg::Gather => {
+            let (result_opt, state_opt) = {
+                let mut sess = session.lock().await;
+                if let Some(ref mut adv) = sess.adventure {
+                    let args = serde_json::json!({});
+                    match execute_tool_call(adv, "gather", &args) {
+                        Ok(ToolExecResult::Immediate(result)) => {
+                            let adv_clone = adv.clone();
+                            let _ = sess.store.save_adventure(&adv_clone);
+                            let state = serde_json::to_value(&adv_clone).ok();
+                            (Some(result), state)
+                        }
+                        _ => (None, None)
+                    }
+                } else {
+                    (None, None)
+                }
+            };
+            if let Some(result) = result_opt {
+                let gathered = result["gathered"].as_array()
+                    .map(|a| a.clone())
+                    .unwrap_or_default();
+                send_msg(sender, &ServerMsg::GatherResult {
+                    gathered,
+                    biome: result["biome"].as_str().unwrap_or("").to_string(),
+                    survival_xp: result["survival_xp"].as_u64().unwrap_or(0) as u32,
+                }).await;
+                if let Some(state) = state_opt {
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                }
+            }
+        }
+
+        ClientMsg::GetSkills => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let args = serde_json::json!({});
+                match execute_tool_call(&mut adv.clone(), "get_skills", &args) {
+                    Ok(ToolExecResult::Immediate(result)) => {
+                        let skills = result["skills"].as_array()
+                            .map(|a| a.clone())
+                            .unwrap_or_default();
+                        send_msg(sender, &ServerMsg::SkillList { skills }).await;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ClientMsg::EquipItem { item_name } => {
+            let state_opt = {
+                let mut sess = session.lock().await;
+                if let Some(mut adv) = sess.adventure.take() {
+                    let args = serde_json::json!({"item_name": item_name});
+                    match execute_tool_call(&mut adv, "equip_item", &args) {
+                        Ok(ToolExecResult::Immediate(_result)) => {
+                            let st = build_state_with_map(&adv);
+                            sess.store.save_adventure(&adv).ok();
+                            sess.adventure = Some(adv);
+                            Some(st)
+                        }
+                        _ => {
+                            sess.adventure = Some(adv);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            };
+            if let Some(state) = state_opt {
+                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "equip_failed".to_string(),
+                    message: "Failed to equip item".to_string(),
+                }).await;
+            }
+        }
+
+        ClientMsg::UnequipItem { slot } => {
+            let state_opt = {
+                let mut sess = session.lock().await;
+                if let Some(mut adv) = sess.adventure.take() {
+                    let args = serde_json::json!({"slot": slot});
+                    match execute_tool_call(&mut adv, "unequip_slot", &args) {
+                        Ok(ToolExecResult::Immediate(_result)) => {
+                            let st = build_state_with_map(&adv);
+                            sess.store.save_adventure(&adv).ok();
+                            sess.adventure = Some(adv);
+                            Some(st)
+                        }
+                        _ => {
+                            sess.adventure = Some(adv);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            };
+            if let Some(state) = state_opt {
+                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "unequip_failed".to_string(),
+                    message: "Failed to unequip item".to_string(),
                 }).await;
             }
         }
@@ -693,7 +900,7 @@ async fn continue_tool_loop(
                 send_cost_update(sender, &sess).await;
 
                 if let Some(ref adv) = sess.adventure {
-                    let state = serde_json::to_value(adv)?;
+                    let state = build_state_with_map(adv);
                     send_msg(sender, &ServerMsg::StateUpdate { state }).await;
                 }
 
@@ -991,7 +1198,7 @@ async fn handle_combat_turn_start(
                         player_max_hp: result.player_max_hp,
                     }).await;
 
-                    let state = serde_json::to_value(&adventure)?;
+                    let state = build_state_with_map(&adventure);
                     send_msg(sender, &ServerMsg::StateUpdate { state }).await;
 
                     if adventure.character.hp <= 0 {
@@ -1108,7 +1315,7 @@ async fn handle_combat_action(
                 adventure.character.check_level_up();
                 sess.store.save_adventure(&adventure)?;
 
-                let state = serde_json::to_value(&adventure)?;
+                let state = build_state_with_map(&adventure);
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
                 send_msg(sender, &ServerMsg::CombatEnded { xp_reward: xp, victory: true }).await;
 
@@ -1119,7 +1326,7 @@ async fn handle_combat_action(
                 return Ok(());
             }
 
-            let state = serde_json::to_value(&adventure)?;
+            let state = build_state_with_map(&adventure);
             send_msg(sender, &ServerMsg::StateUpdate { state }).await;
 
             // Send updated actions
@@ -1248,6 +1455,52 @@ async fn handle_combat_action(
             }).await;
         }
 
+
+        "flee" => {
+            if adventure.combat.action_economy.actions == 0 {
+                send_msg(sender, &ServerMsg::Error { code: "no_action".to_string(), message: "No actions remaining".to_string() }).await;
+                sess.adventure = Some(adventure);
+                return Ok(());
+            }
+            adventure.combat.action_economy.actions -= 1;
+
+            let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+            let living = adventure.combat.living_enemies().len() as i32;
+            let flee_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
+            let roll = DiceRoller::roll("d20", 1, dex_mod);
+            let success = roll.total >= flee_dc;
+
+            if success {
+                let desc = format!("{} attempts to flee (rolled {} vs DC {}): SUCCESS! Escaped combat!", adventure.character.name, roll.total, flee_dc);
+                adventure.combat.combat_log.push(desc.clone());
+                adventure.combat.end();
+                sess.store.save_adventure(&adventure)?;
+
+                let state = build_state_with_map(&adventure);
+                send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                send_msg(sender, &ServerMsg::CombatActionResult {
+                    actor: adventure.character.name.clone(), action: "Flee".to_string(),
+                    description: desc, roll: Some(roll.total), hit: None, damage: None,
+                }).await;
+                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false }).await;
+
+                sess.adventure = Some(adventure);
+                sess.messages.push(ChatMessage::user("The player successfully fled from combat. Narrate their narrow escape and present choices for what to do next."));
+                drop(sess);
+                continue_tool_loop(session, xai_client, sender).await?;
+                return Ok(());
+            } else {
+                adventure.combat.flee_attempts += 1;
+                let next_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
+                let desc = format!("{} attempts to flee (rolled {} vs DC {}): FAILED! The enemies block the escape. (Next attempt DC {})", adventure.character.name, roll.total, flee_dc, next_dc);
+                adventure.combat.combat_log.push(desc.clone());
+                send_msg(sender, &ServerMsg::CombatActionResult {
+                    actor: adventure.character.name.clone(), action: "Flee".to_string(),
+                    description: desc, roll: Some(roll.total), hit: Some(false), damage: None,
+                }).await;
+            }
+        }
+
         "end_turn" => {
             adventure.combat.next_turn();
             sess.store.save_adventure(&adventure)?;
@@ -1267,7 +1520,7 @@ async fn handle_combat_action(
     // Save state and send update after action
     if action_id != "end_turn" {
         sess.store.save_adventure(&adventure)?;
-        let state = serde_json::to_value(&adventure)?;
+        let state = build_state_with_map(&adventure);
         send_msg(sender, &ServerMsg::StateUpdate { state }).await;
     }
     sess.adventure = Some(adventure);

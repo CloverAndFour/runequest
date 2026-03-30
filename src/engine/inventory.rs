@@ -12,6 +12,7 @@ pub enum ItemType {
     Potion,
     Scroll,
     Misc,
+    Material,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +35,10 @@ pub struct Item {
     pub stats: ItemStats,
     #[serde(default)]
     pub enchantment: Option<Enchantment>,
+    #[serde(default)]
+    pub tier: u8,
+    #[serde(default)]
+    pub image_id: Option<String>,
     #[serde(default = "default_quantity")]
     pub quantity: u32,
     /// Legacy field — kept for backward compat with old adventures.
@@ -58,6 +63,8 @@ impl Default for Item {
             value_gp: 0,
             stats: ItemStats::default(),
             enchantment: None,
+            tier: 0,
+            image_id: None,
             quantity: 1,
             properties: None,
         }
@@ -139,6 +146,34 @@ impl Inventory {
                 || i.display_name().to_lowercase() == name_lower
                 || i.id.to_lowercase() == name_lower
         })
+    }
+
+    /// Remove an item by its ID, decrementing quantity if stacked.
+    pub fn remove_by_id(&mut self, id: &str) -> Option<Item> {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            if item.quantity > 1 {
+                item.quantity -= 1;
+                let mut single = item.clone();
+                single.quantity = 1;
+                return Some(single);
+            }
+        }
+        if let Some(idx) = self.items.iter().position(|i| i.id == id) {
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    /// Add item, stacking by ID for materials/potions/scrolls.
+    pub fn add_material(&mut self, item: Item) {
+        if matches!(item.item_type, ItemType::Potion | ItemType::Scroll | ItemType::Material) {
+            if let Some(existing) = self.items.iter_mut().find(|i| i.id == item.id) {
+                existing.quantity += item.quantity;
+                return;
+            }
+        }
+        self.items.push(item);
     }
 
     pub fn total_weight(&self) -> f32 {

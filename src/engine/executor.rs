@@ -4,9 +4,11 @@ use serde_json::Value;
 
 use super::adventure::AdventureState;
 use super::combat::{Enemy, EnemyAttack};
+use super::crafting::{CRAFTING_GRAPH, material_to_item, equipment_to_item};
 use super::dice::DiceRoller;
 use super::equipment::{get_item, EquipSlot};
 use super::inventory::{Item, ItemType};
+use super::world_map;
 use crate::error::{RunequestError, Result};
 
 /// Result of executing a tool call.
@@ -224,6 +226,8 @@ pub fn execute_tool_call(
                 stats: Default::default(),
                 enchantment: None,
                 quantity: 1,
+                tier: 0,
+                image_id: None,
                 properties: None,
             });
 
@@ -246,7 +250,11 @@ pub fn execute_tool_call(
             let item_id = args["item_id"].as_str().unwrap_or("");
             let quantity = args["quantity"].as_u64().unwrap_or(1) as u32;
 
-            if let Some(mut item) = get_item(item_id) {
+            let item_opt = get_item(item_id)
+                .or_else(|| material_to_item(&*CRAFTING_GRAPH, item_id))
+                .or_else(|| equipment_to_item(item_id));
+
+            if let Some(mut item) = item_opt {
                 item.quantity = quantity;
                 let name = item.display_name();
                 state.inventory.add(item);
@@ -497,6 +505,9 @@ pub fn execute_tool_call(
                                 max_hp: hp,
                                 ac,
                                 attacks,
+                            
+                    enemy_type: None,
+                    tier: None,
                             })
                         })
                         .collect()
@@ -829,6 +840,8 @@ pub fn execute_tool_call(
                         stats: Default::default(),
                         enchantment: None,
                         quantity: 1,
+                        tier: 0,
+                        image_id: None,
                         properties: None,
                     };
                     state.inventory.add(key_item);
@@ -1103,105 +1116,407 @@ pub fn execute_tool_call(
 
         "buy_item" => {
             let item_id = args["item_id"].as_str().unwrap_or("");
-            let world = match &mut state.world {
-                Some(w) => w,
-                None => {
-                    return Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "error": "No world map exists in this adventure."
-                    })));
+            // Use hex world shop
+            let county = world_map::current_county(&state.world_position);
+            match county {
+                Some(county) if county.has_town => {
+                    let shop_entries = world_map::generate_shop(county.tier);
+                    let entry = shop_entries.iter().find(|e| e.item_id == item_id);
+                    match entry {
+                        Some(entry) => {
+                            let item = match super::equipment::get_item(item_id) {
+                                Some(i) => i,
+                                None => return Ok(ToolExecResult::Immediate(serde_json::json!({
+                                    "success": false, "error": format!("Item '{}' not found", item_id)
+                                }))),
+                            };
+                            let price = std::cmp::max((item.value_gp as f32 * entry.price_mult).ceil() as u32, 1u32);
+                            if state.character.gold < price {
+                                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                                    "success": false,
+                                    "error": format!("Not enough gold. Need {} but have {}", price, state.character.gold),
+                                })));
+                            }
+                            state.character.gold -= price;
+                            state.inventory.gold = state.character.gold;
+                            let mut inv_item = item.clone();
+                            inv_item.quantity = 1;
+                            state.inventory.items.push(inv_item);
+                            Ok(ToolExecResult::Immediate(serde_json::json!({
+                                "success": true,
+                                "message": format!("Bought {} for {} gold", item.name, price),
+                                "gold_remaining": state.character.gold,
+                            })))
+                        }
+                        None => Ok(ToolExecResult::Immediate(serde_json::json!({
+                            "success": false,
+                            "error": format!("Item '{}' is not available in this shop", item_id),
+                        }))),
+                    }
                 }
-            };
-
-            let location_id = world.current_location;
-            match world.buy_item(
-                location_id,
-                item_id,
-                &mut state.character.gold,
-                &mut state.inventory,
-            ) {
-                Ok(msg) => {
-                    state.inventory.gold = state.character.gold;
-                    Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "success": true,
-                        "message": msg,
-                        "gold_remaining": state.character.gold,
-                    })))
-                }
-                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                _ => Ok(ToolExecResult::Immediate(serde_json::json!({
                     "success": false,
-                    "error": e,
+                    "error": "No shop at this location.",
                 }))),
             }
         }
 
         "sell_item" => {
             let item_name = args["item_name"].as_str().unwrap_or("");
-            let world = match &mut state.world {
-                Some(w) => w,
-                None => {
-                    return Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "error": "No world map exists in this adventure."
-                    })));
-                }
-            };
-
-            match world.sell_item(
-                item_name,
-                &mut state.character.gold,
-                &mut state.inventory,
-            ) {
-                Ok(msg) => {
+            // Check we are at a town
+            let county = world_map::current_county(&state.world_position);
+            let at_town = county.map(|c| c.has_town).unwrap_or(false);
+            if !at_town {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "success": false,
+                    "error": "No shop here — you must be at a town to sell items.",
+                })));
+            }
+            // Find item in inventory by name (case-insensitive)
+            let idx = state.inventory.items.iter().position(|i| i.name.to_lowercase() == item_name.to_lowercase());
+            match idx {
+                Some(idx) => {
+                    let item = state.inventory.items.remove(idx);
+                    let base_item = super::equipment::get_item(&item.id);
+                    let sell_price = base_item.map(|i| std::cmp::max(i.value_gp / 2, 1)).unwrap_or(1);
+                    state.character.gold += sell_price;
                     state.inventory.gold = state.character.gold;
                     Ok(ToolExecResult::Immediate(serde_json::json!({
                         "success": true,
-                        "message": msg,
+                        "message": format!("Sold {} for {} gold", item.name, sell_price),
                         "gold_remaining": state.character.gold,
                     })))
                 }
-                Err(e) => Ok(ToolExecResult::Immediate(serde_json::json!({
+                None => Ok(ToolExecResult::Immediate(serde_json::json!({
                     "success": false,
-                    "error": e,
+                    "error": format!("Item '{}' not found in inventory", item_name),
                 }))),
             }
         }
 
         "view_shop" => {
-            let world = match &state.world {
-                Some(w) => w,
+            // Try hex world first
+            let county = world_map::current_county(&state.world_position);
+            if let Some(county) = county {
+                if !county.has_town {
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": "No shop here — this county has no town."
+                    })));
+                }
+                let shop_entries = world_map::generate_shop(county.tier);
+                let items: Vec<serde_json::Value> = shop_entries.iter().filter_map(|se| {
+                    let item = super::equipment::get_item(&se.item_id)?;
+                    let price = (item.value_gp as f32 * se.price_mult).ceil() as u32;
+                    Some(serde_json::json!({
+                        "item_id": se.item_id,
+                        "name": item.name,
+                        "price": std::cmp::max(price, 1),
+                        "stock": se.stock,
+                        "description": item.description,
+                    }))
+                }).collect();
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "shop_name": format!("{} General Store", county.name),
+                    "location": county.name,
+                    "items": items,
+                    "player_gold": state.character.gold,
+                })))
+            } else {
+                Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": "No shop at this location.",
+                })))
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // Crafting tools
+        // -----------------------------------------------------------------------
+
+        "craft_item" => {
+            let recipe_id = args["recipe_id"].as_str().unwrap_or("");
+            let graph = &*CRAFTING_GRAPH;
+
+            // Find recipe
+            let recipe = match graph.recipes.iter().find(|r| r.id == recipe_id) {
+                Some(r) => r,
                 None => {
                     return Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "error": "No world map exists in this adventure."
+                        "error": format!("Recipe {} not found", recipe_id),
                     })));
                 }
             };
 
-            let location_id = world.current_location;
-            let info = world.format_shop_info(location_id);
-            let shop = world.get_shop(location_id);
-            match shop {
-                Some(shop) => {
-                    let items: Vec<serde_json::Value> = shop.items.iter().filter_map(|si| {
-                        let item = super::equipment::get_item(&si.item_id)?;
-                        let price = (item.value_gp as f32 * si.price_multiplier).ceil() as u32;
-                        Some(serde_json::json!({
-                            "item_id": si.item_id,
-                            "name": item.name,
-                            "price": std::cmp::max(price, 1),
-                            "stock": si.stock,
-                        }))
+            // Check skill rank
+            let skill_id = recipe.skill.skill_id();
+            let player_rank = state.skills.get(skill_id).map(|s| s.rank).unwrap_or(0);
+            if player_rank < recipe.skill_rank {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": format!("Requires {} rank {} but you have rank {}", recipe.skill.name(), recipe.skill_rank, player_rank),
+                })));
+            }
+
+            // Check station availability
+            let county = world_map::current_county(&state.world_position);
+            let has_station = if let Some(c) = county {
+                c.stations.iter().any(|st| {
+                    st.supported_skills().contains(&skill_id) && st.max_tier() >= recipe.tier
+                })
+            } else {
+                false
+            };
+            if !has_station {
+                return Ok(ToolExecResult::Immediate(serde_json::json!({
+                    "error": format!("No crafting station available for {} tier {} here. Travel to a town with the right station.", recipe.skill.name(), recipe.tier),
+                })));
+            }
+
+            // Check all inputs
+            for (mat_id, qty) in &recipe.inputs {
+                let have = state.inventory.items.iter()
+                    .filter(|i| i.id == *mat_id)
+                    .map(|i| i.quantity)
+                    .sum::<u32>();
+                if have < *qty {
+                    let mat_name = graph.materials.get(mat_id).map(|m| m.name.as_str()).unwrap_or(mat_id);
+                    return Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": format!("Missing material: need {} x{} but have {}", mat_name, qty, have),
+                    })));
+                }
+            }
+
+            // Consume inputs
+            for (mat_id, qty) in &recipe.inputs {
+                for _ in 0..*qty {
+                    state.inventory.remove_by_id(mat_id);
+                }
+            }
+
+            // Produce output
+            let output_id = &recipe.output;
+            let output_item = equipment_to_item(output_id)
+                .or_else(|| material_to_item(graph, output_id));
+
+            let output_name = if let Some(mut item) = output_item {
+                item.quantity = recipe.output_qty;
+                let name = item.display_name();
+                state.inventory.add_material(item);
+                name
+            } else {
+                output_id.to_string()
+            };
+
+            // Skill XP chance: 15% at-level, 25% above-level
+            let xp_chance = if player_rank > recipe.skill_rank { 0.25 } else { 0.15 };
+            let mut rng = rand::thread_rng();
+            let skill_progress = if rand::Rng::gen::<f64>(&mut rng) < xp_chance {
+                let xp_amount = 10 + (recipe.tier as u32) * 5;
+                let result = state.skills.gain_xp(skill_id, xp_amount);
+                if let Some((new_rank, ranked_up)) = result {
+                    Some(serde_json::json!({
+                        "skill": skill_id,
+                        "xp_gained": xp_amount,
+                        "new_rank": new_rank,
+                        "ranked_up": ranked_up,
+                    }))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "crafted": true,
+                "output": output_name,
+                "quantity": recipe.output_qty,
+                "recipe": recipe.name,
+                "skill_progress": skill_progress,
+            })))
+        }
+
+        "list_recipes" => {
+            let skill_filter = args.get("skill").and_then(|v| v.as_str());
+            let tier_filter = args.get("tier").and_then(|v| v.as_u64()).map(|t| t as u8);
+            let graph = &*CRAFTING_GRAPH;
+
+            // Get available stations at current location
+            let county = world_map::current_county(&state.world_position);
+            let stations: Vec<_> = county.map(|c| c.stations.clone()).unwrap_or_default();
+
+            let recipes: Vec<serde_json::Value> = graph.recipes.iter()
+                .filter(|r| {
+                    // Filter by skill if specified
+                    if let Some(sf) = skill_filter {
+                        if r.skill.skill_id() != sf { return false; }
+                    }
+                    // Filter by tier if specified
+                    if let Some(tf) = tier_filter {
+                        if r.tier != tf { return false; }
+                    }
+                    // Filter by player skill rank
+                    let player_rank = state.skills.get(r.skill.skill_id()).map(|s| s.rank).unwrap_or(0);
+                    if player_rank < r.skill_rank { return false; }
+                    // Filter by available stations
+                    stations.iter().any(|st| {
+                        st.supported_skills().contains(&r.skill.skill_id()) && st.max_tier() >= r.tier
+                    })
+                })
+                .map(|r| {
+                    let inputs: Vec<serde_json::Value> = r.inputs.iter().map(|(id, qty)| {
+                        let name = graph.materials.get(id).map(|m| m.name.as_str()).unwrap_or(id.as_str());
+                        serde_json::json!({"id": id, "name": name, "quantity": qty})
                     }).collect();
+                    let output_name = graph.materials.get(&r.output).map(|m| m.name.as_str()).unwrap_or(r.output.as_str());
+                    serde_json::json!({
+                        "id": r.id,
+                        "name": r.name,
+                        "skill": r.skill.name(),
+                        "skill_rank": r.skill_rank,
+                        "tier": r.tier,
+                        "inputs": inputs,
+                        "output": r.output,
+                        "output_name": output_name,
+                        "output_qty": r.output_qty,
+                    })
+                })
+                .collect();
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "recipes": recipes,
+                "count": recipes.len(),
+            })))
+        }
+
+        "gather" => {
+            let county = world_map::current_county(&state.world_position);
+            let biome_str = county.map(|c| format!("{}", c.biome)).unwrap_or_else(|| "Plains".to_string());
+
+            // Biome-based gather pools
+            let pool: &[&str] = match biome_str.as_str() {
+                "Forest" => &["green_wood", "plant_fiber", "wild_herbs", "crude_thread"],
+                "Hills" => &["rough_stone", "scrap_metal", "raw_quartz", "muddy_clay"],
+                "Mountains" => &["scrap_metal", "rough_stone", "raw_quartz", "charcoal"],
+                "Swamp" => &["muddy_clay", "plant_fiber", "wild_herbs", "crude_thread"],
+                "Desert" => &["rough_stone", "raw_quartz", "charcoal", "scrap_metal"],
+                "Tundra" => &["raw_hide_scraps", "crude_thread", "rough_stone", "charcoal"],
+                "Coast" => &["plant_fiber", "muddy_clay", "crude_thread", "raw_quartz"],
+                "Volcanic" => &["charcoal", "scrap_metal", "rough_stone", "raw_quartz"],
+                _ /* Plains */ => &["raw_hide_scraps", "crude_thread", "plant_fiber", "green_wood"],
+            };
+
+            let graph = &*CRAFTING_GRAPH;
+            let mut rng = rand::thread_rng();
+            let count = rand::Rng::gen_range(&mut rng, 1..=3usize);
+            let mut gathered = Vec::new();
+
+            for _ in 0..count {
+                let idx = rand::Rng::gen_range(&mut rng, 0..pool.len());
+                let mat_id = pool[idx];
+                if let Some(item) = material_to_item(graph, mat_id) {
+                    gathered.push(serde_json::json!({"id": mat_id, "name": item.name.clone()}));
+                    state.inventory.add_material(item);
+                }
+            }
+
+            // Award 5-10 Survival XP
+            let surv_xp = rand::Rng::gen_range(&mut rng, 5..=10u32);
+            let surv_result = state.skills.gain_xp("survival", surv_xp);
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "gathered": gathered,
+                "biome": biome_str,
+                "survival_xp": surv_xp,
+                "survival_rank_up": surv_result.map(|(_, up)| up).unwrap_or(false),
+            })))
+        }
+
+        // -----------------------------------------------------------------------
+        // Skill tools
+        // -----------------------------------------------------------------------
+
+        "award_skill_xp" => {
+            let skill_id = args["skill_id"].as_str().unwrap_or("");
+            let amount = args["amount"].as_u64().unwrap_or(0) as u32;
+
+            match state.skills.gain_xp(skill_id, amount) {
+                Some((new_rank, ranked_up)) => {
                     Ok(ToolExecResult::Immediate(serde_json::json!({
-                        "shop_name": shop.name,
-                        "location": world.locations[location_id].name,
-                        "items": items,
-                        "player_gold": state.character.gold,
-                        "display": info,
+                        "skill": skill_id,
+                        "xp_gained": amount,
+                        "new_rank": new_rank,
+                        "ranked_up": ranked_up,
                     })))
                 }
-                None => Ok(ToolExecResult::Immediate(serde_json::json!({
-                    "error": "No shop at this location.",
-                }))),
+                None => {
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "error": format!("Skill {} not found", skill_id),
+                    })))
+                }
             }
+        }
+
+        "get_skills" => {
+            let skills_json: Vec<serde_json::Value> = state.skills.skills.iter().map(|s| {
+                serde_json::json!({
+                    "id": s.id,
+                    "name": s.name,
+                    "rank": s.rank,
+                    "rank_name": super::skills::rank_name(s.rank),
+                    "xp": s.xp,
+                    "xp_to_next": s.xp_to_next,
+                })
+            }).collect();
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "skills": skills_json,
+            })))
+        }
+
+        "improve_skill" => {
+            let skill_id = args["skill_id"].as_str().unwrap_or("");
+            match state.skills.improve(skill_id) {
+                Some(new_rank) => {
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": true,
+                        "skill": skill_id,
+                        "new_rank": new_rank,
+                        "rank_name": super::skills::rank_name(new_rank),
+                    })))
+                }
+                None => {
+                    Ok(ToolExecResult::Immediate(serde_json::json!({
+                        "success": false,
+                        "error": format!("Cannot improve skill {} (not found or already max rank)", skill_id),
+                    })))
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // World map info tool
+        // -----------------------------------------------------------------------
+
+        "get_map_info" => {
+            let info = world_map::map_info(&state.world_position, &state.discovery);
+            Ok(ToolExecResult::Immediate(info))
+        }
+
+        // -----------------------------------------------------------------------
+        // Murderer flag tools
+        // -----------------------------------------------------------------------
+
+        "flag_murderer" => {
+            state.murderer = true;
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "flagged": true,
+                "message": "Player has been flagged as a murderer. Town guards will be hostile.",
+            })))
+        }
+
+        "check_murderer" => {
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "is_murderer": state.murderer,
+            })))
         }
 
         _ => Err(RunequestError::InvalidToolCall(format!(

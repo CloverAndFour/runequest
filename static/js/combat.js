@@ -142,9 +142,11 @@ export function renderCombatEnded(container, data) {
     document.getElementById('combatActionBar')?.remove();
 
     const div = document.createElement('div');
-    div.className = `combat-ended ${data.victory ? 'victory' : 'defeat'}`;
+    div.className = `combat-ended ${data.victory ? 'victory' : data.fled ? 'fled' : 'defeat'}`;
     div.innerHTML = data.victory
         ? `<div class="combat-ended-title">Victory!</div><div>+${data.xp_reward} XP</div>`
+        : data.fled
+        ? `<div class="combat-ended-title">Escaped!</div><div>You fled from combat.</div>`
         : `<div class="combat-ended-title">Defeated...</div>`;
     storyContent.appendChild(div);
     storyContent.scrollTop = storyContent.scrollHeight;

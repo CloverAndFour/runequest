@@ -1,5 +1,12 @@
 // Adventure screen renderer and info panel
 
+
+function equipWsCall(action, data) {
+    if (window.rqWs && window.rqWs.send) {
+        window.rqWs.send({ type: action, ...data });
+    }
+}
+
 export function renderAdventure(container, state, handlers) {
     if (!state) {
         container.innerHTML = '<div class="loading">Loading adventure</div>';
@@ -210,6 +217,7 @@ function renderInventory(el, state) {
     const eq = state.equipment || {};
     const inv = state.inventory || { items: [], gold: 0 };
     const typeIcons = { weapon: '\u2694', armor: '\u{1F6E1}', potion: '\u{1F9EA}', scroll: '\u{1F4DC}', misc: '\u{1F4E6}' };
+    const inCombat = state.combat?.active === true;
 
     const SLOT_LABELS = [
         ['head', 'Head'], ['amulet', 'Amulet'], ['main_hand', 'Main Hand'],
@@ -219,13 +227,15 @@ function renderInventory(el, state) {
     ];
 
     let html = '<div class="section-title">Equipped</div>';
+    if (!inCombat) html += '<div class="equip-hint">Click to unequip</div>';
     html += '<div class="equip-slots">';
     SLOT_LABELS.forEach(([key, label]) => {
         const item = eq[key];
         if (item) {
             const name = item.enchantment ? `${item.enchantment.name_prefix} ${item.name}` : item.name;
             const rarityClass = (item.rarity || 'common').toLowerCase();
-            html += `<div class="equip-slot filled" title="${escapeAttr(item.description || '')}">
+            const clickable = !inCombat ? ' clickable' : '';
+            html += `<div class="equip-slot filled${clickable}" data-slot="${key}" title="${escapeAttr(item.description || '')}${!inCombat ? ' — click to unequip' : ''}">
                 <span class="slot-label">${label}</span>
                 <span class="slot-item rarity-${rarityClass}">${escapeHtml(name)}</span>
             </div>`;
@@ -244,6 +254,7 @@ function renderInventory(el, state) {
 
     // Backpack
     html += '<div class="section-title" style="margin-top:12px;">Backpack</div>';
+    if (!inCombat) html += '<div class="equip-hint">Click equippable items to equip</div>';
     if (!inv.items || inv.items.length === 0) {
         html += '<div class="empty-state" style="padding:8px;">Empty</div>';
     } else {
@@ -253,7 +264,10 @@ function renderInventory(el, state) {
             const qty = item.quantity > 1 ? ` (x${item.quantity})` : '';
             const name = item.enchantment ? `${item.enchantment.name_prefix} ${item.name}` : item.name;
             const rarityClass = (item.rarity || 'common').toLowerCase();
-            html += `<li class="item-entry" title="${escapeAttr(item.description || '')}">
+            const equippable = !inCombat && item.slot;
+            const clickable = equippable ? ' clickable' : '';
+            const itemName = item.enchantment ? `${item.enchantment.name_prefix} ${item.name}` : item.name;
+            html += `<li class="item-entry${clickable}" ${equippable ? `data-equip-name="${escapeAttr(itemName)}"` : ''} title="${escapeAttr(item.description || '')}${equippable ? ' — click to equip' : ''}">
                 <span class="item-icon">${icon}</span>
                 <span class="item-name rarity-${rarityClass}">${escapeHtml(name)}${qty}</span>
                 <span class="item-type">${item.item_type || 'misc'}</span>
@@ -263,64 +277,194 @@ function renderInventory(el, state) {
     }
 
     el.innerHTML = html;
+
+    // Bind click handlers for equip/unequip (only outside combat)
+    if (!inCombat && state.id) {
+        el.querySelectorAll('.equip-slot.clickable').forEach(slot => {
+            slot.addEventListener('click', async () => {
+                slot.classList.add('loading');
+                await equipApiCall(state.id, 'unequip', { slot: slot.dataset.slot });
+            });
+        });
+        el.querySelectorAll('.item-entry.clickable').forEach(entry => {
+            entry.addEventListener('click', async () => {
+                entry.classList.add('loading');
+                await equipApiCall(state.id, 'equip', { item_name: entry.dataset.equipName });
+            });
+        });
+    }
 }
 
 function renderMap(el, state) {
-    // Show world map if available and not in a dungeon
-    const world = state.world;
     const dungeon = state.dungeon;
+    const mapView = state.map_view;
 
-    if (world && !dungeon) {
-        renderWorldMap(el, world);
+    if (mapView && !dungeon) {
+        renderHexMap(el, mapView);
         return;
     }
 
-    if (!dungeon) {
-        el.innerHTML = '<div class="empty-state">No map available.</div>';
+    if (dungeon) {
+        renderDungeonMap(el, dungeon);
         return;
     }
 
+    el.innerHTML = '<div class="empty-state">No map available.</div>';
+}
+
+function renderHexMap(el, mapView) {
+    const current = mapView.current;
+    let html = '<div class="map-header">';
+    if (current) {
+        html += '<div class="dungeon-name">' + escapeHtml(current.name) + '</div>';
+        html += '<div style="font-size:11px;color:var(--text-muted);">' + escapeHtml(current.region || '') + ' &middot; ' + escapeHtml(current.biome || '') + '</div>';
+    }
+    html += '</div>';
+
+    const hexes = mapView.hexes || [];
+    if (hexes.length > 0) {
+        const HEX_SIZE = 28;
+        const HEX_W = HEX_SIZE * Math.sqrt(3);
+        const HEX_H = HEX_SIZE * 2;
+
+        const hexData = hexes.map(function(h) {
+            var px = HEX_SIZE * Math.sqrt(3) * (h.q + h.r / 2.0);
+            var py = HEX_SIZE * 1.5 * h.r;
+            return { hex: h, px: px, py: py };
+        });
+
+        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        hexData.forEach(function(d) {
+            if (d.px - HEX_W/2 < minX) minX = d.px - HEX_W/2;
+            if (d.px + HEX_W/2 > maxX) maxX = d.px + HEX_W/2;
+            if (d.py - HEX_H/2 < minY) minY = d.py - HEX_H/2;
+            if (d.py + HEX_H/2 > maxY) maxY = d.py + HEX_H/2;
+        });
+
+        var svgW = maxX - minX + 10;
+        var svgH = maxY - minY + 10;
+        var offX = -minX + 5;
+        var offY = -minY + 5;
+
+        html += '<svg class="hex-map-svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" preserveAspectRatio="xMidYMid meet" style="width:100%;max-height:320px;">';
+
+        hexData.forEach(function(d) {
+            var cx = d.px + offX;
+            var cy = d.py + offY;
+            var h = d.hex;
+
+            var points = [];
+            for (var i = 0; i < 6; i++) {
+                var angle = Math.PI / 180 * (60 * i - 30);
+                points.push((cx + HEX_SIZE * Math.cos(angle)).toFixed(1) + ',' + (cy + HEX_SIZE * Math.sin(angle)).toFixed(1));
+            }
+            var pointsStr = points.join(' ');
+
+            var fillColor = '#1a1a2e';
+            if (!h.discovered) {
+                fillColor = '#0d0d15';
+            } else {
+                var biome = (h.biome || '').toLowerCase();
+                if (biome === 'forest') fillColor = '#1a3a1a';
+                else if (biome === 'plains' || biome === 'grassland') fillColor = '#2a3a1a';
+                else if (biome === 'mountain' || biome === 'mountains') fillColor = '#2a2a3a';
+                else if (biome === 'desert') fillColor = '#3a3a1a';
+                else if (biome === 'swamp') fillColor = '#1a2a2a';
+                else if (biome === 'tundra' || biome === 'snow') fillColor = '#2a3a4a';
+                else if (biome === 'coast' || biome === 'ocean') fillColor = '#1a2a4a';
+                else if (biome === 'jungle') fillColor = '#0a3a0a';
+                else if (biome === 'volcanic') fillColor = '#3a1a0a';
+                else fillColor = '#1a2a1a';
+            }
+
+            var strokeColor = h.current ? '#d4a843' : '#333';
+            var strokeWidth = h.current ? 2.5 : 0.8;
+
+            html += '<polygon points="' + pointsStr + '" fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="' + strokeWidth + '"/>';
+
+            if (h.discovered) {
+                var icons = [];
+                if (h.current) icons.push('\u25c9');
+                if (h.has_town) icons.push('\ud83c\udfe0');
+                if (h.has_dungeon) icons.push('\ud83d\udc80');
+                if (h.has_tower) icons.push('\ud83c\udff0');
+                if (h.has_exchange) icons.push('\ud83e\ude99');
+
+                if (icons.length > 0) {
+                    var fsize = icons.length > 2 ? 8 : 10;
+                    var fcolor = h.current ? '#d4a843' : '#ccc';
+                    html += '<text x="' + cx + '" y="' + (cy + 1) + '" text-anchor="middle" dominant-baseline="central" font-size="' + fsize + '" fill="' + fcolor + '">' + icons.join('') + '</text>';
+                }
+            }
+        });
+
+        html += '</svg>';
+    }
+
+    var directions = mapView.directions || [];
+    if (directions.length > 0) {
+        html += '<div class="hex-directions">';
+        directions.forEach(function(dir) {
+            var biomeStr = dir.biome && dir.biome !== '?' ? ' (' + dir.biome + ')' : '';
+            html += '<div class="hex-dir-entry">';
+            html += '<span class="hex-dir-name">' + escapeHtml(dir.direction) + '</span> ';
+            html += '<span class="hex-dir-target">' + escapeHtml(dir.name) + biomeStr + '</span>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (current) {
+        html += '<div class="hex-features">';
+        if (current.has_town) html += '<span class="hex-feat">\ud83c\udfe0 Town</span>';
+        if (current.has_dungeon) html += '<span class="hex-feat">\ud83d\udc80 Dungeon</span>';
+        if (current.has_tower) html += '<span class="hex-feat">\ud83c\udff0 ' + escapeHtml(current.tower_name || 'Tower') + '</span>';
+        if (current.has_exchange) html += '<span class="hex-feat">\ud83e\ude99 Exchange</span>';
+        if (current.has_guild_hall) html += '<span class="hex-feat">\u2694 Guild Hall</span>';
+        html += '</div>';
+    }
+
+    html += '<div class="map-legend" style="margin-top:4px;">';
+    html += '<span>\u25c9 You</span>';
+    html += '<span>\ud83c\udfe0 Town</span>';
+    html += '<span>\ud83d\udc80 Dungeon</span>';
+    html += '<span>\ud83c\udff0 Tower</span>';
+    html += '</div>';
+
+    el.innerHTML = html;
+}
+
+function renderDungeonMap(el, dungeon) {
     const floor = dungeon.floors[dungeon.current_floor];
     if (!floor) {
         el.innerHTML = '<div class="empty-state">Invalid floor.</div>';
         return;
     }
 
-    // Floor selector
-    let html = `<div class="map-header">
-        <div class="dungeon-name">${escapeHtml(dungeon.name)}</div>
-        <div class="floor-selector">`;
-    dungeon.floors.forEach((f, i) => {
-        const active = i === dungeon.current_floor ? ' active' : '';
-        html += `<span class="floor-btn${active}">F${f.level}</span>`;
+    let html = '<div class="map-header"><div class="dungeon-name">' + escapeHtml(dungeon.name) + '</div><div class="floor-selector">';
+    dungeon.floors.forEach(function(f, i) {
+        var active = i === dungeon.current_floor ? ' active' : '';
+        html += '<span class="floor-btn' + active + '">F' + f.level + '</span>';
     });
     html += '</div></div>';
 
-    // Current room info
-    const currentRoom = floor.rooms[dungeon.current_room];
+    var currentRoom = floor.rooms[dungeon.current_room];
     if (currentRoom) {
-        const typeLabel = currentRoom.room_type || 'unknown';
-        const clearedBadge = currentRoom.cleared ? ' <span class="room-cleared-badge">Cleared</span>' : '';
-        html += `<div class="current-room-info">
-            <span class="room-label">${escapeHtml(currentRoom.name)}</span>
-            <span class="room-type-badge">${typeLabel}</span>${clearedBadge}
-        </div>`;
+        var typeLabel = currentRoom.room_type || 'unknown';
+        var clearedBadge = currentRoom.cleared ? ' <span class="room-cleared-badge">Cleared</span>' : '';
+        html += '<div class="current-room-info"><span class="room-label">' + escapeHtml(currentRoom.name) + '</span><span class="room-type-badge">' + typeLabel + '</span>' + clearedBadge + '</div>';
     }
 
-    // Render grid map
-    const W = floor.width || 40;
-    const H = floor.height || 30;
-    const CELL = 7;
+    var W = floor.width || 40;
+    var H = floor.height || 30;
+    var CELL = 7;
+    var grid = Array.from({length: H}, function() { return Array(W).fill('fog'); });
 
-    // Build a 2D grid of cell types
-    const grid = Array.from({length: H}, () => Array(W).fill('fog'));
-
-    // Mark rooms
-    floor.rooms.forEach((room, idx) => {
+    floor.rooms.forEach(function(room, idx) {
         if (!room.discovered) return;
-        for (let ry = room.y; ry < room.y + room.h && ry < H; ry++) {
-            for (let rx = room.x; rx < room.x + room.w && rx < W; rx++) {
-                let cellClass = 'room';
+        for (var ry = room.y; ry < room.y + room.h && ry < H; ry++) {
+            for (var rx = room.x; rx < room.x + room.w && rx < W; rx++) {
+                var cellClass = 'room';
                 if (idx === dungeon.current_room) cellClass = 'current';
                 else if (room.room_type === 'Boss') cellClass = 'boss';
                 else if (room.room_type === 'Combat' && !room.cleared) cellClass = 'combat';
@@ -332,87 +476,32 @@ function renderMap(el, state) {
         }
     });
 
-    // Mark corridors
-    floor.corridors.forEach(cor => {
+    floor.corridors.forEach(function(cor) {
         if (!cor.discovered) return;
-        cor.cells.forEach(([cx, cy]) => {
+        cor.cells.forEach(function(cell) {
+            var cx = cell[0], cy = cell[1];
             if (cy < H && cx < W && grid[cy][cx] === 'fog') {
                 grid[cy][cx] = 'corridor';
             }
         });
     });
 
-    // Render as CSS grid
-    html += `<div class="dungeon-grid" style="grid-template-columns:repeat(${W},${CELL}px);grid-template-rows:repeat(${H},${CELL}px);">`;
-    for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-            html += `<div class="map-cell ${grid[y][x]}"></div>`;
+    html += '<div class="dungeon-grid" style="grid-template-columns:repeat(' + W + ',' + CELL + 'px);grid-template-rows:repeat(' + H + ',' + CELL + 'px);">';
+    for (var y = 0; y < H; y++) {
+        for (var x = 0; x < W; x++) {
+            html += '<div class="map-cell ' + grid[y][x] + '"></div>';
         }
     }
     html += '</div>';
 
-    // Legend
-    html += `<div class="map-legend">
-        <span><span class="legend-swatch current"></span>You</span>
-        <span><span class="legend-swatch room"></span>Room</span>
-        <span><span class="legend-swatch cleared"></span>Cleared</span>
-        <span><span class="legend-swatch combat"></span>Enemies</span>
-        <span><span class="legend-swatch stairs"></span>Stairs</span>
-        <span><span class="legend-swatch treasure"></span>Treasure</span>
-    </div>`;
-
-    el.innerHTML = html;
-}
-
-function renderWorldMap(el, world) {
-    const currentLoc = world.locations[world.current_location];
-
-    let html = `<div class="map-header">
-        <div class="dungeon-name">${escapeHtml(world.name)}</div>
-    </div>`;
-
-    // Current location
-    html += `<div class="current-room-info">
-        <span class="room-label">${escapeHtml(currentLoc.name)}</span>
-        <span class="room-type-badge">${currentLoc.location_type}</span>
-    </div>`;
-
-    // World map as positioned nodes
-    html += '<div class="world-map-container">';
-
-    // Draw connections first (as lines)
-    html += '<svg class="world-map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">';
-    world.connections.forEach(conn => {
-        if (!conn.discovered) return;
-        const from = world.locations[conn.from];
-        const to = world.locations[conn.to];
-        const dangerColor = conn.danger_level === 0 ? '#2a5a2a' : conn.danger_level === 1 ? '#5a5a2a' : conn.danger_level === 2 ? '#5a3a1a' : '#5a1a1a';
-        html += `<line x1="${from.x*100}" y1="${from.y*100}" x2="${to.x*100}" y2="${to.y*100}" stroke="${dangerColor}" stroke-width="0.4" opacity="0.6"/>`;
-    });
-    html += '</svg>';
-
-    // Draw location nodes
-    world.locations.forEach((loc, i) => {
-        if (!loc.discovered) return;
-        const isCurrent = i === world.current_location;
-        const typeClass = loc.location_type.toLowerCase ? loc.location_type.toLowerCase() : loc.location_type;
-        const icon = {town:'\u{1F3E0}', dungeon:'\u{1F480}', wilderness:'\u{1F332}', landmark:'\u2728', camp:'\u{26FA}', tower:'\u{1F3F0}'}[typeClass] || '\u25CF';
-        html += `<div class="world-node ${typeClass}${isCurrent ? ' current' : ''}" style="left:${loc.x*100}%;top:${loc.y*100}%" title="${escapeAttr(loc.description)}">
-            <span class="node-icon">${icon}</span>
-            <span class="node-label">${escapeHtml(loc.name)}</span>
-        </div>`;
-    });
-
+    html += '<div class="map-legend">';
+    html += '<span><span class="legend-swatch current"></span>You</span>';
+    html += '<span><span class="legend-swatch room"></span>Room</span>';
+    html += '<span><span class="legend-swatch cleared"></span>Cleared</span>';
+    html += '<span><span class="legend-swatch combat"></span>Enemies</span>';
+    html += '<span><span class="legend-swatch stairs"></span>Stairs</span>';
+    html += '<span><span class="legend-swatch treasure"></span>Treasure</span>';
     html += '</div>';
-
-    // Legend
-    html += `<div class="map-legend" style="margin-top:4px;">
-        <span>\u{1F3E0} Town</span>
-        <span>\u{1F480} Dungeon</span>
-        <span>\u{1F332} Wild</span>
-        <span>\u{1F3F0} Tower</span>
-        <span>\u26FA Camp</span>
-    </div>`;
 
     el.innerHTML = html;
 }

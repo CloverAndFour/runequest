@@ -2,6 +2,8 @@
 
 use crate::engine::AdventureState;
 use crate::engine::conditions::conditions_summary;
+use crate::engine::skills::rank_name;
+
 
 pub fn build_system_prompt(state: &AdventureState) -> String {
     format!(
@@ -77,6 +79,45 @@ Write in second person ("You see...", "You feel..."). Be vivid and atmospheric. 
 
 When combat starts, describe the enemies dramatically. During combat, narrate each action with flair. When the player succeeds on a roll, celebrate it. When they fail, make the consequence feel real but not unfair.
 
+## CRAFTING SYSTEM
+
+The world has a full crafting system with 10 crafting skills and a tiered progression:
+
+**Crafting Flow:** Gather T0 materials -> Craft intermediate materials -> Craft equipment
+1. Use `gather` to collect raw materials from the current biome (free, no skill needed)
+2. Use `craft_item` with a recipe ID to transform materials into better materials or equipment
+3. Use `list_recipes` to see what the player can craft at their current location and skill level
+
+**Crafting Skills (gateway staircase):**
+LW (Leatherworking, T1) -> SM (Smithing, T2) -> WW (Woodworking, T3) -> AL (Alchemy, T4) ->
+EN (Enchanting, T5) -> TL (Tailoring, T6) -> JC (Jewelcrafting, T7) -> RC (Runecrafting, T8) ->
+AF (Artificing, T9) -> TH (Theurgy, T10)
+
+**Crafting Stations:** Towns have crafting stations based on their tier. Low-tier towns have basic stations
+(Tanning Rack, Basic Forge), high-tier towns have advanced stations (Master Forge, Runic Circle, Sacred Altar).
+The Primordial Forge supports all skills at all tiers.
+
+**10 Equipment Lines:** Blade, Axe, Holy, Dagger, Bow, Fist, Staff, Wand, Scepter, Song —
+each produces weapons and armor from T1 to T10.
+
+**For New Players:**
+- Suggest gathering materials when they arrive at a new location
+- Mention crafting when they have enough materials for a recipe
+- Use `list_recipes` to check what is available before suggesting crafting
+- Award crafting skill XP when players complete crafting-related quests
+
+**Tool Usage:**
+- `gather` — free action, always works, gives 1-3 materials + Survival XP
+- `craft_item` — requires recipe_id, checks skill/station/materials automatically
+- `list_recipes` — shows only recipes the player can actually craft here and now
+- `award_skill_xp` — for rewarding skill progress from quests or practice
+- `get_skills` — to check player skill ranks before suggesting crafting
+
+## SKILLS
+
+{skills_summary}
+Murderer Status: {murderer_status}
+
 {dungeon_section}"#,
         char_name = state.character.name,
         race = state.character.race,
@@ -115,6 +156,21 @@ When combat starts, describe the enemies dramatically. During combat, narrate ea
         } else {
             "None".to_string()
         },
+        skills_summary = {
+            let crafting: Vec<String> = state.skills.skills.iter()
+                .filter(|s| ["leatherworking","smithing","woodworking","alchemy","enchanting",
+                             "tailoring","jewelcrafting","runecrafting","artificing","theurgy",
+                             "survival"].contains(&s.id.as_str()))
+                .filter(|s| s.rank > 0)
+                .map(|s| format!("{}: {} ({})", s.name, rank_name(s.rank), s.rank))
+                .collect();
+            if crafting.is_empty() {
+                "Crafting Skills: All untrained".to_string()
+            } else {
+                format!("Crafting Skills: {}", crafting.join(", "))
+            }
+        },
+        murderer_status = if state.murderer { "YES — guards are hostile" } else { "No" },
         dungeon_section = if state.world.is_some() {
             build_world_section(state)
         } else {

@@ -14,6 +14,26 @@ pub struct EnemyAttack {
     pub to_hit_bonus: i32,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum EnemyType {
+    Brute,
+    Skulker,
+    Mystic,
+    Undead,
+}
+
+impl std::fmt::Display for EnemyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnemyType::Brute => write!(f, "Brute"),
+            EnemyType::Skulker => write!(f, "Skulker"),
+            EnemyType::Mystic => write!(f, "Mystic"),
+            EnemyType::Undead => write!(f, "Undead"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Enemy {
     pub name: String,
@@ -21,6 +41,10 @@ pub struct Enemy {
     pub max_hp: i32,
     pub ac: i32,
     pub attacks: Vec<EnemyAttack>,
+    #[serde(default)]
+    pub enemy_type: Option<EnemyType>,
+    #[serde(default)]
+    pub tier: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -104,6 +128,8 @@ pub struct CombatState {
     #[serde(default)]
     pub player_dodging: bool,
     #[serde(default)]
+    pub flee_attempts: u32,
+    #[serde(default)]
     pub combat_log: Vec<String>,
 }
 
@@ -118,6 +144,7 @@ impl CombatState {
         self.enemies = enemies;
         self.round = 1;
         self.player_dodging = false;
+        self.flee_attempts = 0;
         self.combat_log.clear();
 
         // Roll initiative
@@ -335,6 +362,15 @@ impl CombatState {
             }
             _ => {}
         }
+
+        let flee_dc = (10 + self.living_enemies().len() as i32 * 2 - self.flee_attempts as i32 * 2).max(5);
+        actions.push(AvailableAction {
+            id: "flee".to_string(),
+            name: "Flee".to_string(),
+            cost: "Action".to_string(),
+            description: format!("Attempt to escape combat (DC {})", flee_dc),
+            enabled: has_action,
+        });
 
         actions.push(AvailableAction {
             id: "end_turn".to_string(),

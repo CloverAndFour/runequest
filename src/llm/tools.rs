@@ -71,7 +71,7 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
             },
             "required": ["name", "description", "item_type"]
         })),
-        tool("give_item", "Give the player a standard item from the item database by ID. The item goes into their inventory (backpack). Use equip_item afterwards if the player should equip it. Standard IDs include: longsword, shortsword, dagger, mace, quarterstaff, battleaxe, rapier, greatsword, greataxe, longbow, shortbow, light_crossbow, heavy_crossbow, leather_armor, studded_leather, chain_shirt, chain_mail, scale_mail, plate_armor, shield, health_potion, greater_health_potion, ring_of_protection, cloak_of_protection, boots_of_speed, gauntlets_of_ogre_power, amulet_of_health, flametongue_longsword, frostbrand_greatsword, vorpal_longsword, etc.", serde_json::json!({
+        tool("give_item", "Give the player a standard item from the item database by ID. The item goes into their inventory (backpack). The player manages their own equipment via the UI. Standard IDs include: longsword, shortsword, dagger, mace, quarterstaff, battleaxe, rapier, greatsword, greataxe, longbow, shortbow, light_crossbow, heavy_crossbow, leather_armor, studded_leather, chain_shirt, chain_mail, scale_mail, plate_armor, shield, health_potion, greater_health_potion, ring_of_protection, cloak_of_protection, boots_of_speed, gauntlets_of_ogre_power, amulet_of_health, flametongue_longsword, frostbrand_greatsword, vorpal_longsword, etc.", serde_json::json!({
             "type": "object",
             "properties": {
                 "item_id": {"type": "string", "description": "Item ID from the standard database (e.g. 'longsword', 'health_potion', 'ring_of_protection')"},
@@ -86,20 +86,6 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
                 "reason": {"type": "string", "description": "Reason for gold award (e.g. 'loot from goblin', 'quest reward')"}
             },
             "required": ["amount"]
-        })),
-        tool("equip_item", "Equip an item from the player's inventory to the appropriate equipment slot. If the slot is already occupied, the old item is swapped back to inventory. Recalculates AC automatically.", serde_json::json!({
-            "type": "object",
-            "properties": {
-                "item_name": {"type": "string", "description": "Name of the item in inventory to equip"}
-            },
-            "required": ["item_name"]
-        })),
-        tool("unequip_slot", "Remove the item from an equipment slot and place it in inventory. Recalculates AC automatically.", serde_json::json!({
-            "type": "object",
-            "properties": {
-                "slot": {"type": "string", "enum": ["head", "amulet", "main_hand", "off_hand", "chest", "hands", "ring", "legs", "feet", "back"], "description": "Equipment slot to unequip"}
-            },
-            "required": ["slot"]
         })),
         tool("remove_item", "Remove an item from the player's inventory.", serde_json::json!({
             "type": "object",
@@ -259,6 +245,64 @@ pub fn build_tool_definitions() -> Vec<ToolDef> {
                 "item_name": {"type": "string", "description": "Name of the item in inventory to sell"}
             },
             "required": ["item_name"]
+        })),
+        // -------------------------------------------------------------------
+        // Crafting tools
+        // -------------------------------------------------------------------
+        tool("craft_item", "Craft an item using a recipe. Requires: (1) sufficient crafting skill rank, (2) a crafting station at the current town that supports the skill and tier, (3) all input materials in inventory. On success, inputs are consumed and the output is added to inventory. There is a chance to gain crafting skill XP.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "recipe_id": {"type": "string", "description": "Recipe ID to craft (e.g. 'cured_leather', 'iron_ingot')"}
+            },
+            "required": ["recipe_id"]
+        })),
+        tool("list_recipes", "List available crafting recipes. Filters by player skill rank and available crafting stations at the current location. Optionally filter by skill or tier.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "skill": {"type": "string", "description": "Filter by crafting skill ID (e.g. 'leatherworking', 'smithing')"},
+                "tier": {"type": "integer", "description": "Filter by recipe tier (1-10)"}
+            }
+        })),
+        tool("gather", "Gather raw materials from the current biome. Picks 1-3 random T0 materials based on the biome type (forest gives wood/herbs, mountains give stone/metal, etc.). Awards 5-10 Survival XP. No crafting station or skill rank required.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        // -------------------------------------------------------------------
+        // Skill tools
+        // -------------------------------------------------------------------
+        tool("award_skill_xp", "Award XP to a specific skill. Skills rank up automatically when XP threshold is reached.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string", "description": "Skill ID (e.g. 'weapon_mastery', 'stealth', 'leatherworking')"},
+                "amount": {"type": "integer", "description": "XP amount to award"}
+            },
+            "required": ["skill_id", "amount"]
+        })),
+        tool("get_skills", "Return the player's full skill set with ranks, XP, and XP thresholds.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("improve_skill", "Directly improve a skill by 1 rank (bypass XP). Use sparingly for quest rewards or special events.", serde_json::json!({
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string", "description": "Skill ID to improve"}
+            },
+            "required": ["skill_id"]
+        })),
+        // -------------------------------------------------------------------
+        // Map and social tools
+        // -------------------------------------------------------------------
+        tool("get_map_info", "Get hex map info for the player's current position including neighbors, biome, tier, and points of interest.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("flag_murderer", "Flag the player as a murderer. Town guards will become hostile. Use when the player kills an innocent NPC.", serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })),
+        tool("check_murderer", "Check if the player is flagged as a murderer.", serde_json::json!({
+            "type": "object",
+            "properties": {}
         })),
     ]
 }

@@ -67,6 +67,7 @@ function handleServerMsg(msg) {
             break;
         case 'narrative_end':
             endNarrative();
+            renderFixedActions();
             break;
         case 'dice_roll_request':
             showDiceRollUI(msg);
@@ -79,6 +80,19 @@ function handleServerMsg(msg) {
             break;
         case 'state_update':
             gameState = msg.state;
+            updateInfoPanel();
+            renderFixedActions();
+            break;
+        case 'state_changes':
+            showStateChanges(msg);
+            if (gameState && gameState.character) {
+                if (msg.gold_delta) gameState.character.gold += msg.gold_delta;
+                if (msg.xp_delta) gameState.character.xp += msg.xp_delta;
+                if (msg.hp_delta) gameState.character.hp = Math.min(
+                    gameState.character.hp + msg.hp_delta,
+                    gameState.character.max_hp
+                );
+            }
             updateInfoPanel();
             break;
         case 'cost_update':
@@ -168,6 +182,8 @@ function appendNarrativeChunk(text) {
 function endNarrative() {
     if (currentNarrativeEl) {
         currentNarrativeEl.classList.remove('streaming');
+        const storyContent = document.querySelector('.story-content');
+        if (storyContent) storyContent.scrollTop = storyContent.scrollHeight;
         currentNarrativeEl = null;
     }
 }
@@ -272,7 +288,7 @@ function showChoices(data) {
     endNarrative();
 
     const div = document.createElement('div');
-    div.className = 'choices-container';
+    div.className = 'llm-choices-section';
 
     let html = `<div class="choices-prompt">${escapeHtml(data.prompt)}</div><div class="choices-grid">`;
     data.choices.forEach((choice, i) => {
@@ -293,11 +309,15 @@ function showChoices(data) {
     storyContent.appendChild(div);
     storyContent.scrollTop = storyContent.scrollHeight;
 
+    // Ensure fixed actions appear above LLM choices
+    renderFixedActions();
+
     div.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const index = parseInt(btn.dataset.index);
             const text = btn.dataset.text;
-            div.remove();
+            storyContent.querySelectorAll('.fixed-choices-section, .llm-choices-section, .choices-separator').forEach(function(el) { el.remove(); });
+            showLoadingSpinner();
             ws.send({ type: 'select_choice', index, text });
         });
     });
@@ -308,7 +328,15 @@ function showChoices(data) {
         const submit = () => {
             const text = input.value.trim();
             if (text) {
-                div.remove();
+                storyContent.querySelectorAll('.fixed-choices-section, .llm-choices-section, .choices-separator').forEach(function(el) { el.remove(); });
+                const storyContent2 = document.querySelector('.story-content');
+                if (storyContent2) {
+                    const msgBlock = document.createElement('div');
+                    msgBlock.className = 'user-message-block';
+                    msgBlock.textContent = '> ' + text;
+                    storyContent2.appendChild(msgBlock);
+                }
+                showLoadingSpinner();
                 ws.send({ type: 'send_message', content: text });
             }
         };
@@ -460,5 +488,138 @@ function escapeAttr(str) {
 }
 
 window.rqWs = { send: (msg) => ws?.send(msg) };
+
+function showLoadingSpinner() {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+    if (storyContent.querySelector('.loading-narrative')) return;
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading-narrative';
+    loadingDiv.innerHTML = '<div class="d20-spinner"></div><span class="loading-text">Thinking...</span>';
+    storyContent.appendChild(loadingDiv);
+    storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function showStateChanges(data) {
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+    const badges = [];
+    if (data.gold_delta > 0) badges.push('<span class="sc-badge sc-gold">+' + data.gold_delta + ' gold</span>');
+    if (data.gold_delta < 0) badges.push('<span class="sc-badge sc-gold-loss">' + data.gold_delta + ' gold</span>');
+    if (data.xp_delta > 0) badges.push('<span class="sc-badge sc-xp">+' + data.xp_delta + ' XP</span>');
+    if (data.hp_delta > 0) badges.push('<span class="sc-badge sc-heal">+' + data.hp_delta + ' HP</span>');
+    if (data.hp_delta < 0) badges.push('<span class="sc-badge sc-damage">' + data.hp_delta + ' HP</span>');
+    if (data.level_up) badges.push('<span class="sc-badge sc-level">LEVEL UP!</span>');
+    if (data.items_gained) data.items_gained.forEach(function(i) { badges.push('<span class="sc-badge sc-item-gain">+' + escapeHtml(i) + '</span>'); });
+    if (data.items_lost) data.items_lost.forEach(function(i) { badges.push('<span class="sc-badge sc-item-loss">-' + escapeHtml(i) + '</span>'); });
+    if (badges.length === 0) return;
+    var div = document.createElement('div');
+    div.className = 'state-changes';
+    div.innerHTML = badges.join(' ');
+    storyContent.appendChild(div);
+    storyContent.scrollTop = storyContent.scrollHeight;
+}
+
+function renderFixedActions() {
+    var storyContent = document.querySelector('.story-content');
+    if (!storyContent) return;
+    
+    var llmSection = storyContent.querySelector('.llm-choices-section');
+    
+    // Remove existing fixed actions
+    document.querySelectorAll('.fixed-choices-section').forEach(function(el) { el.remove(); });
+
+    if (!gameState) return;
+    if (gameState.combat && gameState.combat.active) return;
+    if (gameState.character && (gameState.character.dead || gameState.character.hp <= 0)) return;
+
+    var buttons = [];
+
+    // Use map_view system exclusively
+    var mapView = gameState.map_view;
+    if (mapView) {
+        if (mapView.directions) {
+            mapView.directions.forEach(function(dir) {
+                var tierStr = dir.tier && dir.tier !== '?' ? ' (T' + dir.tier + ')' : '';
+                var label = dir.direction + ': ' + dir.name + tierStr;
+                buttons.push({ label: label, icon: '\u{1F9ED}', action: 'travel_dir:' + dir.direction.toLowerCase(), type: 'travel' });
+            });
+        }
+        var current = mapView.current;
+        if (current) {
+            if (current.has_town) buttons.push({ label: 'Visit Shop', icon: '\u{1F6D2}', action: 'shop', type: 'shop' });
+            if (current.has_dungeon) buttons.push({ label: 'Enter Dungeon', icon: '\u{1F480}', action: 'dungeon', type: 'dungeon' });
+            if (current.has_tower) buttons.push({ label: 'Enter ' + (current.tower_name || 'Tower'), icon: '\u{1F3F0}', action: 'tower', type: 'tower' });
+            if (current.has_exchange) buttons.push({ label: 'Exchange', icon: '\u{1FA99}', action: 'exchange', type: 'exchange' });
+            if (current.has_guild_hall) buttons.push({ label: 'Guild Hall', icon: '\u2694', action: 'guild_hall', type: 'guild_hall' });
+        }
+    }
+
+    // NPCs at location
+    var npcsHere = (gameState.npcs || []).filter(function(n) {
+        return n.location && gameState.current_scene &&
+               n.location.toLowerCase() === gameState.current_scene.location.toLowerCase();
+    });
+    npcsHere.forEach(function(npc) {
+        buttons.push({ label: 'Talk to ' + npc.name, icon: '\u{1F4AC}', action: 'npc:' + npc.name, type: 'npc' });
+    });
+
+    if (buttons.length === 0) return;
+
+    var section = document.createElement('div');
+    section.className = 'fixed-choices-section';
+    section.innerHTML = '<div class="choices-grid">' +
+        buttons.map(function(b) {
+            return '<button class="choice-btn fixed-choice" data-action="' + b.action + '" data-type="' + b.type + '">' +
+                '<span class="fa-icon">' + b.icon + '</span> ' + escapeHtml(b.label) +
+                '</button>';
+        }).join('') + '</div>';
+
+    if (llmSection) {
+        storyContent.insertBefore(section, llmSection);
+        if (!storyContent.querySelector('.choices-separator')) {
+            var sep = document.createElement('div');
+            sep.className = 'choices-separator';
+            storyContent.insertBefore(sep, llmSection);
+        }
+    } else {
+        storyContent.appendChild(section);
+    }
+    storyContent.scrollTop = storyContent.scrollHeight;
+
+    section.querySelectorAll('.fixed-choice').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            handleFixedAction(btn.dataset.action, btn.dataset.type);
+        });
+    });
+}
+
+function handleFixedAction(action, type) {
+    document.querySelectorAll('.fixed-choices-section, .llm-choices-section, .choices-container').forEach(function(el) { el.remove(); });
+    if (type === 'travel') {
+        var direction = action.replace('travel_dir:', '');
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Travel ' + direction });
+    } else if (type === 'shop') {
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'I want to visit the shop' });
+    } else if (type === 'dungeon') {
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Enter the dungeon' });
+    } else if (type === 'tower') {
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Enter the tower' });
+    } else if (type === 'exchange') {
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Visit the exchange' });
+    } else if (type === 'guild_hall') {
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Visit the guild hall' });
+    } else if (type === 'npc') {
+        var npcName = action.replace('npc:', '');
+        showLoadingSpinner();
+        ws.send({ type: 'send_message', content: 'Talk to ' + npcName });
+    }
+}
 
 init();

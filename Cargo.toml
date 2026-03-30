@@ -45,6 +45,10 @@ fs2 = "0.4"
 # Password input
 rpassword = "5"
 
+# Markdown rendering
+pulldown-cmark = "0.12"
+rand_chacha = "0.3"
+
 [profile.release]
 codegen-units = 4
 incremental = true

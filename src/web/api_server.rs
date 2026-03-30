@@ -1,7 +1,7 @@
 //! REST API server — stateless JSON endpoints on a separate port.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     middleware as axum_mw,
     response::IntoResponse,
@@ -22,6 +22,7 @@ use crate::engine::conditions::apply_turn_effects;
 use crate::engine::dice::DiceRoller;
 use crate::engine::equipment;
 use crate::engine::executor::{execute_tool_call, ToolExecResult};
+use crate::engine::crafting::CRAFTING_GRAPH;
 use crate::llm::client::XaiClient;
 use crate::llm::pricing::{model_cost, TokenUsage};
 use crate::llm::prompts::{adventure_start_prompt, build_system_prompt};
@@ -148,10 +149,14 @@ struct CreateAdventureRequest {
     name: String,
     character_name: String,
     race: String,
-    class: String,
+    #[serde(default)]
+    class: Option<String>,
+    #[serde(default)]
+    background: Option<String>,
     #[serde(default)]
     scenario: Option<String>,
-    stats: StatsInput,
+    #[serde(default)]
+    stats: Option<StatsInput>,
 }
 
 #[derive(Deserialize)]
@@ -218,6 +223,20 @@ struct XpRequest {
 struct ConditionRequest {
     condition: String,
     action: String,
+}
+
+#[derive(Deserialize)]
+struct CraftRequest {
+    recipe_id: String,
+}
+
+#[derive(Deserialize)]
+struct SkillRequest {
+    action: String,
+    #[serde(default)]
+    skill_id: Option<String>,
+    #[serde(default)]
+    amount: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -379,6 +398,15 @@ pub async fn run_api_server(
         // Items
         .route("/api/items", get(list_items))
         .route("/api/items/:id", get(get_item_by_id))
+        // Crafting
+        .route("/api/recipes", get(list_recipes))
+        .route("/api/recipes/:recipe_id", get(get_recipe))
+        .route("/api/materials", get(list_materials))
+        .route("/api/adventures/:id/craft", post(craft_item))
+        // Skills
+        .route("/api/adventures/:id/engine/skill", post(engine_skill))
+        // Backgrounds
+        .route("/api/backgrounds", get(list_backgrounds))
         .layer(axum_mw::from_fn_with_state(
             auth_state.clone(),
             require_auth,
@@ -461,6 +489,16 @@ fn build_combat_info(adventure: &AdventureState) -> Option<CombatInfo> {
     })
 }
 
+
+fn build_state_with_map(adventure: &AdventureState) -> serde_json::Value {
+    let mut state = serde_json::to_value(adventure).unwrap_or_default();
+    if let serde_json::Value::Object(ref mut map) = state {
+        map.insert("map_view".to_string(),
+            crate::engine::world_map::build_map_view(&adventure.world_position, &adventure.discovery, false));
+    }
+    state
+}
+
 fn game_response(
     adventure: &AdventureState,
     narrative: Option<String>,
@@ -468,7 +506,7 @@ fn game_response(
     cost: Option<CostInfo>,
 ) -> GameResponse {
     GameResponse {
-        state: serde_json::to_value(adventure).unwrap_or_default(),
+        state: build_state_with_map(adventure),
         narrative,
         pending,
         combat: build_combat_info(adventure),
@@ -887,17 +925,26 @@ async fn create_adventure(
     Json(req): Json<CreateAdventureRequest>,
 ) -> impl IntoResponse {
     let race = parse_race(&req.race);
-    let class = parse_class(&req.class);
-    let stats = Stats {
-        strength: req.stats.strength,
-        dexterity: req.stats.dexterity,
-        constitution: req.stats.constitution,
-        intelligence: req.stats.intelligence,
-        wisdom: req.stats.wisdom,
-        charisma: req.stats.charisma,
+    let class = parse_class(req.class.as_deref().unwrap_or("warrior"));
+    let stats = if let Some(ref s) = req.stats {
+        Stats {
+            strength: s.strength,
+            dexterity: s.dexterity,
+            constitution: s.constitution,
+            intelligence: s.intelligence,
+            wisdom: s.wisdom,
+            charisma: s.charisma,
+        }
+    } else {
+        Stats { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 }
     };
-
-    let adventure = AdventureState::new(req.name, req.character_name, race, class, stats, &req.scenario);
+    let adventure = if let Some(ref bg_str) = req.background {
+        let bg = crate::engine::backgrounds::Background::from_str(bg_str)
+            .unwrap_or_default();
+        AdventureState::new_with_background(req.name, req.character_name, race, bg, &req.scenario)
+    } else {
+        AdventureState::new(req.name, req.character_name, race, class, stats, &req.scenario)
+    };
     let store = make_store(&state, &user.username);
 
     if let Err(e) = store.create_adventure(adventure.clone()) {
@@ -1465,6 +1512,75 @@ async fn combat_action(
             adventure.combat.combat_log.push(action_description.clone());
         }
 
+
+        "flee" => {
+            if adventure.combat.action_economy.actions == 0 {
+                return err_json("no_action", "No actions remaining").into_response();
+            }
+            adventure.combat.action_economy.actions -= 1;
+
+            let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+            let living = adventure.combat.living_enemies().len() as i32;
+            let flee_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
+            let roll = DiceRoller::roll("d20", 1, dex_mod);
+            let success = roll.total >= flee_dc;
+
+            if success {
+                action_description = format!(
+                    "{} attempts to flee (rolled {} vs DC {}): SUCCESS! Escaped combat!",
+                    adventure.character.name, roll.total, flee_dc
+                );
+                adventure.combat.combat_log.push(action_description.clone());
+                adventure.combat.end();
+                store.save_adventure(&adventure).ok();
+
+                // Ask LLM to narrate the escape
+                let messages = {
+                    let mut m = load_messages_for_adventure(&store, &adventure);
+                    m.push(ChatMessage::user(
+                        "The player successfully fled from combat. Narrate their narrow escape and present choices for what to do next.",
+                    ));
+                    let _ = store.append_message(
+                        &id,
+                        &HistoryMessage {
+                            role: "user".to_string(),
+                            content: Some("The player successfully fled from combat. Narrate their narrow escape and present choices for what to do next.".to_string()),
+                            tool_calls: None,
+                            tool_call_id: None,
+                            timestamp: chrono::Utc::now(),
+                        },
+                    );
+                    m
+                };
+
+                match run_tool_loop(&state, &store, adventure, messages, &user.username).await {
+                    Ok(result) => {
+                        let mut narr = action_description;
+                        if !result.narrative.is_empty() {
+                            narr.push('\n');
+                            narr.push_str(&result.narrative);
+                        }
+                        return Json(game_response(
+                            &result.adventure,
+                            Some(narr),
+                            result.pending,
+                            result.total_cost,
+                        ))
+                        .into_response();
+                    }
+                    Err(e) => return e.into_response(),
+                }
+            } else {
+                adventure.combat.flee_attempts += 1;
+                let next_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
+                action_description = format!(
+                    "{} attempts to flee (rolled {} vs DC {}): FAILED! The enemies block the escape. (Next attempt DC {})",
+                    adventure.character.name, roll.total, flee_dc, next_dc
+                );
+                adventure.combat.combat_log.push(action_description.clone());
+            }
+        }
+
         "end_turn" => {
             adventure.combat.next_turn();
             run_enemy_turns(&mut adventure);
@@ -1516,7 +1632,7 @@ async fn equip_item(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1542,7 +1658,7 @@ async fn unequip_item(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1572,7 +1688,7 @@ async fn engine_hp(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1598,7 +1714,7 @@ async fn engine_item(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1624,7 +1740,7 @@ async fn engine_gold(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1650,7 +1766,7 @@ async fn engine_xp(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1682,7 +1798,7 @@ async fn engine_condition(
             store.save_adventure(&adventure).ok();
             Json(serde_json::json!({
                 "result": result,
-                "state": serde_json::to_value(&adventure).unwrap_or_default(),
+                "state": build_state_with_map(&adventure),
             }))
             .into_response()
         }
@@ -1720,6 +1836,9 @@ async fn engine_combat(
                     to_hit_bonus: a.to_hit_bonus,
                 })
                 .collect(),
+        
+            enemy_type: None,
+            tier: None,
         })
         .collect();
 
@@ -1798,6 +1917,188 @@ async fn get_item_by_id(Path(item_id): Path<String>) -> impl IntoResponse {
         .into_response(),
         None => err_not_found("Item not found").into_response(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Crafting endpoints
+// ---------------------------------------------------------------------------
+
+async fn list_recipes(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let graph = &*CRAFTING_GRAPH;
+    let skill_filter = params.get("skill").map(|s: &String| s.as_str());
+    let tier_filter = params.get("tier").and_then(|t: &String| t.parse::<u8>().ok());
+
+    let recipes: Vec<serde_json::Value> = graph.recipes.iter()
+        .filter(|r| {
+            if let Some(sf) = skill_filter {
+                if r.skill.skill_id() != sf { return false; }
+            }
+            if let Some(tf) = tier_filter {
+                if r.tier != tf { return false; }
+            }
+            true
+        })
+        .map(|r| {
+            let inputs: Vec<serde_json::Value> = r.inputs.iter().map(|(id, qty)| {
+                let name = graph.materials.get(id).map(|m| m.name.as_str()).unwrap_or(id.as_str());
+                serde_json::json!({"id": id, "name": name, "quantity": qty})
+            }).collect();
+            let output_name = graph.materials.get(&r.output).map(|m| m.name.as_str()).unwrap_or(r.output.as_str());
+            serde_json::json!({
+                "id": r.id,
+                "name": r.name,
+                "skill": r.skill.name(),
+                "skill_id": r.skill.skill_id(),
+                "skill_rank": r.skill_rank,
+                "tier": r.tier,
+                "inputs": inputs,
+                "output": r.output,
+                "output_name": output_name,
+                "output_qty": r.output_qty,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({ "recipes": recipes }))
+}
+
+async fn get_recipe(Path(recipe_id): Path<String>) -> impl IntoResponse {
+    let graph = &*CRAFTING_GRAPH;
+    match graph.recipes.iter().find(|r| r.id == recipe_id) {
+        Some(r) => {
+            let inputs: Vec<serde_json::Value> = r.inputs.iter().map(|(id, qty)| {
+                let name = graph.materials.get(id).map(|m| m.name.as_str()).unwrap_or(id.as_str());
+                serde_json::json!({"id": id, "name": name, "quantity": qty})
+            }).collect();
+            let output_name = graph.materials.get(&r.output).map(|m| m.name.as_str()).unwrap_or(r.output.as_str());
+            Json(serde_json::json!({
+                "id": r.id,
+                "name": r.name,
+                "skill": r.skill.name(),
+                "skill_id": r.skill.skill_id(),
+                "skill_rank": r.skill_rank,
+                "tier": r.tier,
+                "inputs": inputs,
+                "output": r.output,
+                "output_name": output_name,
+                "output_qty": r.output_qty,
+            }))
+            .into_response()
+        }
+        None => err_not_found("Recipe not found").into_response(),
+    }
+}
+
+async fn list_materials() -> impl IntoResponse {
+    let graph = &*CRAFTING_GRAPH;
+    let materials: Vec<serde_json::Value> = graph.materials.values()
+        .map(|m| serde_json::json!({
+            "id": m.id,
+            "name": m.name,
+            "tier": m.tier,
+            "source": format!("{:?}", m.source),
+        }))
+        .collect();
+    Json(serde_json::json!({ "materials": materials }))
+}
+
+async fn craft_item(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CraftRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let args = serde_json::json!({"recipe_id": req.recipe_id});
+    match execute_tool_call(&mut adventure, "craft_item", &args) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            store.save_adventure(&adventure).ok();
+            Json(serde_json::json!({
+                "result": result,
+                "state": build_state_with_map(&adventure),
+            }))
+            .into_response()
+        }
+        _ => err_internal("Crafting failed").into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Skill endpoint
+// ---------------------------------------------------------------------------
+
+async fn engine_skill(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+    Json(req): Json<SkillRequest>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let (tool_name, args) = match req.action.as_str() {
+        "get" => ("get_skills", serde_json::json!({})),
+        "improve" => {
+            let skill_id = match &req.skill_id {
+                Some(s) => s.clone(),
+                None => return err_json("missing_field", "skill_id required for improve").into_response(),
+            };
+            ("improve_skill", serde_json::json!({"skill_id": skill_id}))
+        }
+        "award_xp" => {
+            let skill_id = match &req.skill_id {
+                Some(s) => s.clone(),
+                None => return err_json("missing_field", "skill_id required for award_xp").into_response(),
+            };
+            let amount = req.amount.unwrap_or(0);
+            ("award_skill_xp", serde_json::json!({"skill_id": skill_id, "amount": amount}))
+        }
+        _ => return err_json("invalid_action", "action must be 'get', 'improve', or 'award_xp'").into_response(),
+    };
+
+    match execute_tool_call(&mut adventure, tool_name, &args) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            store.save_adventure(&adventure).ok();
+            Json(serde_json::json!({
+                "result": result,
+                "state": build_state_with_map(&adventure),
+            }))
+            .into_response()
+        }
+        _ => err_internal("Skill operation failed").into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backgrounds endpoint
+// ---------------------------------------------------------------------------
+
+async fn list_backgrounds() -> impl IntoResponse {
+    use crate::engine::backgrounds::Background;
+    let backgrounds = Background::all();
+    let result: Vec<serde_json::Value> = backgrounds.iter().map(|b| {
+        serde_json::json!({
+            "name": b.name(),
+            "description": b.description(),
+            "starting_gold": b.starting_gold(),
+            "starting_skills": b.starting_skills(),
+        })
+    }).collect();
+    Json(serde_json::json!({ "backgrounds": result }))
 }
 
 // ---------------------------------------------------------------------------

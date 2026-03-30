@@ -9,7 +9,9 @@ use super::combat::CombatState;
 use super::dungeon::Dungeon;
 use super::equipment::{get_item, Equipment};
 use super::inventory::Inventory;
+use super::skills::{self, SkillSet};
 use super::world::{self, WorldMap};
+use super::world_map::{PlayerPosition, DiscoveryState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scene {
@@ -41,6 +43,14 @@ pub struct AdventureState {
     pub dungeon: Option<Dungeon>,
     #[serde(default)]
     pub world: Option<WorldMap>,
+    #[serde(default)]
+    pub skills: SkillSet,
+    #[serde(default)]
+    pub world_position: PlayerPosition,
+    #[serde(default)]
+    pub discovery: DiscoveryState,
+    #[serde(default)]
+    pub murderer: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -120,12 +130,24 @@ impl AdventureState {
                     inventory.add(item);
                 }
             }
+            // New classes get warrior-like starting equipment
+            _ => {
+                if let Some(item) = get_item("longsword") {
+                    let _ = equipment.equip(item);
+                }
+                if let Some(item) = get_item("leather_armor") {
+                    let _ = equipment.equip(item);
+                }
+            }
         }
 
         // Everyone starts with a health potion in their backpack
         if let Some(item) = get_item("health_potion") {
             inventory.add(item);
         }
+
+        // Initialize skills based on class (before Character::new consumes class)
+        let char_skills = skills::starting_skills(&class);
 
         let mut character = Character::new(char_name, race, class, stats);
 
@@ -144,6 +166,11 @@ impl AdventureState {
             description: start_loc.description.clone(),
         };
 
+        // Initialize world position and discovery
+        let world_position = PlayerPosition::default();
+        let mut discovery_state = DiscoveryState::default();
+        discovery_state.discover(world_position.coord());
+
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name,
@@ -157,8 +184,97 @@ impl AdventureState {
             quest_log: Vec::new(),
             dungeon: None,
             world: Some(world_map),
+            skills: char_skills,
+            world_position,
+            discovery: discovery_state,
+            murderer: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
     }
+    pub fn new_with_background(
+        name: String,
+        char_name: String,
+        race: Race,
+        background: super::backgrounds::Background,
+        scenario: &Option<String>,
+    ) -> Self {
+        let stats = Stats { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
+        let con_mod = Stats::modifier(stats.constitution);
+        let base_hp = 8 + con_mod;
+
+        let mut character = Character {
+            name: char_name,
+            race,
+            class: Class::Warrior, // Default, will be derived from skills
+            level: 1,
+            xp: 0,
+            hp: base_hp,
+            max_hp: base_hp,
+            ac: 10,
+            gold: background.starting_gold(),
+            stats,
+            conditions: Vec::new(),
+            dead: false,
+            background: Some(format!("{}", background)),
+            murderer: false,
+            kill_count: 0,
+        };
+
+        let mut inventory = Inventory::new();
+        let mut equipment = Equipment::new();
+
+        // Equip background starting items
+        for item_id in background.starting_items() {
+            if let Some(item) = get_item(item_id) {
+                let _ = equipment.equip(item);
+            }
+        }
+
+        character.ac = character.calculate_ac(&equipment);
+        inventory.gold = character.gold;
+
+        // Skills: all 44 at rank 0, then apply background
+        let mut char_skills = skills::all_skills();
+        skills::apply_background(&mut char_skills, &background);
+
+        let abilities = Vec::new();
+        let spell_slots = SpellSlots::default();
+
+        // World
+        let world_map = world::create_world(scenario);
+        let start_loc = &world_map.locations[world_map.current_location];
+        let scene = Scene {
+            location: start_loc.name.clone(),
+            description: start_loc.description.clone(),
+        };
+
+        let world_position = PlayerPosition::from_coord(
+            super::world_map::race_spawn_position(&format!("{}", character.race))
+        );
+        let mut discovery_state = DiscoveryState::default();
+        discovery_state.discover(world_position.coord());
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            name,
+            character,
+            inventory,
+            equipment,
+            abilities,
+            spell_slots,
+            combat: CombatState::new(),
+            current_scene: scene,
+            quest_log: Vec::new(),
+            dungeon: None,
+            world: Some(world_map),
+            skills: char_skills,
+            world_position,
+            discovery: discovery_state,
+            murderer: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
 }

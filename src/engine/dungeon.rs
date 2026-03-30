@@ -155,6 +155,8 @@ impl EnemyTemplate {
                     to_hit_bonus: a.to_hit_bonus,
                 })
                 .collect(),
+            enemy_type: None,
+            tier: None,
         }
     }
 }

@@ -34,6 +34,11 @@ pub enum Class {
     Rogue,
     Cleric,
     Ranger,
+    Berserker,
+    Paladin,
+    Monk,
+    Warlock,
+    Bard,
 }
 
 impl std::fmt::Display for Class {
@@ -44,6 +49,11 @@ impl std::fmt::Display for Class {
             Class::Rogue => write!(f, "Rogue"),
             Class::Cleric => write!(f, "Cleric"),
             Class::Ranger => write!(f, "Ranger"),
+            Class::Berserker => write!(f, "Berserker"),
+            Class::Paladin => write!(f, "Paladin"),
+            Class::Monk => write!(f, "Monk"),
+            Class::Warlock => write!(f, "Warlock"),
+            Class::Bard => write!(f, "Bard"),
         }
     }
 }
@@ -96,6 +106,12 @@ pub struct Character {
     pub conditions: Vec<String>,
     #[serde(default)]
     pub dead: bool,
+    #[serde(default)]
+    pub background: Option<String>,
+    #[serde(default)]
+    pub murderer: bool,
+    #[serde(default)]
+    pub kill_count: u32,
 }
 
 /// XP thresholds per level (index = level, value = XP needed for that level).
@@ -120,7 +136,8 @@ impl Character {
             Class::Mage => 6 + con_mod,
             Class::Rogue => 8 + con_mod,
             Class::Cleric => 8 + con_mod,
-            Class::Ranger => 10 + con_mod,
+            Class::Ranger | Class::Berserker | Class::Paladin => 10 + con_mod,
+            Class::Monk | Class::Warlock | Class::Bard => 8 + con_mod,
         };
 
         // AC starts at 10 (unarmored) — will be recalculated after equipping gear
@@ -137,6 +154,9 @@ impl Character {
             stats,
             conditions: Vec::new(),
             dead: false,
+            background: None,
+            murderer: false,
+            kill_count: 0,
         }
     }
 
@@ -193,7 +213,8 @@ impl Character {
                 Class::Mage => 4 + con_mod,
                 Class::Rogue => 5 + con_mod,
                 Class::Cleric => 5 + con_mod,
-                Class::Ranger => 6 + con_mod,
+                Class::Ranger | Class::Berserker | Class::Paladin => 6 + con_mod,
+                Class::Monk | Class::Warlock | Class::Bard => 5 + con_mod,
             };
             let hp_gain = std::cmp::max(hp_gain, 1);
             self.max_hp += hp_gain;

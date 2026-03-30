@@ -33,6 +33,15 @@ enum Commands {
 
         #[arg(long, env = "RUNEQUEST_REQUIRE_AUTH")]
         require_auth: bool,
+
+        #[arg(long, default_value = "2997", env = "RUNEQUEST_WIKI_PORT")]
+        wiki_port: u16,
+
+        #[arg(long, default_value = "100.64.0.10", env = "RUNEQUEST_WIKI_BIND_ADDR")]
+        wiki_bind_address: String,
+
+        #[arg(long, default_value = "wiki", env = "RUNEQUEST_WIKI_DIR")]
+        wiki_dir: PathBuf,
     },
 
     /// Manage users
@@ -70,6 +79,9 @@ async fn main() -> Result<()> {
             bind_address,
             data_dir,
             require_auth,
+            wiki_port,
+            wiki_bind_address,
+            wiki_dir,
         } => {
             let base_path = resolve_data_dir(data_dir.as_deref())?;
 
@@ -120,6 +132,15 @@ async fn main() -> Result<()> {
                 .await
             });
 
+            let wiki_handle = tokio::spawn(async move {
+                runequest::web::wiki_server::run_wiki_server(
+                    wiki_port,
+                    &wiki_bind_address,
+                    wiki_dir,
+                )
+                .await
+            });
+
             tokio::select! {
                 result = web_handle => {
                     match result {
@@ -133,6 +154,13 @@ async fn main() -> Result<()> {
                         Ok(Ok(())) => eprintln!("API server exited"),
                         Ok(Err(e)) => eprintln!("API server error: {}", e),
                         Err(e) => eprintln!("API server task error: {}", e),
+                    }
+                }
+                result = wiki_handle => {
+                    match result {
+                        Ok(Ok(())) => eprintln!("Wiki server exited"),
+                        Ok(Err(e)) => eprintln!("Wiki server error: {}", e),
+                        Err(e) => eprintln!("Wiki server task error: {}", e),
                     }
                 }
             }

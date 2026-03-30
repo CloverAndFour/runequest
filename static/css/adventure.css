@@ -1021,6 +1021,31 @@
 .rarity-epic { color: #cc44cc; }
 .rarity-legendary { color: #ffaa00; }
 
+.equip-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2px 0;
+    opacity: 0.7;
+}
+
+.equip-slot.clickable,
+.item-entry.clickable {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.equip-slot.clickable:hover,
+.item-entry.clickable:hover {
+    background: rgba(200, 168, 78, 0.15);
+}
+
+.equip-slot.loading,
+.item-entry.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 .gold-display {
     text-align: center;
     font-size: 13px;
@@ -1261,6 +1286,12 @@
     background: rgba(170, 42, 42, 0.1);
 }
 
+.combat-ended.fled {
+    border-color: var(--accent-yellow, #ccaa44);
+    color: #ccaa44;
+    background: rgba(170, 138, 42, 0.1);
+}
+
 .combat-ended-title {
     font-size: 24px;
     margin-bottom: 8px;
@@ -1307,6 +1338,78 @@
     font-size: 11px;
     color: var(--text-muted);
     margin-top: 2px;
+}
+
+/* Fixed choices - compact buttons */
+.fixed-choices-section {
+    padding: 8px 0;
+}
+
+.fixed-choices-section .choices-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fixed-choices-section .choice-btn {
+    border-color: var(--border-dark);
+    padding: 6px 10px;
+    font-size: 12px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.fixed-choices-section .fa-icon {
+    margin-right: 4px;
+}
+
+/* Separator between fixed and LLM choices */
+.choices-separator {
+    width: 80%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-gold), transparent);
+    margin: 12px auto;
+}
+
+/* LLM choices section */
+.llm-choices-section {
+    padding: 8px 0;
+}
+
+/* State change summary badges */
+.state-changes {
+    font-size: 12px;
+    padding: 4px 8px;
+    margin: 4px 0 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.sc-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 11px;
+    display: inline-block;
+}
+.sc-gold { background: rgba(200,168,78,0.2); color: var(--text-gold-bright); border: 1px solid var(--text-gold); }
+.sc-gold-loss { background: rgba(200,168,78,0.1); color: var(--text-muted); border: 1px solid var(--border-dark); }
+.sc-xp { background: rgba(68,136,204,0.2); color: var(--xp-blue); border: 1px solid var(--xp-blue); }
+.sc-heal { background: rgba(34,170,34,0.2); color: var(--hp-green); border: 1px solid var(--hp-green); }
+.sc-damage { background: rgba(204,34,34,0.2); color: var(--hp-red); border: 1px solid var(--hp-red); }
+.sc-level { background: rgba(176,136,208,0.3); color: var(--text-quest); border: 1px solid var(--text-quest); }
+.sc-item-gain { background: rgba(42,138,42,0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+.sc-item-loss { background: rgba(170,42,42,0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+/* User message display */
+.user-message-block {
+    color: var(--text-gold-bright);
+    border-left: 3px solid var(--text-gold);
+    padding: 4px 12px;
+    margin: 8px 0;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 /* ===== MOBILE RESPONSIVE ===== */
@@ -1412,4 +1515,47 @@
     .info-tab { font-size: 9px; padding: 8px 0; }
     .stat-box .stat-value { font-size: 18px; }
     .stat-allocator { grid-template-columns: 1fr; }
+}
+
+/* Hex world map */
+.hex-map-svg {
+    display: block;
+    margin: 8px auto;
+}
+
+.hex-directions {
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+.hex-dir-entry {
+    padding: 2px 0;
+    color: var(--text-light);
+}
+
+.hex-dir-name {
+    color: var(--text-gold);
+    font-family: var(--font-medieval);
+    display: inline-block;
+    width: 80px;
+}
+
+.hex-dir-target {
+    color: var(--text-muted);
+}
+
+.hex-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+.hex-feat {
+    padding: 2px 8px;
+    background: rgba(212, 168, 67, 0.1);
+    border: 1px solid var(--border-gold);
+    border-radius: 4px;
+    color: var(--text-gold);
 }

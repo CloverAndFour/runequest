@@ -130,5 +130,7 @@ pub fn starting_abilities(class: &Class) -> Vec<Ability> {
                 uses_remaining: None,
             },
         ],
+        // New classes - use generic abilities for now
+        _ => vec![],
     }
 }

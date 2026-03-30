@@ -10,10 +10,16 @@ pub enum ClientMsg {
         name: String,
         character_name: String,
         race: String,
-        class: String,
+        #[serde(default)]
+        class: Option<String>,
+        #[serde(default)]
+        background: Option<String>,
+        #[serde(default)]
+        backstory: Option<String>,
         #[serde(default)]
         scenario: Option<String>,
-        stats: StatsInput,
+        #[serde(default)]
+        stats: Option<StatsInput>,
     },
     LoadAdventure {
         adventure_id: String,
@@ -43,6 +49,29 @@ pub enum ClientMsg {
         #[serde(default)]
         item_name: Option<String>,
     },
+    // NPC
+    GetNpcs,
+    // Crafting
+    CraftItem {
+        recipe_id: String,
+    },
+    ListRecipes {
+        #[serde(default)]
+        skill: Option<String>,
+        #[serde(default)]
+        tier: Option<u8>,
+    },
+    ListMaterials,
+    Gather,
+    // Skills
+    // Equipment (UI)
+    EquipItem {
+        item_name: String,
+    },
+    UnequipItem {
+        slot: String,
+    },
+    GetSkills,
 }
 
 #[derive(Debug, Deserialize)]
@@ -160,6 +189,46 @@ pub enum ServerMsg {
     Error {
         code: String,
         message: String,
+    },
+    // Crafting results
+    CraftResult {
+        recipe_name: String,
+        output: String,
+        quantity: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        skill_progress: Option<serde_json::Value>,
+    },
+    RecipeList {
+        recipes: Vec<serde_json::Value>,
+    },
+    MaterialList {
+        materials: Vec<serde_json::Value>,
+    },
+    GatherResult {
+        gathered: Vec<serde_json::Value>,
+        biome: String,
+        survival_xp: u32,
+    },
+    SkillList {
+        skills: Vec<serde_json::Value>,
+    },
+    StateChanges {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        gold_delta: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        xp_delta: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hp_delta: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        level_up: Option<bool>,
+        #[serde(default)]
+        items_gained: Vec<String>,
+        #[serde(default)]
+        items_lost: Vec<String>,
+        #[serde(default)]
+        conditions_added: Vec<String>,
+        #[serde(default)]
+        conditions_removed: Vec<String>,
     },
 }
 

@@ -392,6 +392,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -412,6 +414,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -431,6 +435,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -450,6 +456,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -469,6 +477,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -488,6 +498,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -510,6 +522,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -529,6 +543,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -548,6 +564,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -567,6 +585,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -587,6 +607,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -607,6 +629,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -627,6 +651,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -647,6 +673,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -667,6 +695,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -691,6 +721,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -713,6 +745,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -735,6 +769,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -757,6 +793,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -777,6 +815,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -794,6 +834,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -811,6 +853,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -831,6 +875,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -849,6 +895,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -867,6 +915,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -885,6 +935,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -903,6 +955,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -923,6 +977,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -941,6 +997,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -959,6 +1017,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -977,6 +1037,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -996,6 +1058,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1016,6 +1080,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1034,6 +1100,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1054,6 +1122,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1071,6 +1141,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1090,6 +1162,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1107,6 +1181,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1124,6 +1200,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1144,6 +1222,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1161,6 +1241,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1180,6 +1262,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1198,6 +1282,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1217,6 +1303,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1235,6 +1323,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1254,6 +1344,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1280,6 +1372,8 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Flametongue".into(),
             }),
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1305,6 +1399,8 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Frostbrand".into(),
             }),
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1330,6 +1426,8 @@ fn item_database() -> Vec<Item> {
                 name_prefix: "Vorpal".into(),
             }),
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1349,6 +1447,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1366,6 +1466,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1383,6 +1485,8 @@ fn item_database() -> Vec<Item> {
             },
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
 
@@ -1399,6 +1503,8 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1413,6 +1519,8 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1427,6 +1535,8 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
         Item {
@@ -1441,6 +1551,8 @@ fn item_database() -> Vec<Item> {
             stats: Default::default(),
             enchantment: None,
             quantity: 1,
+            tier: 0,
+            image_id: None,
             properties: None,
         },
     ]
