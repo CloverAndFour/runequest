@@ -54,6 +54,41 @@ enum Commands {
         tls_key: Option<PathBuf>,
     },
 
+    /// Run battle simulations
+    Simulate {
+        /// Run full class x enemy sweep
+        #[arg(long)]
+        sweep: bool,
+
+        /// Run consumable impact analysis
+        #[arg(long)]
+        consumables: bool,
+
+        /// Run armor slot impact analysis
+        #[arg(long)]
+        armor_slots: bool,
+
+        /// Run combined gear+consumables analysis
+        #[arg(long)]
+        combined: bool,
+
+        /// Print stat tables
+        #[arg(long)]
+        stats: bool,
+
+        /// Run party balance report
+        #[arg(long)]
+        party_report: bool,
+
+        /// Single class report
+        #[arg(long)]
+        class: Option<String>,
+
+        /// Number of trials per matchup
+        #[arg(long, default_value = "1000")]
+        trials: u32,
+    },
+
     /// Manage users
     User {
         #[arg(long, env = "RUNEQUEST_DATA_DIR")]
@@ -204,6 +239,45 @@ async fn main() -> Result<()> {
                         Err(e) => eprintln!("Wiki server task error: {}", e),
                     }
                 }
+            }
+        }
+
+        Commands::Simulate {
+            sweep, consumables, armor_slots, combined, stats, party_report,
+            class, trials,
+        } => {
+            use runequest::engine::simulator;
+
+            if stats {
+                print!("{}", simulator::stat_table_report());
+            }
+            if sweep {
+                print!("{}", simulator::sweep_report(trials));
+            }
+            if consumables {
+                print!("{}", simulator::consumable_report(trials));
+            }
+            if armor_slots {
+                print!("{}", simulator::armor_slot_report(trials));
+            }
+            if combined {
+                print!("{}", simulator::combined_report(trials));
+            }
+            if party_report {
+                print!("{}", simulator::party_report(trials));
+            }
+            if let Some(ref name) = class {
+                if let Some(c) = simulator::SimClass::from_str(name) {
+                    print!("{}", simulator::class_report(c, trials));
+                } else {
+                    eprintln!("Unknown class: {}. Options: warrior, berserker, paladin, rogue, ranger, monk, mage, warlock, cleric, bard", name);
+                }
+            }
+            if !sweep && !consumables && !armor_slots && !combined && !stats && !party_report && class.is_none() {
+                // Default: run everything
+                print!("{}", simulator::sweep_report(trials));
+                print!("{}", simulator::consumable_report(trials));
+                print!("{}", simulator::armor_slot_report(trials));
             }
         }
 

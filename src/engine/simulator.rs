@@ -370,6 +370,130 @@ pub fn monster_damage(enemy_type: EnemyType, tier: u32) -> (u32, u32, i32) {
 // COMBATANT STATE
 // ========================================================================
 
+// ========================================================================
+// ARMOR SLOT SYSTEM — AC split across 5 body slots
+// ========================================================================
+
+/// AC distribution across armor slots (fractions of total armor AC).
+/// Head 15%, Chest 35%, Hands 10%, Legs 25%, Feet 15% = 100%.
+#[derive(Debug, Clone, Copy)]
+pub struct ArmorSlots {
+    pub head: bool,
+    pub chest: bool,
+    pub hands: bool,
+    pub legs: bool,
+    pub feet: bool,
+}
+
+impl ArmorSlots {
+    pub fn full() -> Self {
+        Self { head: true, chest: true, hands: true, legs: true, feet: true }
+    }
+
+    pub fn missing(slots: &[&str]) -> Self {
+        let mut a = Self::full();
+        for s in slots {
+            match *s {
+                "head" => a.head = false,
+                "chest" => a.chest = false,
+                "hands" => a.hands = false,
+                "legs" => a.legs = false,
+                "feet" => a.feet = false,
+                _ => {}
+            }
+        }
+        a
+    }
+
+    /// Fraction of armor AC this loadout provides (0.0 - 1.0).
+    pub fn ac_fraction(&self) -> f64 {
+        let mut f = 0.0;
+        if self.head  { f += 0.15; }
+        if self.chest { f += 0.35; }
+        if self.hands { f += 0.10; }
+        if self.legs  { f += 0.25; }
+        if self.feet  { f += 0.15; }
+        f
+    }
+
+    pub fn slot_count(&self) -> u32 {
+        [self.head, self.chest, self.hands, self.legs, self.feet]
+            .iter().filter(|&&b| b).count() as u32
+    }
+
+    /// Slot-specific bonuses for equipped pieces.
+    /// Head: +1 perception (modeled as initiative), Feet: +1 flee bonus.
+    /// Hands: +1 attack bonus. Legs: nothing extra (pure AC).
+    /// Chest: nothing extra (pure AC, biggest share).
+    pub fn attack_bonus(&self) -> i32 {
+        if self.hands { 1 } else { 0 }
+    }
+}
+
+// ========================================================================
+// CONSUMABLE LOADOUT
+// ========================================================================
+
+/// Consumable loadout for a combat encounter.
+#[derive(Debug, Clone, Copy)]
+pub struct ConsumableLoadout {
+    pub healing_potions: u32,
+    pub buff_potions: u32,      // +to_hit buff
+    pub alch_weapons: u32,      // opening AoE damage
+}
+
+impl ConsumableLoadout {
+    pub fn none() -> Self {
+        Self { healing_potions: 0, buff_potions: 0, alch_weapons: 0 }
+    }
+
+    pub fn potions(n: u32) -> Self {
+        Self { healing_potions: n, buff_potions: 0, alch_weapons: 0 }
+    }
+
+    pub fn standard(tier_budget: u32) -> Self {
+        // Standard loadout: 2 heal, 1 buff for T2+, 1 alch weapon for T3+
+        Self {
+            healing_potions: tier_budget.min(2),
+            buff_potions: if tier_budget >= 2 { 1 } else { 0 },
+            alch_weapons: if tier_budget >= 3 { 1 } else { 0 },
+        }
+    }
+
+    pub fn full(tier: u32) -> Self {
+        Self {
+            healing_potions: 3,
+            buff_potions: if tier >= 2 { 1 } else { 0 },
+            alch_weapons: if tier >= 3 { 1 } else { 0 },
+        }
+    }
+}
+
+/// Healing potion amount: linear formula from wiki
+pub fn heal_amount(tier: u32) -> i32 {
+    if tier == 0 { 3 } else { (2 * tier + 5) as i32 }
+}
+
+/// Buff potion bonus: +1 + floor(tier/2)
+pub fn buff_bonus(tier: u32) -> i32 {
+    1 + (tier / 3) as i32  // v5b: capped lower (+4 max at T10, was +6)
+}
+
+/// Buff duration: 3 + floor(tier/2) rounds
+pub fn buff_duration(tier: u32) -> i32 {
+    (3 + tier / 2) as i32
+}
+
+/// Alchemical weapon damage: 1d6 + tier*2
+pub fn alch_weapon_damage(tier: u32) -> i32 {
+    // Halved to model Dex save for half damage (avg outcome)
+    (tier + 1) as i32
+}
+
+// ========================================================================
+// COMBATANT STATE (v5: multi-slot armor + consumables)
+// ========================================================================
+
 #[derive(Debug, Clone)]
 struct Combatant {
     hp: i32,
@@ -384,19 +508,26 @@ struct Combatant {
     rage_dmg_bonus: i32,
     rage_resist: bool,
     sneak_attack_dice: u32,
-    hide_rounds: i32,          // v2: limited rounds of advantage
+    hide_rounds: i32,
     smite_damage: i32,
     lay_on_hands: i32,
     healing_word: i32,
-    healing_word_uses: i32,    // v2: Cleric gets 2 uses
+    healing_word_uses: i32,
     hex_damage_dice: u32,
-    arcane_burst_dice: u32,    // v2: Mage bonus d6 on every hit
+    arcane_burst_dice: u32,
     flurry_available: bool,
     inspire_bonus: i32,
     inspire_rounds: i32,
     cutting_words_penalty: i32,
     cutting_words_rounds: i32,
     ranged_bonus: i32,
+    // v5: Consumables
+    healing_potions: u32,
+    heal_cooldown: i32,         // rounds until next healing potion allowed
+    buff_to_hit_bonus: i32,     // active buff potion bonus
+    buff_rounds_left: i32,      // rounds remaining on buff
+    alch_weapons: u32,          // throwable AoE weapons
+    tier: u32,                  // needed for consumable scaling
 }
 
 impl Combatant {
@@ -418,7 +549,20 @@ impl Combatant {
             flurry_available: false, inspire_bonus: 0, inspire_rounds: 0,
             cutting_words_penalty: 0, cutting_words_rounds: 0,
             ranged_bonus: 0,
+            healing_potions: 0,
+            heal_cooldown: 0,
+            buff_to_hit_bonus: 0,
+            buff_rounds_left: 0,
+            alch_weapons: 0,
+            tier: 0,
         };
+
+        c.tier = tier;
+        c.healing_potions = 0;
+        c.heal_cooldown = 0;
+        c.buff_to_hit_bonus = 0;
+        c.buff_rounds_left = 0;
+        c.alch_weapons = 0;
 
         match class {
             SimClass::Warrior => {
@@ -469,6 +613,20 @@ impl Combatant {
         c
     }
 
+    fn with_consumables(mut self, loadout: ConsumableLoadout) -> Self {
+        self.healing_potions = loadout.healing_potions;
+        self.buff_to_hit_bonus = 0;
+        self.buff_rounds_left = 0;
+        self.heal_cooldown = 0;
+        self.alch_weapons = loadout.alch_weapons;
+        // Apply buff potion at start of combat (pre-fight preparation)
+        if loadout.buff_potions > 0 {
+            self.buff_to_hit_bonus = buff_bonus(self.tier);
+            self.buff_rounds_left = buff_duration(self.tier);
+        }
+        self
+    }
+
     fn from_monster(enemy_type: EnemyType, tier: u32) -> Self {
         let hp = monster_max_hp(enemy_type, tier);
         let ac = monster_ac(enemy_type, tier);
@@ -486,6 +644,12 @@ impl Combatant {
             flurry_available: false, inspire_bonus: 0, inspire_rounds: 0,
             cutting_words_penalty: 0, cutting_words_rounds: 0,
             ranged_bonus: 0,
+            healing_potions: 0,
+            heal_cooldown: 0,
+            buff_to_hit_bonus: 0,
+            buff_rounds_left: 0,
+            alch_weapons: 0,
+            tier: 0,
         }
     }
 }
@@ -538,14 +702,40 @@ fn attack_roll(
 // 1v1 COMBAT SIMULATION
 // ========================================================================
 
-fn simulate_1v1(class: SimClass, tier: u32, enemy_type: EnemyType, enemy_tier: u32) -> bool {
+fn simulate_1v1_base(
+    class: SimClass, tier: u32,
+    enemy_type: EnemyType, enemy_tier: u32,
+    armor: ArmorSlots, loadout: ConsumableLoadout,
+) -> bool {
     let mut rng = rand::thread_rng();
-    let mut player = Combatant::from_player(class, tier);
+    let mut player = Combatant::from_player(class, tier).with_consumables(loadout);
+
+    // Apply armor slot AC: base AC (10 + class bonus) + armor_fraction * (full_ac - base)
+    let full_ac = player.ac;
+    let base_ac = 10; // unarmored base
+    let armor_ac = full_ac - base_ac;
+    player.ac = base_ac + (armor_ac as f64 * armor.ac_fraction()).round() as i32;
+    // Hands slot gives +1 attack bonus
+    player.to_hit += armor.attack_bonus();
+
     let mut monster = Combatant::from_monster(enemy_type, enemy_tier);
 
     let type_mult = type_damage_mult(class, enemy_type);
 
+    // Opening: throw alchemical weapon before combat loop
+    if player.alch_weapons > 0 {
+        let alch_dmg = alch_weapon_damage(tier);
+        monster.hp -= alch_dmg;
+        player.alch_weapons -= 1;
+        if monster.hp <= 0 {
+            return true;
+        }
+    }
+
     for _round in 0..50 {
+        // Tick consumable cooldowns
+        if player.heal_cooldown > 0 { player.heal_cooldown -= 1; }
+        if player.buff_rounds_left > 0 { player.buff_rounds_left -= 1; }
         // === PLAYER TURN ===
 
         // Determine if player has advantage this round (Rogue hiding)
@@ -556,7 +746,8 @@ fn simulate_1v1(class: SimClass, tier: u32, enemy_type: EnemyType, enemy_tier: u
 
         // Bard inspire tick
         let effective_to_hit = player.to_hit
-            + if player.inspire_rounds > 0 { player.inspire_bonus } else { 0 };
+            + if player.inspire_rounds > 0 { player.inspire_bonus } else { 0 }
+            + if player.buff_rounds_left > 0 { player.buff_to_hit_bonus } else { 0 };
         if player.inspire_rounds > 0 {
             player.inspire_rounds -= 1;
         }
@@ -588,6 +779,17 @@ fn simulate_1v1(class: SimClass, tier: u32, enemy_type: EnemyType, enemy_tier: u
             player.hp = std::cmp::min(player.hp + heal, player.max_hp);
             player.healing_word_uses -= 1;
             // Bonus action, can still attack
+        }
+
+        // v5: Healing potion usage (action, 3-round cooldown)
+        if !used_action && player.healing_potions > 0 && player.heal_cooldown <= 0
+            && player.hp <= player.max_hp * 30 / 100
+        {
+            let heal = heal_amount(player.tier);
+            player.hp = std::cmp::min(player.hp + heal, player.max_hp);
+            player.healing_potions -= 1;
+            player.heal_cooldown = 5;
+            used_action = true;
         }
 
         if !used_action {
@@ -825,6 +1027,10 @@ fn simulate_party(
 // TRIAL RUNNERS
 // ========================================================================
 
+fn simulate_1v1(class: SimClass, tier: u32, enemy_type: EnemyType, enemy_tier: u32) -> bool {
+    simulate_1v1_base(class, tier, enemy_type, enemy_tier, ArmorSlots::full(), ConsumableLoadout::none())
+}
+
 pub fn run_1v1_trials(
     class: SimClass, tier: u32,
     enemy_type: EnemyType, enemy_tier: u32,
@@ -832,6 +1038,18 @@ pub fn run_1v1_trials(
 ) -> f64 {
     let wins: u32 = (0..trials)
         .map(|_| if simulate_1v1(class, tier, enemy_type, enemy_tier) { 1 } else { 0 })
+        .sum();
+    wins as f64 / trials as f64
+}
+
+pub fn run_1v1_trials_with(
+    class: SimClass, tier: u32,
+    enemy_type: EnemyType, enemy_tier: u32,
+    armor: ArmorSlots, loadout: ConsumableLoadout,
+    trials: u32,
+) -> f64 {
+    let wins: u32 = (0..trials)
+        .map(|_| if simulate_1v1_base(class, tier, enemy_type, enemy_tier, armor, loadout) { 1 } else { 0 })
         .sum();
     wins as f64 / trials as f64
 }
@@ -1121,6 +1339,188 @@ pub fn parse_party(spec: &str) -> Option<Vec<PartyMember>> {
         members.push(PartyMember { class, tier, role });
     }
     if members.is_empty() { None } else { Some(members) }
+}
+
+pub fn consumable_report(trials: u32) -> String {
+    let mut out = String::new();
+
+    out.push_str("========================================================================\n");
+    out.push_str("  CONSUMABLE IMPACT ANALYSIS (v5)\n");
+    out.push_str("========================================================================\n");
+    out.push_str(&format!("  Trials per matchup: {}\n", trials));
+    out.push_str("  Healing potion: 2*tier+5 HP, 5-round cooldown\n");
+    out.push_str("  Buff potion: +1+tier/3 to-hit, 3+tier/2 rounds\n");
+    out.push_str("  Alch weapon: ~tier+1 opening damage (after saves)\n\n");
+
+    // Test a representative class per archetype
+    let test_classes = [
+        SimClass::Warrior, SimClass::Rogue, SimClass::Mage,
+        SimClass::Cleric, SimClass::Bard,
+    ];
+
+    out.push_str("--- Win Rate Delta: No Consumables vs Consumable Loadouts ---\n\n");
+
+    for &class in &test_classes {
+        out.push_str(&format!("  {} ({}):\n", class.name(), class.archetype()));
+        out.push_str("  Tier | Base   | +2 Heal | +2H+Buff | +2H+B+Alch | Delta\n");
+        out.push_str("  -----+--------+---------+----------+------------+------\n");
+
+        for tier in [1, 3, 5, 7, 10] {
+            let base = run_1v1_trials(class, tier, EnemyType::Brute, tier, trials);
+
+            let heal_only = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::full(), ConsumableLoadout::potions(2), trials,
+            );
+
+            let heal_buff = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::full(),
+                ConsumableLoadout { healing_potions: 2, buff_potions: 1, alch_weapons: 0 },
+                trials,
+            );
+
+            let full = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::full(), ConsumableLoadout::full(tier), trials,
+            );
+
+            let delta = ((full - base) * 100.0).round() as i32;
+            let indicator = if delta >= 15 && delta <= 25 { " OK" }
+                else if delta < 15 { " LOW" }
+                else { " HIGH" };
+
+            out.push_str(&format!("  T{:<3} | {:>4.0}%  | {:>5.0}%  | {:>6.0}%   | {:>8.0}%   | {:>+3}%{}\n",
+                tier,
+                base * 100.0, heal_only * 100.0, heal_buff * 100.0, full * 100.0,
+                delta, indicator,
+            ));
+        }
+        out.push('\n');
+    }
+
+    out
+}
+
+pub fn armor_slot_report(trials: u32) -> String {
+    let mut out = String::new();
+
+    out.push_str("========================================================================\n");
+    out.push_str("  ARMOR SLOT IMPACT ANALYSIS (v5)\n");
+    out.push_str("========================================================================\n");
+    out.push_str(&format!("  Trials per matchup: {}\n", trials));
+    out.push_str("  AC split: Head 15%, Chest 35%, Hands 10%, Legs 25%, Feet 15%\n\n");
+
+    let test_classes = [SimClass::Warrior, SimClass::Rogue, SimClass::Mage];
+
+    out.push_str("--- Win Rate by Missing Armor Pieces (vs Brute, same tier) ---\n\n");
+
+    for &class in &test_classes {
+        out.push_str(&format!("  {} (base AC scaling: {}):\n",
+            class.name(),
+            match class {
+                SimClass::Warrior | SimClass::Paladin => "15+tier (heavy)",
+                SimClass::Rogue | SimClass::Ranger => "14+tier (medium)",
+                _ => "13+tier (light)",
+            }));
+        out.push_str("  Tier | Full  | -Head | -Chest | -Hands | -Legs | -Feet | Naked\n");
+        out.push_str("  -----+-------+-------+--------+--------+-------+-------+------\n");
+
+        for tier in [1, 3, 5, 7, 10] {
+            let full = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::full(), ConsumableLoadout::none(), trials,
+            );
+
+            let no_head = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["head"]), ConsumableLoadout::none(), trials,
+            );
+
+            let no_chest = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["chest"]), ConsumableLoadout::none(), trials,
+            );
+
+            let no_hands = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["hands"]), ConsumableLoadout::none(), trials,
+            );
+
+            let no_legs = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["legs"]), ConsumableLoadout::none(), trials,
+            );
+
+            let no_feet = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["feet"]), ConsumableLoadout::none(), trials,
+            );
+
+            let naked = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["head", "chest", "hands", "legs", "feet"]),
+                ConsumableLoadout::none(), trials,
+            );
+
+            out.push_str(&format!("  T{:<3} | {:>3.0}%  | {:>3.0}%  | {:>4.0}%   | {:>4.0}%   | {:>3.0}%  | {:>3.0}%  | {:>3.0}%\n",
+                tier,
+                full * 100.0, no_head * 100.0, no_chest * 100.0,
+                no_hands * 100.0, no_legs * 100.0, no_feet * 100.0,
+                naked * 100.0,
+            ));
+        }
+        out.push('\n');
+    }
+
+    out
+}
+
+pub fn combined_report(trials: u32) -> String {
+    let mut out = String::new();
+
+    out.push_str("========================================================================\n");
+    out.push_str("  COMBINED: PARTIAL GEAR + CONSUMABLES (v5)\n");
+    out.push_str("========================================================================\n");
+    out.push_str(&format!("  Trials: {}\n\n", trials));
+    out.push_str("  Scenario: Player missing chest piece but has consumables\n");
+    out.push_str("  Question: Can consumables compensate for missing gear?\n\n");
+
+    out.push_str("  Class    | Tier | Full+0pot | -Chest+0 | -Chest+2H+B | Compensated?\n");
+    out.push_str("  ---------+------+-----------+----------+-------------+-------------\n");
+
+    for &class in SimClass::all() {
+        for tier in [3, 5, 7] {
+            let full_no_pot = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::full(), ConsumableLoadout::none(), trials,
+            );
+
+            let no_chest_no_pot = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["chest"]), ConsumableLoadout::none(), trials,
+            );
+
+            let no_chest_with_pot = run_1v1_trials_with(
+                class, tier, EnemyType::Brute, tier,
+                ArmorSlots::missing(&["chest"]),
+                ConsumableLoadout { healing_potions: 2, buff_potions: 1, alch_weapons: 0 },
+                trials,
+            );
+
+            let compensated = if no_chest_with_pot >= full_no_pot * 0.95 { "YES" }
+                else if no_chest_with_pot >= full_no_pot * 0.85 { "PARTIAL" }
+                else { "NO" };
+
+            out.push_str(&format!("  {:<8} | T{:<3} | {:>7.0}%  | {:>6.0}%  | {:>9.0}%   | {}\n",
+                class.short(), tier,
+                full_no_pot * 100.0, no_chest_no_pot * 100.0,
+                no_chest_with_pot * 100.0, compensated,
+            ));
+        }
+    }
+
+    out
 }
 
 pub fn parse_boss(spec: &str) -> Option<(EnemyType, u32)> {

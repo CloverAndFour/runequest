@@ -647,7 +647,7 @@ impl CraftingGraph {
         for line in Self::equipment_lines() {
             for tier in 1..=10u8 {
                 let wid = format!("{}_weapon_t{}", line, tier);
-                let aid = format!("{}_armor_t{}", line, tier);
+                let aid = format!("{}_chest_t{}", line, tier);
                 let wc = self.production_cost(&wid);
                 let ac = self.production_cost(&aid);
                 result.insert((line.to_string(), tier), (wc, ac));
@@ -1544,1132 +1544,3132 @@ pub fn build_crafting_graph() -> CraftingGraph {
 
     // --- BLADE line: SM+LW+EN ---
     g.add_material("blade_weapon_t1", "Crude Sword", 1, MaterialSource::Crafted);
-    g.add_material("blade_armor_t1", "Crude Plate", 1, MaterialSource::Crafted);
+        g.add_material("blade_head_t1", "Crude Plate Helm", 1, MaterialSource::Crafted);
+    g.add_material("blade_chest_t1", "Crude Plate", 1, MaterialSource::Crafted);
+    g.add_material("blade_hands_t1", "Crude Plate Gauntlets", 1, MaterialSource::Crafted);
+    g.add_material("blade_legs_t1", "Crude Plate Greaves", 1, MaterialSource::Crafted);
+    g.add_material("blade_feet_t1", "Crude Plate Sabatons", 1, MaterialSource::Crafted);
     g.add_material("blade_weapon_t2", "Iron Blade", 2, MaterialSource::Crafted);
-    g.add_material("blade_armor_t2", "Iron Plate", 2, MaterialSource::Crafted);
+        g.add_material("blade_head_t2", "Iron Plate Helm", 2, MaterialSource::Crafted);
+    g.add_material("blade_chest_t2", "Iron Plate", 2, MaterialSource::Crafted);
+    g.add_material("blade_hands_t2", "Iron Plate Gauntlets", 2, MaterialSource::Crafted);
+    g.add_material("blade_legs_t2", "Iron Plate Greaves", 2, MaterialSource::Crafted);
+    g.add_material("blade_feet_t2", "Iron Plate Sabatons", 2, MaterialSource::Crafted);
     g.add_material("blade_weapon_t3", "Steel Longsword", 3, MaterialSource::Crafted);
-    g.add_material("blade_armor_t3", "Steel Plate Armor", 3, MaterialSource::Crafted);
+        g.add_material("blade_head_t3", "Steel Plate Armor Helm", 3, MaterialSource::Crafted);
+    g.add_material("blade_chest_t3", "Steel Plate Armor", 3, MaterialSource::Crafted);
+    g.add_material("blade_hands_t3", "Steel Plate Armor Gauntlets", 3, MaterialSource::Crafted);
+    g.add_material("blade_legs_t3", "Steel Plate Armor Greaves", 3, MaterialSource::Crafted);
+    g.add_material("blade_feet_t3", "Steel Plate Armor Sabatons", 3, MaterialSource::Crafted);
     g.add_material("blade_weapon_t4", "Dwarven Sword", 4, MaterialSource::Crafted);
-    g.add_material("blade_armor_t4", "Dwarven Plate", 4, MaterialSource::Crafted);
+        g.add_material("blade_head_t4", "Dwarven Plate Helm", 4, MaterialSource::Crafted);
+    g.add_material("blade_chest_t4", "Dwarven Plate", 4, MaterialSource::Crafted);
+    g.add_material("blade_hands_t4", "Dwarven Plate Gauntlets", 4, MaterialSource::Crafted);
+    g.add_material("blade_legs_t4", "Dwarven Plate Greaves", 4, MaterialSource::Crafted);
+    g.add_material("blade_feet_t4", "Dwarven Plate Sabatons", 4, MaterialSource::Crafted);
     g.add_material("blade_weapon_t5", "Mithril Edge", 5, MaterialSource::Crafted);
-    g.add_material("blade_armor_t5", "Mithril Plate", 5, MaterialSource::Crafted);
+        g.add_material("blade_head_t5", "Mithril Plate Helm", 5, MaterialSource::Crafted);
+    g.add_material("blade_chest_t5", "Mithril Plate", 5, MaterialSource::Crafted);
+    g.add_material("blade_hands_t5", "Mithril Plate Gauntlets", 5, MaterialSource::Crafted);
+    g.add_material("blade_legs_t5", "Mithril Plate Greaves", 5, MaterialSource::Crafted);
+    g.add_material("blade_feet_t5", "Mithril Plate Sabatons", 5, MaterialSource::Crafted);
     g.add_material("blade_weapon_t6", "Runeblade", 6, MaterialSource::Crafted);
-    g.add_material("blade_armor_t6", "Runeplate", 6, MaterialSource::Crafted);
+        g.add_material("blade_head_t6", "Runeplate Helm", 6, MaterialSource::Crafted);
+    g.add_material("blade_chest_t6", "Runeplate", 6, MaterialSource::Crafted);
+    g.add_material("blade_hands_t6", "Runeplate Gauntlets", 6, MaterialSource::Crafted);
+    g.add_material("blade_legs_t6", "Runeplate Greaves", 6, MaterialSource::Crafted);
+    g.add_material("blade_feet_t6", "Runeplate Sabatons", 6, MaterialSource::Crafted);
     g.add_material("blade_weapon_t7", "Dragonsteel Sword", 7, MaterialSource::Crafted);
-    g.add_material("blade_armor_t7", "Dragonsteel Plate", 7, MaterialSource::Crafted);
+        g.add_material("blade_head_t7", "Dragonsteel Plate Helm", 7, MaterialSource::Crafted);
+    g.add_material("blade_chest_t7", "Dragonsteel Plate", 7, MaterialSource::Crafted);
+    g.add_material("blade_hands_t7", "Dragonsteel Plate Gauntlets", 7, MaterialSource::Crafted);
+    g.add_material("blade_legs_t7", "Dragonsteel Plate Greaves", 7, MaterialSource::Crafted);
+    g.add_material("blade_feet_t7", "Dragonsteel Plate Sabatons", 7, MaterialSource::Crafted);
     g.add_material("blade_weapon_t8", "Voidforged Blade", 8, MaterialSource::Crafted);
-    g.add_material("blade_armor_t8", "Voidforged Plate", 8, MaterialSource::Crafted);
+        g.add_material("blade_head_t8", "Voidforged Plate Helm", 8, MaterialSource::Crafted);
+    g.add_material("blade_chest_t8", "Voidforged Plate", 8, MaterialSource::Crafted);
+    g.add_material("blade_hands_t8", "Voidforged Plate Gauntlets", 8, MaterialSource::Crafted);
+    g.add_material("blade_legs_t8", "Voidforged Plate Greaves", 8, MaterialSource::Crafted);
+    g.add_material("blade_feet_t8", "Voidforged Plate Sabatons", 8, MaterialSource::Crafted);
     g.add_material("blade_weapon_t9", "Celestial Longsword", 9, MaterialSource::Crafted);
-    g.add_material("blade_armor_t9", "Celestial Plate", 9, MaterialSource::Crafted);
+        g.add_material("blade_head_t9", "Celestial Plate Helm", 9, MaterialSource::Crafted);
+    g.add_material("blade_chest_t9", "Celestial Plate", 9, MaterialSource::Crafted);
+    g.add_material("blade_hands_t9", "Celestial Plate Gauntlets", 9, MaterialSource::Crafted);
+    g.add_material("blade_legs_t9", "Celestial Plate Greaves", 9, MaterialSource::Crafted);
+    g.add_material("blade_feet_t9", "Celestial Plate Sabatons", 9, MaterialSource::Crafted);
     g.add_material("blade_weapon_t10", "Primordial Titansblade", 10, MaterialSource::Crafted);
-    g.add_material("blade_armor_t10", "Primordial Titansguard", 10, MaterialSource::Crafted);
+        g.add_material("blade_head_t10", "Primordial Titansguard Helm", 10, MaterialSource::Crafted);
+    g.add_material("blade_chest_t10", "Primordial Titansguard", 10, MaterialSource::Crafted);
+    g.add_material("blade_hands_t10", "Primordial Titansguard Gauntlets", 10, MaterialSource::Crafted);
+    g.add_material("blade_legs_t10", "Primordial Titansguard Greaves", 10, MaterialSource::Crafted);
+    g.add_material("blade_feet_t10", "Primordial Titansguard Sabatons", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_blade_weapon_t1", "Forge Crude Sword",
         CraftingSkill::Smithing, 1, 1,
         &[("iron_nugget", 2), ("leather_strip", 1), ("faint_enchant_dust", 1), ("venom_sac", 1)],
         "blade_weapon_t1", 1);
-    g.add_recipe("eq_blade_armor_t1", "Craft Crude Plate",
+        g.add_recipe("eq_blade_head_t1", "Craft Crude Plate Helm",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "blade_head_t1", 1);
+    g.add_recipe("eq_blade_chest_t1", "Craft Crude Plate",
         CraftingSkill::Smithing, 1, 1,
         &[("leather_strip", 2), ("iron_nugget", 1), ("faint_enchant_dust", 1), ("ectoplasm", 1)],
-        "blade_armor_t1", 1);
+        "blade_chest_t1", 1);
+    g.add_recipe("eq_blade_hands_t1", "Craft Crude Plate Gauntlets",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "blade_hands_t1", 1);
+    g.add_recipe("eq_blade_legs_t1", "Craft Crude Plate Greaves",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("faint_enchant_dust", 1), ("ectoplasm", 1)],
+        "blade_legs_t1", 1);
+    g.add_recipe("eq_blade_feet_t1", "Craft Crude Plate Sabatons",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "blade_feet_t1", 1);
 
     g.add_recipe("eq_blade_weapon_t2", "Forge Iron Blade",
         CraftingSkill::Smithing, 2, 2,
         &[("iron_ingot", 2), ("hardened_leather", 1), ("enchanted_thread", 1), ("arcane_crystal", 1)],
         "blade_weapon_t2", 1);
-    g.add_recipe("eq_blade_armor_t2", "Craft Iron Plate",
+        g.add_recipe("eq_blade_head_t2", "Craft Iron Plate Helm",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "blade_head_t2", 1);
+    g.add_recipe("eq_blade_chest_t2", "Craft Iron Plate",
         CraftingSkill::Smithing, 2, 2,
         &[("hardened_leather", 2), ("iron_ingot", 1), ("enchanted_thread", 1), ("wolf_pelt", 1)],
-        "blade_armor_t2", 1);
+        "blade_chest_t2", 1);
+    g.add_recipe("eq_blade_hands_t2", "Craft Iron Plate Gauntlets",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "blade_hands_t2", 1);
+    g.add_recipe("eq_blade_legs_t2", "Craft Iron Plate Greaves",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("enchanted_thread", 1), ("wolf_pelt", 1)],
+        "blade_legs_t2", 1);
+    g.add_recipe("eq_blade_feet_t2", "Craft Iron Plate Sabatons",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "blade_feet_t2", 1);
 
     g.add_recipe("eq_blade_weapon_t3", "Forge Steel Longsword",
         CraftingSkill::Smithing, 3, 3,
         &[("steel_plate", 2), ("reinforced_leather", 1), ("mana_weave", 1), ("wraith_dust", 1)],
         "blade_weapon_t3", 1);
-    g.add_recipe("eq_blade_armor_t3", "Craft Steel Plate Armor",
+        g.add_recipe("eq_blade_head_t3", "Craft Steel Plate Armor Helm",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "blade_head_t3", 1);
+    g.add_recipe("eq_blade_chest_t3", "Craft Steel Plate Armor",
         CraftingSkill::Smithing, 3, 3,
         &[("reinforced_leather", 2), ("steel_plate", 1), ("mana_weave", 1), ("shadow_thread", 1)],
-        "blade_armor_t3", 1);
+        "blade_chest_t3", 1);
+    g.add_recipe("eq_blade_hands_t3", "Craft Steel Plate Armor Gauntlets",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "blade_hands_t3", 1);
+    g.add_recipe("eq_blade_legs_t3", "Craft Steel Plate Armor Greaves",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("mana_weave", 1), ("shadow_thread", 1)],
+        "blade_legs_t3", 1);
+    g.add_recipe("eq_blade_feet_t3", "Craft Steel Plate Armor Sabatons",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "blade_feet_t3", 1);
 
     g.add_recipe("eq_blade_weapon_t4", "Forge Dwarven Sword",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_steel", 2), ("alchemical_hide", 1), ("alchemical_weave", 1), ("troll_blood", 1)],
         "blade_weapon_t4", 1);
-    g.add_recipe("eq_blade_armor_t4", "Craft Dwarven Plate",
+        g.add_recipe("eq_blade_head_t4", "Craft Dwarven Plate Helm",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "blade_head_t4", 1);
+    g.add_recipe("eq_blade_chest_t4", "Craft Dwarven Plate",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_hide", 2), ("alchemical_steel", 1), ("alchemical_weave", 1), ("elemental_core", 1)],
-        "blade_armor_t4", 1);
+        "blade_chest_t4", 1);
+    g.add_recipe("eq_blade_hands_t4", "Craft Dwarven Plate Gauntlets",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "blade_hands_t4", 1);
+    g.add_recipe("eq_blade_legs_t4", "Craft Dwarven Plate Greaves",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("alchemical_weave", 1), ("elemental_core", 1)],
+        "blade_legs_t4", 1);
+    g.add_recipe("eq_blade_feet_t4", "Craft Dwarven Plate Sabatons",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "blade_feet_t4", 1);
 
     g.add_recipe("eq_blade_weapon_t5", "Forge Mithril Edge",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_steel", 2), ("enchanted_hide", 1), ("enchanted_mana_crystal", 1), ("stalker_claw", 1)],
         "blade_weapon_t5", 1);
-    g.add_recipe("eq_blade_armor_t5", "Craft Mithril Plate",
+        g.add_recipe("eq_blade_head_t5", "Craft Mithril Plate Helm",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "blade_head_t5", 1);
+    g.add_recipe("eq_blade_chest_t5", "Craft Mithril Plate",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_hide", 2), ("enchanted_steel", 1), ("enchanted_mana_crystal", 1), ("mummy_wrappings", 1)],
-        "blade_armor_t5", 1);
+        "blade_chest_t5", 1);
+    g.add_recipe("eq_blade_hands_t5", "Craft Mithril Plate Gauntlets",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "blade_hands_t5", 1);
+    g.add_recipe("eq_blade_legs_t5", "Craft Mithril Plate Greaves",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("enchanted_mana_crystal", 1), ("mummy_wrappings", 1)],
+        "blade_legs_t5", 1);
+    g.add_recipe("eq_blade_feet_t5", "Craft Mithril Plate Sabatons",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "blade_feet_t5", 1);
 
     g.add_recipe("eq_blade_weapon_t6", "Forge Runeblade",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_steel", 2), ("arcane_hide", 1), ("arcane_weave", 1), ("elder_crystal", 1)],
         "blade_weapon_t6", 1);
-    g.add_recipe("eq_blade_armor_t6", "Craft Runeplate",
+        g.add_recipe("eq_blade_head_t6", "Craft Runeplate Helm",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "blade_head_t6", 1);
+    g.add_recipe("eq_blade_chest_t6", "Craft Runeplate",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_hide", 2), ("arcane_steel", 1), ("arcane_weave", 1), ("giant_sinew", 1)],
-        "blade_armor_t6", 1);
+        "blade_chest_t6", 1);
+    g.add_recipe("eq_blade_hands_t6", "Craft Runeplate Gauntlets",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "blade_hands_t6", 1);
+    g.add_recipe("eq_blade_legs_t6", "Craft Runeplate Greaves",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("arcane_weave", 1), ("giant_sinew", 1)],
+        "blade_legs_t6", 1);
+    g.add_recipe("eq_blade_feet_t6", "Craft Runeplate Sabatons",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "blade_feet_t6", 1);
 
     g.add_recipe("eq_blade_weapon_t7", "Forge Dragonsteel Sword",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_steel", 2), ("jeweled_hide", 1), ("jeweled_weave", 1), ("lich_phylactery", 1)],
         "blade_weapon_t7", 1);
-    g.add_recipe("eq_blade_armor_t7", "Craft Dragonsteel Plate",
+        g.add_recipe("eq_blade_head_t7", "Craft Dragonsteel Plate Helm",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "blade_head_t7", 1);
+    g.add_recipe("eq_blade_chest_t7", "Craft Dragonsteel Plate",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_hide", 2), ("jeweled_steel", 1), ("jeweled_weave", 1), ("nightwalker_shade", 1)],
-        "blade_armor_t7", 1);
+        "blade_chest_t7", 1);
+    g.add_recipe("eq_blade_hands_t7", "Craft Dragonsteel Plate Gauntlets",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "blade_hands_t7", 1);
+    g.add_recipe("eq_blade_legs_t7", "Craft Dragonsteel Plate Greaves",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("jeweled_weave", 1), ("nightwalker_shade", 1)],
+        "blade_legs_t7", 1);
+    g.add_recipe("eq_blade_feet_t7", "Craft Dragonsteel Plate Sabatons",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "blade_feet_t7", 1);
 
     g.add_recipe("eq_blade_weapon_t8", "Forge Voidforged Blade",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_steel", 2), ("runic_hide", 1), ("runic_weave", 1), ("storm_essence", 1)],
         "blade_weapon_t8", 1);
-    g.add_recipe("eq_blade_armor_t8", "Craft Voidforged Plate",
+        g.add_recipe("eq_blade_head_t8", "Craft Voidforged Plate Helm",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "blade_head_t8", 1);
+    g.add_recipe("eq_blade_chest_t8", "Craft Voidforged Plate",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_hide", 2), ("runic_steel", 1), ("runic_weave", 1), ("beholder_eye", 1)],
-        "blade_armor_t8", 1);
+        "blade_chest_t8", 1);
+    g.add_recipe("eq_blade_hands_t8", "Craft Voidforged Plate Gauntlets",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "blade_hands_t8", 1);
+    g.add_recipe("eq_blade_legs_t8", "Craft Voidforged Plate Greaves",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("runic_weave", 1), ("beholder_eye", 1)],
+        "blade_legs_t8", 1);
+    g.add_recipe("eq_blade_feet_t8", "Craft Voidforged Plate Sabatons",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "blade_feet_t8", 1);
 
     g.add_recipe("eq_blade_weapon_t9", "Forge Celestial Longsword",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_steel", 2), ("artificed_hide", 1), ("artificed_weave", 1), ("wraith_lord_cloak", 1)],
         "blade_weapon_t9", 1);
-    g.add_recipe("eq_blade_armor_t9", "Craft Celestial Plate",
+        g.add_recipe("eq_blade_head_t9", "Craft Celestial Plate Helm",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "blade_head_t9", 1);
+    g.add_recipe("eq_blade_chest_t9", "Craft Celestial Plate",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_hide", 2), ("artificed_steel", 1), ("artificed_weave", 1), ("demilich_gem", 1)],
-        "blade_armor_t9", 1);
+        "blade_chest_t9", 1);
+    g.add_recipe("eq_blade_hands_t9", "Craft Celestial Plate Gauntlets",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "blade_hands_t9", 1);
+    g.add_recipe("eq_blade_legs_t9", "Craft Celestial Plate Greaves",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("artificed_weave", 1), ("demilich_gem", 1)],
+        "blade_legs_t9", 1);
+    g.add_recipe("eq_blade_feet_t9", "Craft Celestial Plate Sabatons",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "blade_feet_t9", 1);
 
     g.add_recipe("eq_blade_weapon_t10", "Forge Primordial Titansblade",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_steel", 2), ("divine_hide", 1), ("divine_weave", 1), ("arcanum_core", 1)],
         "blade_weapon_t10", 1);
-    g.add_recipe("eq_blade_armor_t10", "Craft Primordial Titansguard",
+        g.add_recipe("eq_blade_head_t10", "Craft Primordial Titansguard Helm",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "blade_head_t10", 1);
+    g.add_recipe("eq_blade_chest_t10", "Craft Primordial Titansguard",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_hide", 2), ("divine_steel", 1), ("divine_weave", 1), ("titan_bone", 1)],
-        "blade_armor_t10", 1);
+        "blade_chest_t10", 1);
+    g.add_recipe("eq_blade_hands_t10", "Craft Primordial Titansguard Gauntlets",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "blade_hands_t10", 1);
+    g.add_recipe("eq_blade_legs_t10", "Craft Primordial Titansguard Greaves",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("divine_weave", 1), ("titan_bone", 1)],
+        "blade_legs_t10", 1);
+    g.add_recipe("eq_blade_feet_t10", "Craft Primordial Titansguard Sabatons",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "blade_feet_t10", 1);
 
 
     // --- AXE line: SM+LW+WW ---
     g.add_material("axe_weapon_t1", "Crude Hatchet", 1, MaterialSource::Crafted);
-    g.add_material("axe_armor_t1", "Crude Hide Armor", 1, MaterialSource::Crafted);
+        g.add_material("axe_head_t1", "Crude Hide Armor Helm", 1, MaterialSource::Crafted);
+    g.add_material("axe_chest_t1", "Crude Hide Armor", 1, MaterialSource::Crafted);
+    g.add_material("axe_hands_t1", "Crude Hide Armor Gauntlets", 1, MaterialSource::Crafted);
+    g.add_material("axe_legs_t1", "Crude Hide Armor Greaves", 1, MaterialSource::Crafted);
+    g.add_material("axe_feet_t1", "Crude Hide Armor Sabatons", 1, MaterialSource::Crafted);
     g.add_material("axe_weapon_t2", "Iron Axe", 2, MaterialSource::Crafted);
-    g.add_material("axe_armor_t2", "Iron-studded Hide", 2, MaterialSource::Crafted);
+        g.add_material("axe_head_t2", "Iron-studded Hide Helm", 2, MaterialSource::Crafted);
+    g.add_material("axe_chest_t2", "Iron-studded Hide", 2, MaterialSource::Crafted);
+    g.add_material("axe_hands_t2", "Iron-studded Hide Gauntlets", 2, MaterialSource::Crafted);
+    g.add_material("axe_legs_t2", "Iron-studded Hide Greaves", 2, MaterialSource::Crafted);
+    g.add_material("axe_feet_t2", "Iron-studded Hide Sabatons", 2, MaterialSource::Crafted);
     g.add_material("axe_weapon_t3", "Steel Greataxe", 3, MaterialSource::Crafted);
-    g.add_material("axe_armor_t3", "Steel-braced Hide", 3, MaterialSource::Crafted);
+        g.add_material("axe_head_t3", "Steel-braced Hide Helm", 3, MaterialSource::Crafted);
+    g.add_material("axe_chest_t3", "Steel-braced Hide", 3, MaterialSource::Crafted);
+    g.add_material("axe_hands_t3", "Steel-braced Hide Gauntlets", 3, MaterialSource::Crafted);
+    g.add_material("axe_legs_t3", "Steel-braced Hide Greaves", 3, MaterialSource::Crafted);
+    g.add_material("axe_feet_t3", "Steel-braced Hide Sabatons", 3, MaterialSource::Crafted);
     g.add_material("axe_weapon_t4", "Dwarven Cleaver", 4, MaterialSource::Crafted);
-    g.add_material("axe_armor_t4", "Dwarven Hide", 4, MaterialSource::Crafted);
+        g.add_material("axe_head_t4", "Dwarven Hide Helm", 4, MaterialSource::Crafted);
+    g.add_material("axe_chest_t4", "Dwarven Hide", 4, MaterialSource::Crafted);
+    g.add_material("axe_hands_t4", "Dwarven Hide Gauntlets", 4, MaterialSource::Crafted);
+    g.add_material("axe_legs_t4", "Dwarven Hide Greaves", 4, MaterialSource::Crafted);
+    g.add_material("axe_feet_t4", "Dwarven Hide Sabatons", 4, MaterialSource::Crafted);
     g.add_material("axe_weapon_t5", "Mithril Axe", 5, MaterialSource::Crafted);
-    g.add_material("axe_armor_t5", "Mithril Hide", 5, MaterialSource::Crafted);
+        g.add_material("axe_head_t5", "Mithril Hide Helm", 5, MaterialSource::Crafted);
+    g.add_material("axe_chest_t5", "Mithril Hide", 5, MaterialSource::Crafted);
+    g.add_material("axe_hands_t5", "Mithril Hide Gauntlets", 5, MaterialSource::Crafted);
+    g.add_material("axe_legs_t5", "Mithril Hide Greaves", 5, MaterialSource::Crafted);
+    g.add_material("axe_feet_t5", "Mithril Hide Sabatons", 5, MaterialSource::Crafted);
     g.add_material("axe_weapon_t6", "Rune Greataxe", 6, MaterialSource::Crafted);
-    g.add_material("axe_armor_t6", "Rune Hide Armor", 6, MaterialSource::Crafted);
+        g.add_material("axe_head_t6", "Rune Hide Armor Helm", 6, MaterialSource::Crafted);
+    g.add_material("axe_chest_t6", "Rune Hide Armor", 6, MaterialSource::Crafted);
+    g.add_material("axe_hands_t6", "Rune Hide Armor Gauntlets", 6, MaterialSource::Crafted);
+    g.add_material("axe_legs_t6", "Rune Hide Armor Greaves", 6, MaterialSource::Crafted);
+    g.add_material("axe_feet_t6", "Rune Hide Armor Sabatons", 6, MaterialSource::Crafted);
     g.add_material("axe_weapon_t7", "Dragon Cleaver", 7, MaterialSource::Crafted);
-    g.add_material("axe_armor_t7", "Dragonhide Armor", 7, MaterialSource::Crafted);
+        g.add_material("axe_head_t7", "Dragonhide Armor Helm", 7, MaterialSource::Crafted);
+    g.add_material("axe_chest_t7", "Dragonhide Armor", 7, MaterialSource::Crafted);
+    g.add_material("axe_hands_t7", "Dragonhide Armor Gauntlets", 7, MaterialSource::Crafted);
+    g.add_material("axe_legs_t7", "Dragonhide Armor Greaves", 7, MaterialSource::Crafted);
+    g.add_material("axe_feet_t7", "Dragonhide Armor Sabatons", 7, MaterialSource::Crafted);
     g.add_material("axe_weapon_t8", "Voidcutter Axe", 8, MaterialSource::Crafted);
-    g.add_material("axe_armor_t8", "Voidhide Armor", 8, MaterialSource::Crafted);
+        g.add_material("axe_head_t8", "Voidhide Armor Helm", 8, MaterialSource::Crafted);
+    g.add_material("axe_chest_t8", "Voidhide Armor", 8, MaterialSource::Crafted);
+    g.add_material("axe_hands_t8", "Voidhide Armor Gauntlets", 8, MaterialSource::Crafted);
+    g.add_material("axe_legs_t8", "Voidhide Armor Greaves", 8, MaterialSource::Crafted);
+    g.add_material("axe_feet_t8", "Voidhide Armor Sabatons", 8, MaterialSource::Crafted);
     g.add_material("axe_weapon_t9", "Celestial Greataxe", 9, MaterialSource::Crafted);
-    g.add_material("axe_armor_t9", "Celestial Hide", 9, MaterialSource::Crafted);
+        g.add_material("axe_head_t9", "Celestial Hide Helm", 9, MaterialSource::Crafted);
+    g.add_material("axe_chest_t9", "Celestial Hide", 9, MaterialSource::Crafted);
+    g.add_material("axe_hands_t9", "Celestial Hide Gauntlets", 9, MaterialSource::Crafted);
+    g.add_material("axe_legs_t9", "Celestial Hide Greaves", 9, MaterialSource::Crafted);
+    g.add_material("axe_feet_t9", "Celestial Hide Sabatons", 9, MaterialSource::Crafted);
     g.add_material("axe_weapon_t10", "Primordial Worldsplitter", 10, MaterialSource::Crafted);
-    g.add_material("axe_armor_t10", "Primordial Beasthide", 10, MaterialSource::Crafted);
+        g.add_material("axe_head_t10", "Primordial Beasthide Helm", 10, MaterialSource::Crafted);
+    g.add_material("axe_chest_t10", "Primordial Beasthide", 10, MaterialSource::Crafted);
+    g.add_material("axe_hands_t10", "Primordial Beasthide Gauntlets", 10, MaterialSource::Crafted);
+    g.add_material("axe_legs_t10", "Primordial Beasthide Greaves", 10, MaterialSource::Crafted);
+    g.add_material("axe_feet_t10", "Primordial Beasthide Sabatons", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_axe_weapon_t1", "Forge Crude Hatchet",
         CraftingSkill::Smithing, 1, 1,
         &[("iron_nugget", 2), ("leather_strip", 1), ("shaped_wood", 1), ("mana_shard", 1)],
         "axe_weapon_t1", 1);
-    g.add_recipe("eq_axe_armor_t1", "Craft Crude Hide Armor",
+        g.add_recipe("eq_axe_head_t1", "Craft Crude Hide Armor Helm",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("wolf_pelt", 1)],
+        "axe_head_t1", 1);
+    g.add_recipe("eq_axe_chest_t1", "Craft Crude Hide Armor",
         CraftingSkill::Smithing, 1, 1,
         &[("leather_strip", 2), ("iron_nugget", 1), ("shaped_wood", 1), ("wolf_pelt", 1)],
-        "axe_armor_t1", 1);
+        "axe_chest_t1", 1);
+    g.add_recipe("eq_axe_hands_t1", "Craft Crude Hide Armor Gauntlets",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("wolf_pelt", 1)],
+        "axe_hands_t1", 1);
+    g.add_recipe("eq_axe_legs_t1", "Craft Crude Hide Armor Greaves",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("shaped_wood", 1), ("wolf_pelt", 1)],
+        "axe_legs_t1", 1);
+    g.add_recipe("eq_axe_feet_t1", "Craft Crude Hide Armor Sabatons",
+        CraftingSkill::Smithing, 1, 1,
+        &[("leather_strip", 1), ("iron_nugget", 1), ("wolf_pelt", 1)],
+        "axe_feet_t1", 1);
 
     g.add_recipe("eq_axe_weapon_t2", "Forge Iron Axe",
         CraftingSkill::Smithing, 2, 2,
         &[("iron_ingot", 2), ("hardened_leather", 1), ("ironwood_plank", 1), ("dark_iron_ore", 1)],
         "axe_weapon_t2", 1);
-    g.add_recipe("eq_axe_armor_t2", "Craft Iron-studded Hide",
+        g.add_recipe("eq_axe_head_t2", "Craft Iron-studded Hide Helm",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("venom_sac", 1)],
+        "axe_head_t2", 1);
+    g.add_recipe("eq_axe_chest_t2", "Craft Iron-studded Hide",
         CraftingSkill::Smithing, 2, 2,
         &[("hardened_leather", 2), ("iron_ingot", 1), ("ironwood_plank", 1), ("venom_sac", 1)],
-        "axe_armor_t2", 1);
+        "axe_chest_t2", 1);
+    g.add_recipe("eq_axe_hands_t2", "Craft Iron-studded Hide Gauntlets",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("venom_sac", 1)],
+        "axe_hands_t2", 1);
+    g.add_recipe("eq_axe_legs_t2", "Craft Iron-studded Hide Greaves",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("ironwood_plank", 1), ("venom_sac", 1)],
+        "axe_legs_t2", 1);
+    g.add_recipe("eq_axe_feet_t2", "Craft Iron-studded Hide Sabatons",
+        CraftingSkill::Smithing, 2, 2,
+        &[("hardened_leather", 1), ("iron_ingot", 1), ("venom_sac", 1)],
+        "axe_feet_t2", 1);
 
     g.add_recipe("eq_axe_weapon_t3", "Forge Steel Greataxe",
         CraftingSkill::Smithing, 3, 3,
         &[("steel_plate", 2), ("reinforced_leather", 1), ("hardwood_beam", 1), ("orc_tusk", 1)],
         "axe_weapon_t3", 1);
-    g.add_recipe("eq_axe_armor_t3", "Craft Steel-braced Hide",
+        g.add_recipe("eq_axe_head_t3", "Craft Steel-braced Hide Helm",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("arcane_crystal", 1)],
+        "axe_head_t3", 1);
+    g.add_recipe("eq_axe_chest_t3", "Craft Steel-braced Hide",
         CraftingSkill::Smithing, 3, 3,
         &[("reinforced_leather", 2), ("steel_plate", 1), ("hardwood_beam", 1), ("arcane_crystal", 1)],
-        "axe_armor_t3", 1);
+        "axe_chest_t3", 1);
+    g.add_recipe("eq_axe_hands_t3", "Craft Steel-braced Hide Gauntlets",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("arcane_crystal", 1)],
+        "axe_hands_t3", 1);
+    g.add_recipe("eq_axe_legs_t3", "Craft Steel-braced Hide Greaves",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("hardwood_beam", 1), ("arcane_crystal", 1)],
+        "axe_legs_t3", 1);
+    g.add_recipe("eq_axe_feet_t3", "Craft Steel-braced Hide Sabatons",
+        CraftingSkill::Smithing, 3, 3,
+        &[("reinforced_leather", 1), ("steel_plate", 1), ("arcane_crystal", 1)],
+        "axe_feet_t3", 1);
 
     g.add_recipe("eq_axe_weapon_t4", "Forge Dwarven Cleaver",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_steel", 2), ("alchemical_hide", 1), ("alchemical_hardwood", 1), ("phase_venom", 1)],
         "axe_weapon_t4", 1);
-    g.add_recipe("eq_axe_armor_t4", "Craft Dwarven Hide",
+        g.add_recipe("eq_axe_head_t4", "Craft Dwarven Hide Helm",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("wraith_dust", 1)],
+        "axe_head_t4", 1);
+    g.add_recipe("eq_axe_chest_t4", "Craft Dwarven Hide",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_hide", 2), ("alchemical_steel", 1), ("alchemical_hardwood", 1), ("wraith_dust", 1)],
-        "axe_armor_t4", 1);
+        "axe_chest_t4", 1);
+    g.add_recipe("eq_axe_hands_t4", "Craft Dwarven Hide Gauntlets",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("wraith_dust", 1)],
+        "axe_hands_t4", 1);
+    g.add_recipe("eq_axe_legs_t4", "Craft Dwarven Hide Greaves",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("alchemical_hardwood", 1), ("wraith_dust", 1)],
+        "axe_legs_t4", 1);
+    g.add_recipe("eq_axe_feet_t4", "Craft Dwarven Hide Sabatons",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_steel", 1), ("wraith_dust", 1)],
+        "axe_feet_t4", 1);
 
     g.add_recipe("eq_axe_weapon_t5", "Forge Mithril Axe",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_steel", 2), ("enchanted_hide", 1), ("enchanted_hardwood", 1), ("naga_pearl", 1)],
         "axe_weapon_t5", 1);
-    g.add_recipe("eq_axe_armor_t5", "Craft Mithril Hide",
+        g.add_recipe("eq_axe_head_t5", "Craft Mithril Hide Helm",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("troll_blood", 1)],
+        "axe_head_t5", 1);
+    g.add_recipe("eq_axe_chest_t5", "Craft Mithril Hide",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_hide", 2), ("enchanted_steel", 1), ("enchanted_hardwood", 1), ("troll_blood", 1)],
-        "axe_armor_t5", 1);
+        "axe_chest_t5", 1);
+    g.add_recipe("eq_axe_hands_t5", "Craft Mithril Hide Gauntlets",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("troll_blood", 1)],
+        "axe_hands_t5", 1);
+    g.add_recipe("eq_axe_legs_t5", "Craft Mithril Hide Greaves",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("enchanted_hardwood", 1), ("troll_blood", 1)],
+        "axe_legs_t5", 1);
+    g.add_recipe("eq_axe_feet_t5", "Craft Mithril Hide Sabatons",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_steel", 1), ("troll_blood", 1)],
+        "axe_feet_t5", 1);
 
     g.add_recipe("eq_axe_weapon_t6", "Forge Rune Greataxe",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_steel", 2), ("arcane_hide", 1), ("arcane_hardwood", 1), ("death_knight_shard", 1)],
         "axe_weapon_t6", 1);
-    g.add_recipe("eq_axe_armor_t6", "Craft Rune Hide Armor",
+        g.add_recipe("eq_axe_head_t6", "Craft Rune Hide Armor Helm",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("stalker_claw", 1)],
+        "axe_head_t6", 1);
+    g.add_recipe("eq_axe_chest_t6", "Craft Rune Hide Armor",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_hide", 2), ("arcane_steel", 1), ("arcane_hardwood", 1), ("stalker_claw", 1)],
-        "axe_armor_t6", 1);
+        "axe_chest_t6", 1);
+    g.add_recipe("eq_axe_hands_t6", "Craft Rune Hide Armor Gauntlets",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("stalker_claw", 1)],
+        "axe_hands_t6", 1);
+    g.add_recipe("eq_axe_legs_t6", "Craft Rune Hide Armor Greaves",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("arcane_hardwood", 1), ("stalker_claw", 1)],
+        "axe_legs_t6", 1);
+    g.add_recipe("eq_axe_feet_t6", "Craft Rune Hide Armor Sabatons",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_hide", 1), ("arcane_steel", 1), ("stalker_claw", 1)],
+        "axe_feet_t6", 1);
 
     g.add_recipe("eq_axe_weapon_t7", "Forge Dragon Cleaver",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_steel", 2), ("jeweled_hide", 1), ("jeweled_hardwood", 1), ("dragon_scale", 1)],
         "axe_weapon_t7", 1);
-    g.add_recipe("eq_axe_armor_t7", "Craft Dragonhide Armor",
+        g.add_recipe("eq_axe_head_t7", "Craft Dragonhide Armor Helm",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("elder_crystal", 1)],
+        "axe_head_t7", 1);
+    g.add_recipe("eq_axe_chest_t7", "Craft Dragonhide Armor",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_hide", 2), ("jeweled_steel", 1), ("jeweled_hardwood", 1), ("elder_crystal", 1)],
-        "axe_armor_t7", 1);
+        "axe_chest_t7", 1);
+    g.add_recipe("eq_axe_hands_t7", "Craft Dragonhide Armor Gauntlets",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("elder_crystal", 1)],
+        "axe_hands_t7", 1);
+    g.add_recipe("eq_axe_legs_t7", "Craft Dragonhide Armor Greaves",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("jeweled_hardwood", 1), ("elder_crystal", 1)],
+        "axe_legs_t7", 1);
+    g.add_recipe("eq_axe_feet_t7", "Craft Dragonhide Armor Sabatons",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_steel", 1), ("elder_crystal", 1)],
+        "axe_feet_t7", 1);
 
     g.add_recipe("eq_axe_weapon_t8", "Forge Voidcutter Axe",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_steel", 2), ("runic_hide", 1), ("runic_hardwood", 1), ("void_silk", 1)],
         "axe_weapon_t8", 1);
-    g.add_recipe("eq_axe_armor_t8", "Craft Voidhide Armor",
+        g.add_recipe("eq_axe_head_t8", "Craft Voidhide Armor Helm",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("lich_phylactery", 1)],
+        "axe_head_t8", 1);
+    g.add_recipe("eq_axe_chest_t8", "Craft Voidhide Armor",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_hide", 2), ("runic_steel", 1), ("runic_hardwood", 1), ("lich_phylactery", 1)],
-        "axe_armor_t8", 1);
+        "axe_chest_t8", 1);
+    g.add_recipe("eq_axe_hands_t8", "Craft Voidhide Armor Gauntlets",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("lich_phylactery", 1)],
+        "axe_hands_t8", 1);
+    g.add_recipe("eq_axe_legs_t8", "Craft Voidhide Armor Greaves",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("runic_hardwood", 1), ("lich_phylactery", 1)],
+        "axe_legs_t8", 1);
+    g.add_recipe("eq_axe_feet_t8", "Craft Voidhide Armor Sabatons",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_hide", 1), ("runic_steel", 1), ("lich_phylactery", 1)],
+        "axe_feet_t8", 1);
 
     g.add_recipe("eq_axe_weapon_t9", "Forge Celestial Greataxe",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_steel", 2), ("artificed_hide", 1), ("artificed_hardwood", 1), ("arch_lich_dust", 1)],
         "axe_weapon_t9", 1);
-    g.add_recipe("eq_axe_armor_t9", "Craft Celestial Hide",
+        g.add_recipe("eq_axe_head_t9", "Craft Celestial Hide Helm",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("storm_essence", 1)],
+        "axe_head_t9", 1);
+    g.add_recipe("eq_axe_chest_t9", "Craft Celestial Hide",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_hide", 2), ("artificed_steel", 1), ("artificed_hardwood", 1), ("storm_essence", 1)],
-        "axe_armor_t9", 1);
+        "axe_chest_t9", 1);
+    g.add_recipe("eq_axe_hands_t9", "Craft Celestial Hide Gauntlets",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("storm_essence", 1)],
+        "axe_hands_t9", 1);
+    g.add_recipe("eq_axe_legs_t9", "Craft Celestial Hide Greaves",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("artificed_hardwood", 1), ("storm_essence", 1)],
+        "axe_legs_t9", 1);
+    g.add_recipe("eq_axe_feet_t9", "Craft Celestial Hide Sabatons",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_hide", 1), ("artificed_steel", 1), ("storm_essence", 1)],
+        "axe_feet_t9", 1);
 
     g.add_recipe("eq_axe_weapon_t10", "Forge Primordial Worldsplitter",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_steel", 2), ("divine_hide", 1), ("divine_hardwood", 1), ("undying_essence", 1)],
         "axe_weapon_t10", 1);
-    g.add_recipe("eq_axe_armor_t10", "Craft Primordial Beasthide",
+        g.add_recipe("eq_axe_head_t10", "Craft Primordial Beasthide Helm",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("wraith_lord_cloak", 1)],
+        "axe_head_t10", 1);
+    g.add_recipe("eq_axe_chest_t10", "Craft Primordial Beasthide",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_hide", 2), ("divine_steel", 1), ("divine_hardwood", 1), ("wraith_lord_cloak", 1)],
-        "axe_armor_t10", 1);
+        "axe_chest_t10", 1);
+    g.add_recipe("eq_axe_hands_t10", "Craft Primordial Beasthide Gauntlets",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("wraith_lord_cloak", 1)],
+        "axe_hands_t10", 1);
+    g.add_recipe("eq_axe_legs_t10", "Craft Primordial Beasthide Greaves",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("divine_hardwood", 1), ("wraith_lord_cloak", 1)],
+        "axe_legs_t10", 1);
+    g.add_recipe("eq_axe_feet_t10", "Craft Primordial Beasthide Sabatons",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_hide", 1), ("divine_steel", 1), ("wraith_lord_cloak", 1)],
+        "axe_feet_t10", 1);
 
 
     // --- HOLY line: SM+RC+TL ---
     g.add_material("holy_weapon_t1", "Crude Mace", 1, MaterialSource::Crafted);
-    g.add_material("holy_armor_t1", "Crude Blessed Plate", 1, MaterialSource::Crafted);
+        g.add_material("holy_head_t1", "Crude Blessed Plate Helm", 1, MaterialSource::Crafted);
+    g.add_material("holy_chest_t1", "Crude Blessed Plate", 1, MaterialSource::Crafted);
+    g.add_material("holy_hands_t1", "Crude Blessed Plate Gauntlets", 1, MaterialSource::Crafted);
+    g.add_material("holy_legs_t1", "Crude Blessed Plate Greaves", 1, MaterialSource::Crafted);
+    g.add_material("holy_feet_t1", "Crude Blessed Plate Sabatons", 1, MaterialSource::Crafted);
     g.add_material("holy_weapon_t2", "Iron Mace", 2, MaterialSource::Crafted);
-    g.add_material("holy_armor_t2", "Iron Blessed Plate", 2, MaterialSource::Crafted);
+        g.add_material("holy_head_t2", "Iron Blessed Plate Helm", 2, MaterialSource::Crafted);
+    g.add_material("holy_chest_t2", "Iron Blessed Plate", 2, MaterialSource::Crafted);
+    g.add_material("holy_hands_t2", "Iron Blessed Plate Gauntlets", 2, MaterialSource::Crafted);
+    g.add_material("holy_legs_t2", "Iron Blessed Plate Greaves", 2, MaterialSource::Crafted);
+    g.add_material("holy_feet_t2", "Iron Blessed Plate Sabatons", 2, MaterialSource::Crafted);
     g.add_material("holy_weapon_t3", "Steel Flanged Mace", 3, MaterialSource::Crafted);
-    g.add_material("holy_armor_t3", "Steel Blessed Plate", 3, MaterialSource::Crafted);
+        g.add_material("holy_head_t3", "Steel Blessed Plate Helm", 3, MaterialSource::Crafted);
+    g.add_material("holy_chest_t3", "Steel Blessed Plate", 3, MaterialSource::Crafted);
+    g.add_material("holy_hands_t3", "Steel Blessed Plate Gauntlets", 3, MaterialSource::Crafted);
+    g.add_material("holy_legs_t3", "Steel Blessed Plate Greaves", 3, MaterialSource::Crafted);
+    g.add_material("holy_feet_t3", "Steel Blessed Plate Sabatons", 3, MaterialSource::Crafted);
     g.add_material("holy_weapon_t4", "Dwarven Warhammer", 4, MaterialSource::Crafted);
-    g.add_material("holy_armor_t4", "Dwarven Blessed Plate", 4, MaterialSource::Crafted);
+        g.add_material("holy_head_t4", "Dwarven Blessed Plate Helm", 4, MaterialSource::Crafted);
+    g.add_material("holy_chest_t4", "Dwarven Blessed Plate", 4, MaterialSource::Crafted);
+    g.add_material("holy_hands_t4", "Dwarven Blessed Plate Gauntlets", 4, MaterialSource::Crafted);
+    g.add_material("holy_legs_t4", "Dwarven Blessed Plate Greaves", 4, MaterialSource::Crafted);
+    g.add_material("holy_feet_t4", "Dwarven Blessed Plate Sabatons", 4, MaterialSource::Crafted);
     g.add_material("holy_weapon_t5", "Mithril Mace", 5, MaterialSource::Crafted);
-    g.add_material("holy_armor_t5", "Mithril Blessed Plate", 5, MaterialSource::Crafted);
+        g.add_material("holy_head_t5", "Mithril Blessed Plate Helm", 5, MaterialSource::Crafted);
+    g.add_material("holy_chest_t5", "Mithril Blessed Plate", 5, MaterialSource::Crafted);
+    g.add_material("holy_hands_t5", "Mithril Blessed Plate Gauntlets", 5, MaterialSource::Crafted);
+    g.add_material("holy_legs_t5", "Mithril Blessed Plate Greaves", 5, MaterialSource::Crafted);
+    g.add_material("holy_feet_t5", "Mithril Blessed Plate Sabatons", 5, MaterialSource::Crafted);
     g.add_material("holy_weapon_t6", "Rune Mace", 6, MaterialSource::Crafted);
-    g.add_material("holy_armor_t6", "Rune Blessed Plate", 6, MaterialSource::Crafted);
+        g.add_material("holy_head_t6", "Rune Blessed Plate Helm", 6, MaterialSource::Crafted);
+    g.add_material("holy_chest_t6", "Rune Blessed Plate", 6, MaterialSource::Crafted);
+    g.add_material("holy_hands_t6", "Rune Blessed Plate Gauntlets", 6, MaterialSource::Crafted);
+    g.add_material("holy_legs_t6", "Rune Blessed Plate Greaves", 6, MaterialSource::Crafted);
+    g.add_material("holy_feet_t6", "Rune Blessed Plate Sabatons", 6, MaterialSource::Crafted);
     g.add_material("holy_weapon_t7", "Dragonforged Mace", 7, MaterialSource::Crafted);
-    g.add_material("holy_armor_t7", "Dragonforged Blessed Plate", 7, MaterialSource::Crafted);
+        g.add_material("holy_head_t7", "Dragonforged Blessed Plate Helm", 7, MaterialSource::Crafted);
+    g.add_material("holy_chest_t7", "Dragonforged Blessed Plate", 7, MaterialSource::Crafted);
+    g.add_material("holy_hands_t7", "Dragonforged Blessed Plate Gauntlets", 7, MaterialSource::Crafted);
+    g.add_material("holy_legs_t7", "Dragonforged Blessed Plate Greaves", 7, MaterialSource::Crafted);
+    g.add_material("holy_feet_t7", "Dragonforged Blessed Plate Sabatons", 7, MaterialSource::Crafted);
     g.add_material("holy_weapon_t8", "Voidforged Mace", 8, MaterialSource::Crafted);
-    g.add_material("holy_armor_t8", "Voidforged Blessed Plate", 8, MaterialSource::Crafted);
+        g.add_material("holy_head_t8", "Voidforged Blessed Plate Helm", 8, MaterialSource::Crafted);
+    g.add_material("holy_chest_t8", "Voidforged Blessed Plate", 8, MaterialSource::Crafted);
+    g.add_material("holy_hands_t8", "Voidforged Blessed Plate Gauntlets", 8, MaterialSource::Crafted);
+    g.add_material("holy_legs_t8", "Voidforged Blessed Plate Greaves", 8, MaterialSource::Crafted);
+    g.add_material("holy_feet_t8", "Voidforged Blessed Plate Sabatons", 8, MaterialSource::Crafted);
     g.add_material("holy_weapon_t9", "Celestial Mace", 9, MaterialSource::Crafted);
-    g.add_material("holy_armor_t9", "Celestial Blessed Plate", 9, MaterialSource::Crafted);
+        g.add_material("holy_head_t9", "Celestial Blessed Plate Helm", 9, MaterialSource::Crafted);
+    g.add_material("holy_chest_t9", "Celestial Blessed Plate", 9, MaterialSource::Crafted);
+    g.add_material("holy_hands_t9", "Celestial Blessed Plate Gauntlets", 9, MaterialSource::Crafted);
+    g.add_material("holy_legs_t9", "Celestial Blessed Plate Greaves", 9, MaterialSource::Crafted);
+    g.add_material("holy_feet_t9", "Celestial Blessed Plate Sabatons", 9, MaterialSource::Crafted);
     g.add_material("holy_weapon_t10", "Primordial Judgement", 10, MaterialSource::Crafted);
-    g.add_material("holy_armor_t10", "Primordial Divineguard", 10, MaterialSource::Crafted);
+        g.add_material("holy_head_t10", "Primordial Divineguard Helm", 10, MaterialSource::Crafted);
+    g.add_material("holy_chest_t10", "Primordial Divineguard", 10, MaterialSource::Crafted);
+    g.add_material("holy_hands_t10", "Primordial Divineguard Gauntlets", 10, MaterialSource::Crafted);
+    g.add_material("holy_legs_t10", "Primordial Divineguard Greaves", 10, MaterialSource::Crafted);
+    g.add_material("holy_feet_t10", "Primordial Divineguard Sabatons", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_holy_weapon_t1", "Forge Crude Mace",
         CraftingSkill::Smithing, 1, 1,
         &[("iron_nugget", 2), ("bone_charm", 1), ("woven_cloth", 1), ("ectoplasm", 1)],
         "holy_weapon_t1", 1);
-    g.add_recipe("eq_holy_armor_t1", "Craft Crude Blessed Plate",
+        g.add_recipe("eq_holy_head_t1", "Craft Crude Blessed Plate Helm",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("venom_sac", 1)],
+        "holy_head_t1", 1);
+    g.add_recipe("eq_holy_chest_t1", "Craft Crude Blessed Plate",
         CraftingSkill::Smithing, 1, 1,
         &[("bone_charm", 2), ("iron_nugget", 1), ("woven_cloth", 1), ("venom_sac", 1)],
-        "holy_armor_t1", 1);
+        "holy_chest_t1", 1);
+    g.add_recipe("eq_holy_hands_t1", "Craft Crude Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("venom_sac", 1)],
+        "holy_hands_t1", 1);
+    g.add_recipe("eq_holy_legs_t1", "Craft Crude Blessed Plate Greaves",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("woven_cloth", 1), ("venom_sac", 1)],
+        "holy_legs_t1", 1);
+    g.add_recipe("eq_holy_feet_t1", "Craft Crude Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("venom_sac", 1)],
+        "holy_feet_t1", 1);
 
     g.add_recipe("eq_holy_weapon_t2", "Forge Iron Mace",
         CraftingSkill::Smithing, 2, 2,
         &[("iron_ingot", 2), ("etched_rune", 1), ("silk_bolt", 1), ("tough_hide", 1)],
         "holy_weapon_t2", 1);
-    g.add_recipe("eq_holy_armor_t2", "Craft Iron Blessed Plate",
+        g.add_recipe("eq_holy_head_t2", "Craft Iron Blessed Plate Helm",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("mana_shard", 1)],
+        "holy_head_t2", 1);
+    g.add_recipe("eq_holy_chest_t2", "Craft Iron Blessed Plate",
         CraftingSkill::Smithing, 2, 2,
         &[("etched_rune", 2), ("iron_ingot", 1), ("silk_bolt", 1), ("mana_shard", 1)],
-        "holy_armor_t2", 1);
+        "holy_chest_t2", 1);
+    g.add_recipe("eq_holy_hands_t2", "Craft Iron Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("mana_shard", 1)],
+        "holy_hands_t2", 1);
+    g.add_recipe("eq_holy_legs_t2", "Craft Iron Blessed Plate Greaves",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("silk_bolt", 1), ("mana_shard", 1)],
+        "holy_legs_t2", 1);
+    g.add_recipe("eq_holy_feet_t2", "Craft Iron Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("mana_shard", 1)],
+        "holy_feet_t2", 1);
 
     g.add_recipe("eq_holy_weapon_t3", "Forge Steel Flanged Mace",
         CraftingSkill::Smithing, 3, 3,
         &[("steel_plate", 2), ("power_rune", 1), ("moonsilk", 1), ("phase_silk", 1)],
         "holy_weapon_t3", 1);
-    g.add_recipe("eq_holy_armor_t3", "Craft Steel Blessed Plate",
+        g.add_recipe("eq_holy_head_t3", "Craft Steel Blessed Plate Helm",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("dark_iron_ore", 1)],
+        "holy_head_t3", 1);
+    g.add_recipe("eq_holy_chest_t3", "Craft Steel Blessed Plate",
         CraftingSkill::Smithing, 3, 3,
         &[("power_rune", 2), ("steel_plate", 1), ("moonsilk", 1), ("dark_iron_ore", 1)],
-        "holy_armor_t3", 1);
+        "holy_chest_t3", 1);
+    g.add_recipe("eq_holy_hands_t3", "Craft Steel Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("dark_iron_ore", 1)],
+        "holy_hands_t3", 1);
+    g.add_recipe("eq_holy_legs_t3", "Craft Steel Blessed Plate Greaves",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("moonsilk", 1), ("dark_iron_ore", 1)],
+        "holy_legs_t3", 1);
+    g.add_recipe("eq_holy_feet_t3", "Craft Steel Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("dark_iron_ore", 1)],
+        "holy_feet_t3", 1);
 
     g.add_recipe("eq_holy_weapon_t4", "Forge Dwarven Warhammer",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_steel", 2), ("alchemical_rune", 1), ("alchemical_silk", 1), ("elemental_heart", 1)],
         "holy_weapon_t4", 1);
-    g.add_recipe("eq_holy_armor_t4", "Craft Dwarven Blessed Plate",
+        g.add_recipe("eq_holy_head_t4", "Craft Dwarven Blessed Plate Helm",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("orc_tusk", 1)],
+        "holy_head_t4", 1);
+    g.add_recipe("eq_holy_chest_t4", "Craft Dwarven Blessed Plate",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_rune", 2), ("alchemical_steel", 1), ("alchemical_silk", 1), ("orc_tusk", 1)],
-        "holy_armor_t4", 1);
+        "holy_chest_t4", 1);
+    g.add_recipe("eq_holy_hands_t4", "Craft Dwarven Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("orc_tusk", 1)],
+        "holy_hands_t4", 1);
+    g.add_recipe("eq_holy_legs_t4", "Craft Dwarven Blessed Plate Greaves",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("alchemical_silk", 1), ("orc_tusk", 1)],
+        "holy_legs_t4", 1);
+    g.add_recipe("eq_holy_feet_t4", "Craft Dwarven Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("orc_tusk", 1)],
+        "holy_feet_t4", 1);
 
     g.add_recipe("eq_holy_weapon_t5", "Forge Mithril Mace",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_steel", 2), ("enchanted_rune", 1), ("enchanted_silk", 1), ("banshee_wail", 1)],
         "holy_weapon_t5", 1);
-    g.add_recipe("eq_holy_armor_t5", "Craft Mithril Blessed Plate",
+        g.add_recipe("eq_holy_head_t5", "Craft Mithril Blessed Plate Helm",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("phase_venom", 1)],
+        "holy_head_t5", 1);
+    g.add_recipe("eq_holy_chest_t5", "Craft Mithril Blessed Plate",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_rune", 2), ("enchanted_steel", 1), ("enchanted_silk", 1), ("phase_venom", 1)],
-        "holy_armor_t5", 1);
+        "holy_chest_t5", 1);
+    g.add_recipe("eq_holy_hands_t5", "Craft Mithril Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("phase_venom", 1)],
+        "holy_hands_t5", 1);
+    g.add_recipe("eq_holy_legs_t5", "Craft Mithril Blessed Plate Greaves",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("enchanted_silk", 1), ("phase_venom", 1)],
+        "holy_legs_t5", 1);
+    g.add_recipe("eq_holy_feet_t5", "Craft Mithril Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("phase_venom", 1)],
+        "holy_feet_t5", 1);
 
     g.add_recipe("eq_holy_weapon_t6", "Forge Rune Mace",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_steel", 2), ("arcane_rune", 1), ("arcane_tapestry", 1), ("golem_core", 1)],
         "holy_weapon_t6", 1);
-    g.add_recipe("eq_holy_armor_t6", "Craft Rune Blessed Plate",
+        g.add_recipe("eq_holy_head_t6", "Craft Rune Blessed Plate Helm",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("naga_pearl", 1)],
+        "holy_head_t6", 1);
+    g.add_recipe("eq_holy_chest_t6", "Craft Rune Blessed Plate",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_rune", 2), ("arcane_steel", 1), ("arcane_tapestry", 1), ("naga_pearl", 1)],
-        "holy_armor_t6", 1);
+        "holy_chest_t6", 1);
+    g.add_recipe("eq_holy_hands_t6", "Craft Rune Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("naga_pearl", 1)],
+        "holy_hands_t6", 1);
+    g.add_recipe("eq_holy_legs_t6", "Craft Rune Blessed Plate Greaves",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("arcane_tapestry", 1), ("naga_pearl", 1)],
+        "holy_legs_t6", 1);
+    g.add_recipe("eq_holy_feet_t6", "Craft Rune Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("naga_pearl", 1)],
+        "holy_feet_t6", 1);
 
     g.add_recipe("eq_holy_weapon_t7", "Forge Dragonforged Mace",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_steel", 2), ("jeweled_rune", 1), ("jeweled_tapestry", 1), ("gloom_silk", 1)],
         "holy_weapon_t7", 1);
-    g.add_recipe("eq_holy_armor_t7", "Craft Dragonforged Blessed Plate",
+        g.add_recipe("eq_holy_head_t7", "Craft Dragonforged Blessed Plate Helm",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("death_knight_shard", 1)],
+        "holy_head_t7", 1);
+    g.add_recipe("eq_holy_chest_t7", "Craft Dragonforged Blessed Plate",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_rune", 2), ("jeweled_steel", 1), ("jeweled_tapestry", 1), ("death_knight_shard", 1)],
-        "holy_armor_t7", 1);
+        "holy_chest_t7", 1);
+    g.add_recipe("eq_holy_hands_t7", "Craft Dragonforged Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("death_knight_shard", 1)],
+        "holy_hands_t7", 1);
+    g.add_recipe("eq_holy_legs_t7", "Craft Dragonforged Blessed Plate Greaves",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("jeweled_tapestry", 1), ("death_knight_shard", 1)],
+        "holy_legs_t7", 1);
+    g.add_recipe("eq_holy_feet_t7", "Craft Dragonforged Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("death_knight_shard", 1)],
+        "holy_feet_t7", 1);
 
     g.add_recipe("eq_holy_weapon_t8", "Forge Voidforged Mace",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_steel", 2), ("runic_gem", 1), ("runic_tapestry", 1), ("astral_fragment", 1)],
         "holy_weapon_t8", 1);
-    g.add_recipe("eq_holy_armor_t8", "Craft Voidforged Blessed Plate",
+        g.add_recipe("eq_holy_head_t8", "Craft Voidforged Blessed Plate Helm",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_gem", 1), ("runic_steel", 1), ("dragon_scale", 1)],
+        "holy_head_t8", 1);
+    g.add_recipe("eq_holy_chest_t8", "Craft Voidforged Blessed Plate",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_gem", 2), ("runic_steel", 1), ("runic_tapestry", 1), ("dragon_scale", 1)],
-        "holy_armor_t8", 1);
+        "holy_chest_t8", 1);
+    g.add_recipe("eq_holy_hands_t8", "Craft Voidforged Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_gem", 1), ("runic_steel", 1), ("dragon_scale", 1)],
+        "holy_hands_t8", 1);
+    g.add_recipe("eq_holy_legs_t8", "Craft Voidforged Blessed Plate Greaves",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_gem", 1), ("runic_steel", 1), ("runic_tapestry", 1), ("dragon_scale", 1)],
+        "holy_legs_t8", 1);
+    g.add_recipe("eq_holy_feet_t8", "Craft Voidforged Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_gem", 1), ("runic_steel", 1), ("dragon_scale", 1)],
+        "holy_feet_t8", 1);
 
     g.add_recipe("eq_holy_weapon_t9", "Forge Celestial Mace",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_steel", 2), ("artificed_gem", 1), ("artificed_tapestry", 1), ("dracolich_fang", 1)],
         "holy_weapon_t9", 1);
-    g.add_recipe("eq_holy_armor_t9", "Craft Celestial Blessed Plate",
+        g.add_recipe("eq_holy_head_t9", "Craft Celestial Blessed Plate Helm",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_gem", 1), ("artificed_steel", 1), ("void_silk", 1)],
+        "holy_head_t9", 1);
+    g.add_recipe("eq_holy_chest_t9", "Craft Celestial Blessed Plate",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_gem", 2), ("artificed_steel", 1), ("artificed_tapestry", 1), ("void_silk", 1)],
-        "holy_armor_t9", 1);
+        "holy_chest_t9", 1);
+    g.add_recipe("eq_holy_hands_t9", "Craft Celestial Blessed Plate Gauntlets",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_gem", 1), ("artificed_steel", 1), ("void_silk", 1)],
+        "holy_hands_t9", 1);
+    g.add_recipe("eq_holy_legs_t9", "Craft Celestial Blessed Plate Greaves",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_gem", 1), ("artificed_steel", 1), ("artificed_tapestry", 1), ("void_silk", 1)],
+        "holy_legs_t9", 1);
+    g.add_recipe("eq_holy_feet_t9", "Craft Celestial Blessed Plate Sabatons",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_gem", 1), ("artificed_steel", 1), ("void_silk", 1)],
+        "holy_feet_t9", 1);
 
     g.add_recipe("eq_holy_weapon_t10", "Forge Primordial Judgement",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_steel", 2), ("divine_gem", 1), ("divine_tapestry", 1), ("primordial_heart", 1)],
         "holy_weapon_t10", 1);
-    g.add_recipe("eq_holy_armor_t10", "Craft Primordial Divineguard",
+        g.add_recipe("eq_holy_head_t10", "Craft Primordial Divineguard Helm",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_gem", 1), ("divine_steel", 1), ("arch_lich_dust", 1)],
+        "holy_head_t10", 1);
+    g.add_recipe("eq_holy_chest_t10", "Craft Primordial Divineguard",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_gem", 2), ("divine_steel", 1), ("divine_tapestry", 1), ("arch_lich_dust", 1)],
-        "holy_armor_t10", 1);
+        "holy_chest_t10", 1);
+    g.add_recipe("eq_holy_hands_t10", "Craft Primordial Divineguard Gauntlets",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_gem", 1), ("divine_steel", 1), ("arch_lich_dust", 1)],
+        "holy_hands_t10", 1);
+    g.add_recipe("eq_holy_legs_t10", "Craft Primordial Divineguard Greaves",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_gem", 1), ("divine_steel", 1), ("divine_tapestry", 1), ("arch_lich_dust", 1)],
+        "holy_legs_t10", 1);
+    g.add_recipe("eq_holy_feet_t10", "Craft Primordial Divineguard Sabatons",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_gem", 1), ("divine_steel", 1), ("arch_lich_dust", 1)],
+        "holy_feet_t10", 1);
 
 
     // --- DAGGER line: LW+AL+JC ---
     g.add_material("dagger_weapon_t1", "Crude Dagger", 1, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t1", "Crude Shadow Leather", 1, MaterialSource::Crafted);
+        g.add_material("dagger_head_t1", "Crude Shadow Leather Hood", 1, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t1", "Crude Shadow Leather", 1, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t1", "Crude Shadow Leather Bracers", 1, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t1", "Crude Shadow Leather Chaps", 1, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t1", "Crude Shadow Leather Boots", 1, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t2", "Iron Dagger", 2, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t2", "Iron-trimmed Shadow Leather", 2, MaterialSource::Crafted);
+        g.add_material("dagger_head_t2", "Iron-trimmed Shadow Leather Hood", 2, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t2", "Iron-trimmed Shadow Leather", 2, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t2", "Iron-trimmed Shadow Leather Bracers", 2, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t2", "Iron-trimmed Shadow Leather Chaps", 2, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t2", "Iron-trimmed Shadow Leather Boots", 2, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t3", "Steel Stiletto", 3, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t3", "Steel-clasped Shadow Leather", 3, MaterialSource::Crafted);
+        g.add_material("dagger_head_t3", "Steel-clasped Shadow Leather Hood", 3, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t3", "Steel-clasped Shadow Leather", 3, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t3", "Steel-clasped Shadow Leather Bracers", 3, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t3", "Steel-clasped Shadow Leather Chaps", 3, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t3", "Steel-clasped Shadow Leather Boots", 3, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t4", "Elven Dagger", 4, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t4", "Elven Shadow Leather", 4, MaterialSource::Crafted);
+        g.add_material("dagger_head_t4", "Elven Shadow Leather Hood", 4, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t4", "Elven Shadow Leather", 4, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t4", "Elven Shadow Leather Bracers", 4, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t4", "Elven Shadow Leather Chaps", 4, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t4", "Elven Shadow Leather Boots", 4, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t5", "Mithril Dagger", 5, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t5", "Mithril Shadow Leather", 5, MaterialSource::Crafted);
+        g.add_material("dagger_head_t5", "Mithril Shadow Leather Hood", 5, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t5", "Mithril Shadow Leather", 5, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t5", "Mithril Shadow Leather Bracers", 5, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t5", "Mithril Shadow Leather Chaps", 5, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t5", "Mithril Shadow Leather Boots", 5, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t6", "Rune Dagger", 6, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t6", "Rune Shadow Leather", 6, MaterialSource::Crafted);
+        g.add_material("dagger_head_t6", "Rune Shadow Leather Hood", 6, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t6", "Rune Shadow Leather", 6, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t6", "Rune Shadow Leather Bracers", 6, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t6", "Rune Shadow Leather Chaps", 6, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t6", "Rune Shadow Leather Boots", 6, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t7", "Dragon Fang Dagger", 7, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t7", "Dragon Shadow Leather", 7, MaterialSource::Crafted);
+        g.add_material("dagger_head_t7", "Dragon Shadow Leather Hood", 7, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t7", "Dragon Shadow Leather", 7, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t7", "Dragon Shadow Leather Bracers", 7, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t7", "Dragon Shadow Leather Chaps", 7, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t7", "Dragon Shadow Leather Boots", 7, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t8", "Voidstrike Dagger", 8, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t8", "Void Shadow Leather", 8, MaterialSource::Crafted);
+        g.add_material("dagger_head_t8", "Void Shadow Leather Hood", 8, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t8", "Void Shadow Leather", 8, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t8", "Void Shadow Leather Bracers", 8, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t8", "Void Shadow Leather Chaps", 8, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t8", "Void Shadow Leather Boots", 8, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t9", "Celestial Dagger", 9, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t9", "Celestial Shadow Leather", 9, MaterialSource::Crafted);
+        g.add_material("dagger_head_t9", "Celestial Shadow Leather Hood", 9, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t9", "Celestial Shadow Leather", 9, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t9", "Celestial Shadow Leather Bracers", 9, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t9", "Celestial Shadow Leather Chaps", 9, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t9", "Celestial Shadow Leather Boots", 9, MaterialSource::Crafted);
     g.add_material("dagger_weapon_t10", "Primordial Shadowfang", 10, MaterialSource::Crafted);
-    g.add_material("dagger_armor_t10", "Primordial Nightveil", 10, MaterialSource::Crafted);
+        g.add_material("dagger_head_t10", "Primordial Nightveil Hood", 10, MaterialSource::Crafted);
+    g.add_material("dagger_chest_t10", "Primordial Nightveil", 10, MaterialSource::Crafted);
+    g.add_material("dagger_hands_t10", "Primordial Nightveil Bracers", 10, MaterialSource::Crafted);
+    g.add_material("dagger_legs_t10", "Primordial Nightveil Chaps", 10, MaterialSource::Crafted);
+    g.add_material("dagger_feet_t10", "Primordial Nightveil Boots", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_dagger_weapon_t1", "Forge Crude Dagger",
         CraftingSkill::Leatherworking, 1, 1,
         &[("leather_strip", 3), ("herbal_paste", 2), ("polished_quartz", 2), ("wolf_pelt", 1)],
         "dagger_weapon_t1", 1);
-    g.add_recipe("eq_dagger_armor_t1", "Craft Crude Shadow Leather",
+        g.add_recipe("eq_dagger_head_t1", "Craft Crude Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 1, 1,
+        &[("herbal_paste", 1), ("leather_strip", 1), ("mana_shard", 1)],
+        "dagger_head_t1", 1);
+    g.add_recipe("eq_dagger_chest_t1", "Craft Crude Shadow Leather",
         CraftingSkill::Leatherworking, 1, 1,
         &[("herbal_paste", 3), ("leather_strip", 2), ("polished_quartz", 1), ("mana_shard", 1)],
-        "dagger_armor_t1", 1);
+        "dagger_chest_t1", 1);
+    g.add_recipe("eq_dagger_hands_t1", "Craft Crude Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 1, 1,
+        &[("herbal_paste", 1), ("leather_strip", 1), ("mana_shard", 1)],
+        "dagger_hands_t1", 1);
+    g.add_recipe("eq_dagger_legs_t1", "Craft Crude Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 1, 1,
+        &[("herbal_paste", 2), ("leather_strip", 1), ("polished_quartz", 1), ("mana_shard", 1)],
+        "dagger_legs_t1", 1);
+    g.add_recipe("eq_dagger_feet_t1", "Craft Crude Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 1, 1,
+        &[("herbal_paste", 1), ("leather_strip", 1), ("mana_shard", 1)],
+        "dagger_feet_t1", 1);
 
     g.add_recipe("eq_dagger_weapon_t2", "Forge Iron Dagger",
         CraftingSkill::Leatherworking, 2, 2,
         &[("hardened_leather", 2), ("refined_potion_base", 1), ("cut_gemstone", 1), ("shadow_thread", 1)],
         "dagger_weapon_t2", 1);
-    g.add_recipe("eq_dagger_armor_t2", "Craft Iron-trimmed Shadow Leather",
+        g.add_recipe("eq_dagger_head_t2", "Craft Iron-trimmed Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 2, 2,
+        &[("refined_potion_base", 1), ("hardened_leather", 1), ("ectoplasm", 1)],
+        "dagger_head_t2", 1);
+    g.add_recipe("eq_dagger_chest_t2", "Craft Iron-trimmed Shadow Leather",
         CraftingSkill::Leatherworking, 2, 2,
         &[("refined_potion_base", 2), ("hardened_leather", 1), ("cut_gemstone", 1), ("ectoplasm", 1)],
-        "dagger_armor_t2", 1);
+        "dagger_chest_t2", 1);
+    g.add_recipe("eq_dagger_hands_t2", "Craft Iron-trimmed Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 2, 2,
+        &[("refined_potion_base", 1), ("hardened_leather", 1), ("ectoplasm", 1)],
+        "dagger_hands_t2", 1);
+    g.add_recipe("eq_dagger_legs_t2", "Craft Iron-trimmed Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 2, 2,
+        &[("refined_potion_base", 1), ("hardened_leather", 1), ("cut_gemstone", 1), ("ectoplasm", 1)],
+        "dagger_legs_t2", 1);
+    g.add_recipe("eq_dagger_feet_t2", "Craft Iron-trimmed Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 2, 2,
+        &[("refined_potion_base", 1), ("hardened_leather", 1), ("ectoplasm", 1)],
+        "dagger_feet_t2", 1);
 
     g.add_recipe("eq_dagger_weapon_t3", "Forge Steel Stiletto",
         CraftingSkill::Leatherworking, 3, 3,
         &[("reinforced_leather", 2), ("alchemical_catalyst", 1), ("jeweled_setting", 1), ("elemental_core", 1)],
         "dagger_weapon_t3", 1);
-    g.add_recipe("eq_dagger_armor_t3", "Craft Steel-clasped Shadow Leather",
+        g.add_recipe("eq_dagger_head_t3", "Craft Steel-clasped Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 3, 3,
+        &[("alchemical_catalyst", 1), ("reinforced_leather", 1), ("tough_hide", 1)],
+        "dagger_head_t3", 1);
+    g.add_recipe("eq_dagger_chest_t3", "Craft Steel-clasped Shadow Leather",
         CraftingSkill::Leatherworking, 3, 3,
         &[("alchemical_catalyst", 2), ("reinforced_leather", 1), ("jeweled_setting", 1), ("tough_hide", 1)],
-        "dagger_armor_t3", 1);
+        "dagger_chest_t3", 1);
+    g.add_recipe("eq_dagger_hands_t3", "Craft Steel-clasped Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 3, 3,
+        &[("alchemical_catalyst", 1), ("reinforced_leather", 1), ("tough_hide", 1)],
+        "dagger_hands_t3", 1);
+    g.add_recipe("eq_dagger_legs_t3", "Craft Steel-clasped Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 3, 3,
+        &[("alchemical_catalyst", 1), ("reinforced_leather", 1), ("jeweled_setting", 1), ("tough_hide", 1)],
+        "dagger_legs_t3", 1);
+    g.add_recipe("eq_dagger_feet_t3", "Craft Steel-clasped Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 3, 3,
+        &[("alchemical_catalyst", 1), ("reinforced_leather", 1), ("tough_hide", 1)],
+        "dagger_feet_t3", 1);
 
     g.add_recipe("eq_dagger_weapon_t4", "Forge Elven Dagger",
         CraftingSkill::Leatherworking, 4, 4,
         &[("alchemical_hide", 2), ("alchemical_elixir_base", 1), ("alchemical_gem", 1), ("mummy_wrappings", 1)],
         "dagger_weapon_t4", 1);
-    g.add_recipe("eq_dagger_armor_t4", "Craft Elven Shadow Leather",
+        g.add_recipe("eq_dagger_head_t4", "Craft Elven Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_hide", 1), ("phase_silk", 1)],
+        "dagger_head_t4", 1);
+    g.add_recipe("eq_dagger_chest_t4", "Craft Elven Shadow Leather",
         CraftingSkill::Leatherworking, 4, 4,
         &[("alchemical_elixir_base", 2), ("alchemical_hide", 1), ("alchemical_gem", 1), ("phase_silk", 1)],
-        "dagger_armor_t4", 1);
+        "dagger_chest_t4", 1);
+    g.add_recipe("eq_dagger_hands_t4", "Craft Elven Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_hide", 1), ("phase_silk", 1)],
+        "dagger_hands_t4", 1);
+    g.add_recipe("eq_dagger_legs_t4", "Craft Elven Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_hide", 1), ("alchemical_gem", 1), ("phase_silk", 1)],
+        "dagger_legs_t4", 1);
+    g.add_recipe("eq_dagger_feet_t4", "Craft Elven Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_hide", 1), ("phase_silk", 1)],
+        "dagger_feet_t4", 1);
 
     g.add_recipe("eq_dagger_weapon_t5", "Forge Mithril Dagger",
         CraftingSkill::Leatherworking, 5, 5,
         &[("enchanted_hide", 2), ("enchanted_elixir", 1), ("enchanted_gem", 1), ("giant_sinew", 1)],
         "dagger_weapon_t5", 1);
-    g.add_recipe("eq_dagger_armor_t5", "Craft Mithril Shadow Leather",
+        g.add_recipe("eq_dagger_head_t5", "Craft Mithril Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_hide", 1), ("elemental_heart", 1)],
+        "dagger_head_t5", 1);
+    g.add_recipe("eq_dagger_chest_t5", "Craft Mithril Shadow Leather",
         CraftingSkill::Leatherworking, 5, 5,
         &[("enchanted_elixir", 2), ("enchanted_hide", 1), ("enchanted_gem", 1), ("elemental_heart", 1)],
-        "dagger_armor_t5", 1);
+        "dagger_chest_t5", 1);
+    g.add_recipe("eq_dagger_hands_t5", "Craft Mithril Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_hide", 1), ("elemental_heart", 1)],
+        "dagger_hands_t5", 1);
+    g.add_recipe("eq_dagger_legs_t5", "Craft Mithril Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_hide", 1), ("enchanted_gem", 1), ("elemental_heart", 1)],
+        "dagger_legs_t5", 1);
+    g.add_recipe("eq_dagger_feet_t5", "Craft Mithril Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_hide", 1), ("elemental_heart", 1)],
+        "dagger_feet_t5", 1);
 
     g.add_recipe("eq_dagger_weapon_t6", "Forge Rune Dagger",
         CraftingSkill::Leatherworking, 6, 6,
         &[("arcane_hide", 2), ("arcane_elixir", 1), ("arcane_gem", 1), ("nightwalker_shade", 1)],
         "dagger_weapon_t6", 1);
-    g.add_recipe("eq_dagger_armor_t6", "Craft Rune Shadow Leather",
+        g.add_recipe("eq_dagger_head_t6", "Craft Rune Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_hide", 1), ("banshee_wail", 1)],
+        "dagger_head_t6", 1);
+    g.add_recipe("eq_dagger_chest_t6", "Craft Rune Shadow Leather",
         CraftingSkill::Leatherworking, 6, 6,
         &[("arcane_elixir", 2), ("arcane_hide", 1), ("arcane_gem", 1), ("banshee_wail", 1)],
-        "dagger_armor_t6", 1);
+        "dagger_chest_t6", 1);
+    g.add_recipe("eq_dagger_hands_t6", "Craft Rune Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_hide", 1), ("banshee_wail", 1)],
+        "dagger_hands_t6", 1);
+    g.add_recipe("eq_dagger_legs_t6", "Craft Rune Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_hide", 1), ("arcane_gem", 1), ("banshee_wail", 1)],
+        "dagger_legs_t6", 1);
+    g.add_recipe("eq_dagger_feet_t6", "Craft Rune Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_hide", 1), ("banshee_wail", 1)],
+        "dagger_feet_t6", 1);
 
     g.add_recipe("eq_dagger_weapon_t7", "Forge Dragon Fang Dagger",
         CraftingSkill::Leatherworking, 7, 7,
         &[("jeweled_hide", 2), ("jeweled_elixir", 1), ("precious_diadem", 1), ("beholder_eye", 1)],
         "dagger_weapon_t7", 1);
-    g.add_recipe("eq_dagger_armor_t7", "Craft Dragon Shadow Leather",
+        g.add_recipe("eq_dagger_head_t7", "Craft Dragon Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_hide", 1), ("golem_core", 1)],
+        "dagger_head_t7", 1);
+    g.add_recipe("eq_dagger_chest_t7", "Craft Dragon Shadow Leather",
         CraftingSkill::Leatherworking, 7, 7,
         &[("jeweled_elixir", 2), ("jeweled_hide", 1), ("precious_diadem", 1), ("golem_core", 1)],
-        "dagger_armor_t7", 1);
+        "dagger_chest_t7", 1);
+    g.add_recipe("eq_dagger_hands_t7", "Craft Dragon Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_hide", 1), ("golem_core", 1)],
+        "dagger_hands_t7", 1);
+    g.add_recipe("eq_dagger_legs_t7", "Craft Dragon Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_hide", 1), ("precious_diadem", 1), ("golem_core", 1)],
+        "dagger_legs_t7", 1);
+    g.add_recipe("eq_dagger_feet_t7", "Craft Dragon Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_hide", 1), ("golem_core", 1)],
+        "dagger_feet_t7", 1);
 
     g.add_recipe("eq_dagger_weapon_t8", "Forge Voidstrike Dagger",
         CraftingSkill::Leatherworking, 8, 8,
         &[("runic_hide", 2), ("runic_elixir", 1), ("runic_gem", 1), ("demilich_gem", 1)],
         "dagger_weapon_t8", 1);
-    g.add_recipe("eq_dagger_armor_t8", "Craft Void Shadow Leather",
+        g.add_recipe("eq_dagger_head_t8", "Craft Void Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 8, 8,
+        &[("runic_elixir", 1), ("runic_hide", 1), ("gloom_silk", 1)],
+        "dagger_head_t8", 1);
+    g.add_recipe("eq_dagger_chest_t8", "Craft Void Shadow Leather",
         CraftingSkill::Leatherworking, 8, 8,
         &[("runic_elixir", 2), ("runic_hide", 1), ("runic_gem", 1), ("gloom_silk", 1)],
-        "dagger_armor_t8", 1);
+        "dagger_chest_t8", 1);
+    g.add_recipe("eq_dagger_hands_t8", "Craft Void Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 8, 8,
+        &[("runic_elixir", 1), ("runic_hide", 1), ("gloom_silk", 1)],
+        "dagger_hands_t8", 1);
+    g.add_recipe("eq_dagger_legs_t8", "Craft Void Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 8, 8,
+        &[("runic_elixir", 1), ("runic_hide", 1), ("runic_gem", 1), ("gloom_silk", 1)],
+        "dagger_legs_t8", 1);
+    g.add_recipe("eq_dagger_feet_t8", "Craft Void Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 8, 8,
+        &[("runic_elixir", 1), ("runic_hide", 1), ("gloom_silk", 1)],
+        "dagger_feet_t8", 1);
 
     g.add_recipe("eq_dagger_weapon_t9", "Forge Celestial Dagger",
         CraftingSkill::Leatherworking, 9, 9,
         &[("artificed_hide", 2), ("artificed_elixir", 1), ("artificed_gem", 1), ("titan_bone", 1)],
         "dagger_weapon_t9", 1);
-    g.add_recipe("eq_dagger_armor_t9", "Craft Celestial Shadow Leather",
+        g.add_recipe("eq_dagger_head_t9", "Craft Celestial Shadow Leather Hood",
+        CraftingSkill::Leatherworking, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_hide", 1), ("astral_fragment", 1)],
+        "dagger_head_t9", 1);
+    g.add_recipe("eq_dagger_chest_t9", "Craft Celestial Shadow Leather",
         CraftingSkill::Leatherworking, 9, 9,
         &[("artificed_elixir", 2), ("artificed_hide", 1), ("artificed_gem", 1), ("astral_fragment", 1)],
-        "dagger_armor_t9", 1);
+        "dagger_chest_t9", 1);
+    g.add_recipe("eq_dagger_hands_t9", "Craft Celestial Shadow Leather Bracers",
+        CraftingSkill::Leatherworking, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_hide", 1), ("astral_fragment", 1)],
+        "dagger_hands_t9", 1);
+    g.add_recipe("eq_dagger_legs_t9", "Craft Celestial Shadow Leather Chaps",
+        CraftingSkill::Leatherworking, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_hide", 1), ("artificed_gem", 1), ("astral_fragment", 1)],
+        "dagger_legs_t9", 1);
+    g.add_recipe("eq_dagger_feet_t9", "Craft Celestial Shadow Leather Boots",
+        CraftingSkill::Leatherworking, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_hide", 1), ("astral_fragment", 1)],
+        "dagger_feet_t9", 1);
 
     g.add_recipe("eq_dagger_weapon_t10", "Forge Primordial Shadowfang",
         CraftingSkill::Leatherworking, 10, 10,
         &[("divine_hide", 2), ("divine_elixir", 1), ("divine_gem", 1), ("lurker_shadow", 1)],
         "dagger_weapon_t10", 1);
-    g.add_recipe("eq_dagger_armor_t10", "Craft Primordial Nightveil",
+        g.add_recipe("eq_dagger_head_t10", "Craft Primordial Nightveil Hood",
+        CraftingSkill::Leatherworking, 10, 10,
+        &[("divine_elixir", 1), ("divine_hide", 1), ("dracolich_fang", 1)],
+        "dagger_head_t10", 1);
+    g.add_recipe("eq_dagger_chest_t10", "Craft Primordial Nightveil",
         CraftingSkill::Leatherworking, 10, 10,
         &[("divine_elixir", 2), ("divine_hide", 1), ("divine_gem", 1), ("dracolich_fang", 1)],
-        "dagger_armor_t10", 1);
+        "dagger_chest_t10", 1);
+    g.add_recipe("eq_dagger_hands_t10", "Craft Primordial Nightveil Bracers",
+        CraftingSkill::Leatherworking, 10, 10,
+        &[("divine_elixir", 1), ("divine_hide", 1), ("dracolich_fang", 1)],
+        "dagger_hands_t10", 1);
+    g.add_recipe("eq_dagger_legs_t10", "Craft Primordial Nightveil Chaps",
+        CraftingSkill::Leatherworking, 10, 10,
+        &[("divine_elixir", 1), ("divine_hide", 1), ("divine_gem", 1), ("dracolich_fang", 1)],
+        "dagger_legs_t10", 1);
+    g.add_recipe("eq_dagger_feet_t10", "Craft Primordial Nightveil Boots",
+        CraftingSkill::Leatherworking, 10, 10,
+        &[("divine_elixir", 1), ("divine_hide", 1), ("dracolich_fang", 1)],
+        "dagger_feet_t10", 1);
 
 
     // --- BOW line: WW+LW+AL ---
     g.add_material("bow_weapon_t1", "Rough Bow", 1, MaterialSource::Crafted);
-    g.add_material("bow_armor_t1", "Crude Ranger Leather", 1, MaterialSource::Crafted);
+        g.add_material("bow_head_t1", "Crude Ranger Leather Hood", 1, MaterialSource::Crafted);
+    g.add_material("bow_chest_t1", "Crude Ranger Leather", 1, MaterialSource::Crafted);
+    g.add_material("bow_hands_t1", "Crude Ranger Leather Bracers", 1, MaterialSource::Crafted);
+    g.add_material("bow_legs_t1", "Crude Ranger Leather Chaps", 1, MaterialSource::Crafted);
+    g.add_material("bow_feet_t1", "Crude Ranger Leather Boots", 1, MaterialSource::Crafted);
     g.add_material("bow_weapon_t2", "Yew Longbow", 2, MaterialSource::Crafted);
-    g.add_material("bow_armor_t2", "Iron-clasped Ranger Leather", 2, MaterialSource::Crafted);
+        g.add_material("bow_head_t2", "Iron-clasped Ranger Leather Hood", 2, MaterialSource::Crafted);
+    g.add_material("bow_chest_t2", "Iron-clasped Ranger Leather", 2, MaterialSource::Crafted);
+    g.add_material("bow_hands_t2", "Iron-clasped Ranger Leather Bracers", 2, MaterialSource::Crafted);
+    g.add_material("bow_legs_t2", "Iron-clasped Ranger Leather Chaps", 2, MaterialSource::Crafted);
+    g.add_material("bow_feet_t2", "Iron-clasped Ranger Leather Boots", 2, MaterialSource::Crafted);
     g.add_material("bow_weapon_t3", "Steel-tipped Bow", 3, MaterialSource::Crafted);
-    g.add_material("bow_armor_t3", "Steel-studded Ranger Leather", 3, MaterialSource::Crafted);
+        g.add_material("bow_head_t3", "Steel-studded Ranger Leather Hood", 3, MaterialSource::Crafted);
+    g.add_material("bow_chest_t3", "Steel-studded Ranger Leather", 3, MaterialSource::Crafted);
+    g.add_material("bow_hands_t3", "Steel-studded Ranger Leather Bracers", 3, MaterialSource::Crafted);
+    g.add_material("bow_legs_t3", "Steel-studded Ranger Leather Chaps", 3, MaterialSource::Crafted);
+    g.add_material("bow_feet_t3", "Steel-studded Ranger Leather Boots", 3, MaterialSource::Crafted);
     g.add_material("bow_weapon_t4", "Elvenshade Bow", 4, MaterialSource::Crafted);
-    g.add_material("bow_armor_t4", "Elven Ranger Leather", 4, MaterialSource::Crafted);
+        g.add_material("bow_head_t4", "Elven Ranger Leather Hood", 4, MaterialSource::Crafted);
+    g.add_material("bow_chest_t4", "Elven Ranger Leather", 4, MaterialSource::Crafted);
+    g.add_material("bow_hands_t4", "Elven Ranger Leather Bracers", 4, MaterialSource::Crafted);
+    g.add_material("bow_legs_t4", "Elven Ranger Leather Chaps", 4, MaterialSource::Crafted);
+    g.add_material("bow_feet_t4", "Elven Ranger Leather Boots", 4, MaterialSource::Crafted);
     g.add_material("bow_weapon_t5", "Mithril Bow", 5, MaterialSource::Crafted);
-    g.add_material("bow_armor_t5", "Mithril Ranger Leather", 5, MaterialSource::Crafted);
+        g.add_material("bow_head_t5", "Mithril Ranger Leather Hood", 5, MaterialSource::Crafted);
+    g.add_material("bow_chest_t5", "Mithril Ranger Leather", 5, MaterialSource::Crafted);
+    g.add_material("bow_hands_t5", "Mithril Ranger Leather Bracers", 5, MaterialSource::Crafted);
+    g.add_material("bow_legs_t5", "Mithril Ranger Leather Chaps", 5, MaterialSource::Crafted);
+    g.add_material("bow_feet_t5", "Mithril Ranger Leather Boots", 5, MaterialSource::Crafted);
     g.add_material("bow_weapon_t6", "Runewind Bow", 6, MaterialSource::Crafted);
-    g.add_material("bow_armor_t6", "Rune Ranger Leather", 6, MaterialSource::Crafted);
+        g.add_material("bow_head_t6", "Rune Ranger Leather Hood", 6, MaterialSource::Crafted);
+    g.add_material("bow_chest_t6", "Rune Ranger Leather", 6, MaterialSource::Crafted);
+    g.add_material("bow_hands_t6", "Rune Ranger Leather Bracers", 6, MaterialSource::Crafted);
+    g.add_material("bow_legs_t6", "Rune Ranger Leather Chaps", 6, MaterialSource::Crafted);
+    g.add_material("bow_feet_t6", "Rune Ranger Leather Boots", 6, MaterialSource::Crafted);
     g.add_material("bow_weapon_t7", "Dragonwing Bow", 7, MaterialSource::Crafted);
-    g.add_material("bow_armor_t7", "Dragon Ranger Leather", 7, MaterialSource::Crafted);
+        g.add_material("bow_head_t7", "Dragon Ranger Leather Hood", 7, MaterialSource::Crafted);
+    g.add_material("bow_chest_t7", "Dragon Ranger Leather", 7, MaterialSource::Crafted);
+    g.add_material("bow_hands_t7", "Dragon Ranger Leather Bracers", 7, MaterialSource::Crafted);
+    g.add_material("bow_legs_t7", "Dragon Ranger Leather Chaps", 7, MaterialSource::Crafted);
+    g.add_material("bow_feet_t7", "Dragon Ranger Leather Boots", 7, MaterialSource::Crafted);
     g.add_material("bow_weapon_t8", "Voidhunter Bow", 8, MaterialSource::Crafted);
-    g.add_material("bow_armor_t8", "Void Ranger Leather", 8, MaterialSource::Crafted);
+        g.add_material("bow_head_t8", "Void Ranger Leather Hood", 8, MaterialSource::Crafted);
+    g.add_material("bow_chest_t8", "Void Ranger Leather", 8, MaterialSource::Crafted);
+    g.add_material("bow_hands_t8", "Void Ranger Leather Bracers", 8, MaterialSource::Crafted);
+    g.add_material("bow_legs_t8", "Void Ranger Leather Chaps", 8, MaterialSource::Crafted);
+    g.add_material("bow_feet_t8", "Void Ranger Leather Boots", 8, MaterialSource::Crafted);
     g.add_material("bow_weapon_t9", "Celestial Stag Bow", 9, MaterialSource::Crafted);
-    g.add_material("bow_armor_t9", "Celestial Ranger Leather", 9, MaterialSource::Crafted);
+        g.add_material("bow_head_t9", "Celestial Ranger Leather Hood", 9, MaterialSource::Crafted);
+    g.add_material("bow_chest_t9", "Celestial Ranger Leather", 9, MaterialSource::Crafted);
+    g.add_material("bow_hands_t9", "Celestial Ranger Leather Bracers", 9, MaterialSource::Crafted);
+    g.add_material("bow_legs_t9", "Celestial Ranger Leather Chaps", 9, MaterialSource::Crafted);
+    g.add_material("bow_feet_t9", "Celestial Ranger Leather Boots", 9, MaterialSource::Crafted);
     g.add_material("bow_weapon_t10", "Primordial Wilds Bow", 10, MaterialSource::Crafted);
-    g.add_material("bow_armor_t10", "Primordial Wildstalker", 10, MaterialSource::Crafted);
+        g.add_material("bow_head_t10", "Primordial Wildstalker Hood", 10, MaterialSource::Crafted);
+    g.add_material("bow_chest_t10", "Primordial Wildstalker", 10, MaterialSource::Crafted);
+    g.add_material("bow_hands_t10", "Primordial Wildstalker Bracers", 10, MaterialSource::Crafted);
+    g.add_material("bow_legs_t10", "Primordial Wildstalker Chaps", 10, MaterialSource::Crafted);
+    g.add_material("bow_feet_t10", "Primordial Wildstalker Boots", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_bow_weapon_t1", "Forge Rough Bow",
         CraftingSkill::Woodworking, 1, 1,
         &[("shaped_wood", 2), ("leather_strip", 1), ("herbal_paste", 1), ("venom_sac", 1)],
         "bow_weapon_t1", 1);
-    g.add_recipe("eq_bow_armor_t1", "Craft Crude Ranger Leather",
+        g.add_recipe("eq_bow_head_t1", "Craft Crude Ranger Leather Hood",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("leather_strip", 1), ("shaped_wood", 1), ("ectoplasm", 1)],
+        "bow_head_t1", 1);
+    g.add_recipe("eq_bow_chest_t1", "Craft Crude Ranger Leather",
         CraftingSkill::Woodworking, 1, 1,
         &[("leather_strip", 2), ("shaped_wood", 2), ("herbal_paste", 1), ("ectoplasm", 1)],
-        "bow_armor_t1", 1);
+        "bow_chest_t1", 1);
+    g.add_recipe("eq_bow_hands_t1", "Craft Crude Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("leather_strip", 1), ("shaped_wood", 1), ("ectoplasm", 1)],
+        "bow_hands_t1", 1);
+    g.add_recipe("eq_bow_legs_t1", "Craft Crude Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("leather_strip", 1), ("shaped_wood", 1), ("herbal_paste", 1), ("ectoplasm", 1)],
+        "bow_legs_t1", 1);
+    g.add_recipe("eq_bow_feet_t1", "Craft Crude Ranger Leather Boots",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("leather_strip", 1), ("shaped_wood", 1), ("ectoplasm", 1)],
+        "bow_feet_t1", 1);
 
     g.add_recipe("eq_bow_weapon_t2", "Forge Yew Longbow",
         CraftingSkill::Woodworking, 2, 2,
         &[("ironwood_plank", 2), ("hardened_leather", 1), ("refined_potion_base", 1), ("arcane_crystal", 1)],
         "bow_weapon_t2", 1);
-    g.add_recipe("eq_bow_armor_t2", "Craft Iron-clasped Ranger Leather",
+        g.add_recipe("eq_bow_head_t2", "Craft Iron-clasped Ranger Leather Hood",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("hardened_leather", 1), ("ironwood_plank", 1), ("wolf_pelt", 1)],
+        "bow_head_t2", 1);
+    g.add_recipe("eq_bow_chest_t2", "Craft Iron-clasped Ranger Leather",
         CraftingSkill::Woodworking, 2, 2,
         &[("hardened_leather", 2), ("ironwood_plank", 1), ("refined_potion_base", 1), ("wolf_pelt", 1)],
-        "bow_armor_t2", 1);
+        "bow_chest_t2", 1);
+    g.add_recipe("eq_bow_hands_t2", "Craft Iron-clasped Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("hardened_leather", 1), ("ironwood_plank", 1), ("wolf_pelt", 1)],
+        "bow_hands_t2", 1);
+    g.add_recipe("eq_bow_legs_t2", "Craft Iron-clasped Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("hardened_leather", 1), ("ironwood_plank", 1), ("refined_potion_base", 1), ("wolf_pelt", 1)],
+        "bow_legs_t2", 1);
+    g.add_recipe("eq_bow_feet_t2", "Craft Iron-clasped Ranger Leather Boots",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("hardened_leather", 1), ("ironwood_plank", 1), ("wolf_pelt", 1)],
+        "bow_feet_t2", 1);
 
     g.add_recipe("eq_bow_weapon_t3", "Forge Steel-tipped Bow",
         CraftingSkill::Woodworking, 3, 3,
         &[("hardwood_beam", 2), ("reinforced_leather", 1), ("alchemical_catalyst", 1), ("wraith_dust", 1)],
         "bow_weapon_t3", 1);
-    g.add_recipe("eq_bow_armor_t3", "Craft Steel-studded Ranger Leather",
+        g.add_recipe("eq_bow_head_t3", "Craft Steel-studded Ranger Leather Hood",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("reinforced_leather", 1), ("hardwood_beam", 1), ("shadow_thread", 1)],
+        "bow_head_t3", 1);
+    g.add_recipe("eq_bow_chest_t3", "Craft Steel-studded Ranger Leather",
         CraftingSkill::Woodworking, 3, 3,
         &[("reinforced_leather", 2), ("hardwood_beam", 1), ("alchemical_catalyst", 1), ("shadow_thread", 1)],
-        "bow_armor_t3", 1);
+        "bow_chest_t3", 1);
+    g.add_recipe("eq_bow_hands_t3", "Craft Steel-studded Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("reinforced_leather", 1), ("hardwood_beam", 1), ("shadow_thread", 1)],
+        "bow_hands_t3", 1);
+    g.add_recipe("eq_bow_legs_t3", "Craft Steel-studded Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("reinforced_leather", 1), ("hardwood_beam", 1), ("alchemical_catalyst", 1), ("shadow_thread", 1)],
+        "bow_legs_t3", 1);
+    g.add_recipe("eq_bow_feet_t3", "Craft Steel-studded Ranger Leather Boots",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("reinforced_leather", 1), ("hardwood_beam", 1), ("shadow_thread", 1)],
+        "bow_feet_t3", 1);
 
     g.add_recipe("eq_bow_weapon_t4", "Forge Elvenshade Bow",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_hardwood", 2), ("alchemical_hide", 1), ("alchemical_elixir_base", 1), ("troll_blood", 1)],
         "bow_weapon_t4", 1);
-    g.add_recipe("eq_bow_armor_t4", "Craft Elven Ranger Leather",
+        g.add_recipe("eq_bow_head_t4", "Craft Elven Ranger Leather Hood",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_hardwood", 1), ("elemental_core", 1)],
+        "bow_head_t4", 1);
+    g.add_recipe("eq_bow_chest_t4", "Craft Elven Ranger Leather",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_hide", 2), ("alchemical_hardwood", 1), ("alchemical_elixir_base", 1), ("elemental_core", 1)],
-        "bow_armor_t4", 1);
+        "bow_chest_t4", 1);
+    g.add_recipe("eq_bow_hands_t4", "Craft Elven Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_hardwood", 1), ("elemental_core", 1)],
+        "bow_hands_t4", 1);
+    g.add_recipe("eq_bow_legs_t4", "Craft Elven Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_hardwood", 1), ("alchemical_elixir_base", 1), ("elemental_core", 1)],
+        "bow_legs_t4", 1);
+    g.add_recipe("eq_bow_feet_t4", "Craft Elven Ranger Leather Boots",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_hide", 1), ("alchemical_hardwood", 1), ("elemental_core", 1)],
+        "bow_feet_t4", 1);
 
     g.add_recipe("eq_bow_weapon_t5", "Forge Mithril Bow",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_hardwood", 2), ("enchanted_hide", 1), ("enchanted_elixir", 1), ("stalker_claw", 1)],
         "bow_weapon_t5", 1);
-    g.add_recipe("eq_bow_armor_t5", "Craft Mithril Ranger Leather",
+        g.add_recipe("eq_bow_head_t5", "Craft Mithril Ranger Leather Hood",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_hardwood", 1), ("mummy_wrappings", 1)],
+        "bow_head_t5", 1);
+    g.add_recipe("eq_bow_chest_t5", "Craft Mithril Ranger Leather",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_hide", 2), ("enchanted_hardwood", 1), ("enchanted_elixir", 1), ("mummy_wrappings", 1)],
-        "bow_armor_t5", 1);
+        "bow_chest_t5", 1);
+    g.add_recipe("eq_bow_hands_t5", "Craft Mithril Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_hardwood", 1), ("mummy_wrappings", 1)],
+        "bow_hands_t5", 1);
+    g.add_recipe("eq_bow_legs_t5", "Craft Mithril Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_hardwood", 1), ("enchanted_elixir", 1), ("mummy_wrappings", 1)],
+        "bow_legs_t5", 1);
+    g.add_recipe("eq_bow_feet_t5", "Craft Mithril Ranger Leather Boots",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_hide", 1), ("enchanted_hardwood", 1), ("mummy_wrappings", 1)],
+        "bow_feet_t5", 1);
 
     g.add_recipe("eq_bow_weapon_t6", "Forge Runewind Bow",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_hardwood", 2), ("arcane_hide", 1), ("arcane_elixir", 1), ("elder_crystal", 1)],
         "bow_weapon_t6", 1);
-    g.add_recipe("eq_bow_armor_t6", "Craft Rune Ranger Leather",
+        g.add_recipe("eq_bow_head_t6", "Craft Rune Ranger Leather Hood",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_hide", 1), ("arcane_hardwood", 1), ("giant_sinew", 1)],
+        "bow_head_t6", 1);
+    g.add_recipe("eq_bow_chest_t6", "Craft Rune Ranger Leather",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_hide", 2), ("arcane_hardwood", 1), ("arcane_elixir", 1), ("giant_sinew", 1)],
-        "bow_armor_t6", 1);
+        "bow_chest_t6", 1);
+    g.add_recipe("eq_bow_hands_t6", "Craft Rune Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_hide", 1), ("arcane_hardwood", 1), ("giant_sinew", 1)],
+        "bow_hands_t6", 1);
+    g.add_recipe("eq_bow_legs_t6", "Craft Rune Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_hide", 1), ("arcane_hardwood", 1), ("arcane_elixir", 1), ("giant_sinew", 1)],
+        "bow_legs_t6", 1);
+    g.add_recipe("eq_bow_feet_t6", "Craft Rune Ranger Leather Boots",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_hide", 1), ("arcane_hardwood", 1), ("giant_sinew", 1)],
+        "bow_feet_t6", 1);
 
     g.add_recipe("eq_bow_weapon_t7", "Forge Dragonwing Bow",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_hardwood", 2), ("jeweled_hide", 1), ("jeweled_elixir", 1), ("lich_phylactery", 1)],
         "bow_weapon_t7", 1);
-    g.add_recipe("eq_bow_armor_t7", "Craft Dragon Ranger Leather",
+        g.add_recipe("eq_bow_head_t7", "Craft Dragon Ranger Leather Hood",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_hardwood", 1), ("nightwalker_shade", 1)],
+        "bow_head_t7", 1);
+    g.add_recipe("eq_bow_chest_t7", "Craft Dragon Ranger Leather",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_hide", 2), ("jeweled_hardwood", 1), ("jeweled_elixir", 1), ("nightwalker_shade", 1)],
-        "bow_armor_t7", 1);
+        "bow_chest_t7", 1);
+    g.add_recipe("eq_bow_hands_t7", "Craft Dragon Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_hardwood", 1), ("nightwalker_shade", 1)],
+        "bow_hands_t7", 1);
+    g.add_recipe("eq_bow_legs_t7", "Craft Dragon Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_hardwood", 1), ("jeweled_elixir", 1), ("nightwalker_shade", 1)],
+        "bow_legs_t7", 1);
+    g.add_recipe("eq_bow_feet_t7", "Craft Dragon Ranger Leather Boots",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_hide", 1), ("jeweled_hardwood", 1), ("nightwalker_shade", 1)],
+        "bow_feet_t7", 1);
 
     g.add_recipe("eq_bow_weapon_t8", "Forge Voidhunter Bow",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_hardwood", 2), ("runic_hide", 1), ("runic_elixir", 1), ("storm_essence", 1)],
         "bow_weapon_t8", 1);
-    g.add_recipe("eq_bow_armor_t8", "Craft Void Ranger Leather",
+        g.add_recipe("eq_bow_head_t8", "Craft Void Ranger Leather Hood",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_hide", 1), ("runic_hardwood", 1), ("beholder_eye", 1)],
+        "bow_head_t8", 1);
+    g.add_recipe("eq_bow_chest_t8", "Craft Void Ranger Leather",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_hide", 2), ("runic_hardwood", 1), ("runic_elixir", 1), ("beholder_eye", 1)],
-        "bow_armor_t8", 1);
+        "bow_chest_t8", 1);
+    g.add_recipe("eq_bow_hands_t8", "Craft Void Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_hide", 1), ("runic_hardwood", 1), ("beholder_eye", 1)],
+        "bow_hands_t8", 1);
+    g.add_recipe("eq_bow_legs_t8", "Craft Void Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_hide", 1), ("runic_hardwood", 1), ("runic_elixir", 1), ("beholder_eye", 1)],
+        "bow_legs_t8", 1);
+    g.add_recipe("eq_bow_feet_t8", "Craft Void Ranger Leather Boots",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_hide", 1), ("runic_hardwood", 1), ("beholder_eye", 1)],
+        "bow_feet_t8", 1);
 
     g.add_recipe("eq_bow_weapon_t9", "Forge Celestial Stag Bow",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_hardwood", 2), ("artificed_hide", 1), ("artificed_elixir", 1), ("wraith_lord_cloak", 1)],
         "bow_weapon_t9", 1);
-    g.add_recipe("eq_bow_armor_t9", "Craft Celestial Ranger Leather",
+        g.add_recipe("eq_bow_head_t9", "Craft Celestial Ranger Leather Hood",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_hide", 1), ("artificed_hardwood", 1), ("demilich_gem", 1)],
+        "bow_head_t9", 1);
+    g.add_recipe("eq_bow_chest_t9", "Craft Celestial Ranger Leather",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_hide", 2), ("artificed_hardwood", 1), ("artificed_elixir", 1), ("demilich_gem", 1)],
-        "bow_armor_t9", 1);
+        "bow_chest_t9", 1);
+    g.add_recipe("eq_bow_hands_t9", "Craft Celestial Ranger Leather Bracers",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_hide", 1), ("artificed_hardwood", 1), ("demilich_gem", 1)],
+        "bow_hands_t9", 1);
+    g.add_recipe("eq_bow_legs_t9", "Craft Celestial Ranger Leather Chaps",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_hide", 1), ("artificed_hardwood", 1), ("artificed_elixir", 1), ("demilich_gem", 1)],
+        "bow_legs_t9", 1);
+    g.add_recipe("eq_bow_feet_t9", "Craft Celestial Ranger Leather Boots",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_hide", 1), ("artificed_hardwood", 1), ("demilich_gem", 1)],
+        "bow_feet_t9", 1);
 
     g.add_recipe("eq_bow_weapon_t10", "Forge Primordial Wilds Bow",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_hardwood", 2), ("divine_hide", 1), ("divine_elixir", 1), ("arcanum_core", 1)],
         "bow_weapon_t10", 1);
-    g.add_recipe("eq_bow_armor_t10", "Craft Primordial Wildstalker",
+        g.add_recipe("eq_bow_head_t10", "Craft Primordial Wildstalker Hood",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_hide", 1), ("divine_hardwood", 1), ("titan_bone", 1)],
+        "bow_head_t10", 1);
+    g.add_recipe("eq_bow_chest_t10", "Craft Primordial Wildstalker",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_hide", 2), ("divine_hardwood", 1), ("divine_elixir", 1), ("titan_bone", 1)],
-        "bow_armor_t10", 1);
+        "bow_chest_t10", 1);
+    g.add_recipe("eq_bow_hands_t10", "Craft Primordial Wildstalker Bracers",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_hide", 1), ("divine_hardwood", 1), ("titan_bone", 1)],
+        "bow_hands_t10", 1);
+    g.add_recipe("eq_bow_legs_t10", "Craft Primordial Wildstalker Chaps",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_hide", 1), ("divine_hardwood", 1), ("divine_elixir", 1), ("titan_bone", 1)],
+        "bow_legs_t10", 1);
+    g.add_recipe("eq_bow_feet_t10", "Craft Primordial Wildstalker Boots",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_hide", 1), ("divine_hardwood", 1), ("titan_bone", 1)],
+        "bow_feet_t10", 1);
 
 
     // --- FIST line: TL+AL+EN ---
     g.add_material("fist_weapon_t1", "Crude Wraps", 1, MaterialSource::Crafted);
-    g.add_material("fist_armor_t1", "Crude Ki Robes", 1, MaterialSource::Crafted);
+        g.add_material("fist_head_t1", "Crude Ki Robes Circlet", 1, MaterialSource::Crafted);
+    g.add_material("fist_chest_t1", "Crude Ki Robes", 1, MaterialSource::Crafted);
+    g.add_material("fist_hands_t1", "Crude Ki Robes Gloves", 1, MaterialSource::Crafted);
+    g.add_material("fist_legs_t1", "Crude Ki Robes Leggings", 1, MaterialSource::Crafted);
+    g.add_material("fist_feet_t1", "Crude Ki Robes Slippers", 1, MaterialSource::Crafted);
     g.add_material("fist_weapon_t2", "Iron-weighted Wraps", 2, MaterialSource::Crafted);
-    g.add_material("fist_armor_t2", "Iron-hemmed Ki Robes", 2, MaterialSource::Crafted);
+        g.add_material("fist_head_t2", "Iron-hemmed Ki Robes Circlet", 2, MaterialSource::Crafted);
+    g.add_material("fist_chest_t2", "Iron-hemmed Ki Robes", 2, MaterialSource::Crafted);
+    g.add_material("fist_hands_t2", "Iron-hemmed Ki Robes Gloves", 2, MaterialSource::Crafted);
+    g.add_material("fist_legs_t2", "Iron-hemmed Ki Robes Leggings", 2, MaterialSource::Crafted);
+    g.add_material("fist_feet_t2", "Iron-hemmed Ki Robes Slippers", 2, MaterialSource::Crafted);
     g.add_material("fist_weapon_t3", "Steel-threaded Wraps", 3, MaterialSource::Crafted);
-    g.add_material("fist_armor_t3", "Steel-clasped Ki Robes", 3, MaterialSource::Crafted);
+        g.add_material("fist_head_t3", "Steel-clasped Ki Robes Circlet", 3, MaterialSource::Crafted);
+    g.add_material("fist_chest_t3", "Steel-clasped Ki Robes", 3, MaterialSource::Crafted);
+    g.add_material("fist_hands_t3", "Steel-clasped Ki Robes Gloves", 3, MaterialSource::Crafted);
+    g.add_material("fist_legs_t3", "Steel-clasped Ki Robes Leggings", 3, MaterialSource::Crafted);
+    g.add_material("fist_feet_t3", "Steel-clasped Ki Robes Slippers", 3, MaterialSource::Crafted);
     g.add_material("fist_weapon_t4", "Dwarven Knuckles", 4, MaterialSource::Crafted);
-    g.add_material("fist_armor_t4", "Dwarven Ki Robes", 4, MaterialSource::Crafted);
+        g.add_material("fist_head_t4", "Dwarven Ki Robes Circlet", 4, MaterialSource::Crafted);
+    g.add_material("fist_chest_t4", "Dwarven Ki Robes", 4, MaterialSource::Crafted);
+    g.add_material("fist_hands_t4", "Dwarven Ki Robes Gloves", 4, MaterialSource::Crafted);
+    g.add_material("fist_legs_t4", "Dwarven Ki Robes Leggings", 4, MaterialSource::Crafted);
+    g.add_material("fist_feet_t4", "Dwarven Ki Robes Slippers", 4, MaterialSource::Crafted);
     g.add_material("fist_weapon_t5", "Mithril Wraps", 5, MaterialSource::Crafted);
-    g.add_material("fist_armor_t5", "Mithril Ki Robes", 5, MaterialSource::Crafted);
+        g.add_material("fist_head_t5", "Mithril Ki Robes Circlet", 5, MaterialSource::Crafted);
+    g.add_material("fist_chest_t5", "Mithril Ki Robes", 5, MaterialSource::Crafted);
+    g.add_material("fist_hands_t5", "Mithril Ki Robes Gloves", 5, MaterialSource::Crafted);
+    g.add_material("fist_legs_t5", "Mithril Ki Robes Leggings", 5, MaterialSource::Crafted);
+    g.add_material("fist_feet_t5", "Mithril Ki Robes Slippers", 5, MaterialSource::Crafted);
     g.add_material("fist_weapon_t6", "Rune Wraps", 6, MaterialSource::Crafted);
-    g.add_material("fist_armor_t6", "Rune Ki Robes", 6, MaterialSource::Crafted);
+        g.add_material("fist_head_t6", "Rune Ki Robes Circlet", 6, MaterialSource::Crafted);
+    g.add_material("fist_chest_t6", "Rune Ki Robes", 6, MaterialSource::Crafted);
+    g.add_material("fist_hands_t6", "Rune Ki Robes Gloves", 6, MaterialSource::Crafted);
+    g.add_material("fist_legs_t6", "Rune Ki Robes Leggings", 6, MaterialSource::Crafted);
+    g.add_material("fist_feet_t6", "Rune Ki Robes Slippers", 6, MaterialSource::Crafted);
     g.add_material("fist_weapon_t7", "Dragon Fist Wraps", 7, MaterialSource::Crafted);
-    g.add_material("fist_armor_t7", "Dragon Ki Robes", 7, MaterialSource::Crafted);
+        g.add_material("fist_head_t7", "Dragon Ki Robes Circlet", 7, MaterialSource::Crafted);
+    g.add_material("fist_chest_t7", "Dragon Ki Robes", 7, MaterialSource::Crafted);
+    g.add_material("fist_hands_t7", "Dragon Ki Robes Gloves", 7, MaterialSource::Crafted);
+    g.add_material("fist_legs_t7", "Dragon Ki Robes Leggings", 7, MaterialSource::Crafted);
+    g.add_material("fist_feet_t7", "Dragon Ki Robes Slippers", 7, MaterialSource::Crafted);
     g.add_material("fist_weapon_t8", "Voidstrike Wraps", 8, MaterialSource::Crafted);
-    g.add_material("fist_armor_t8", "Void Ki Robes", 8, MaterialSource::Crafted);
+        g.add_material("fist_head_t8", "Void Ki Robes Circlet", 8, MaterialSource::Crafted);
+    g.add_material("fist_chest_t8", "Void Ki Robes", 8, MaterialSource::Crafted);
+    g.add_material("fist_hands_t8", "Void Ki Robes Gloves", 8, MaterialSource::Crafted);
+    g.add_material("fist_legs_t8", "Void Ki Robes Leggings", 8, MaterialSource::Crafted);
+    g.add_material("fist_feet_t8", "Void Ki Robes Slippers", 8, MaterialSource::Crafted);
     g.add_material("fist_weapon_t9", "Celestial Wraps", 9, MaterialSource::Crafted);
-    g.add_material("fist_armor_t9", "Celestial Ki Robes", 9, MaterialSource::Crafted);
+        g.add_material("fist_head_t9", "Celestial Ki Robes Circlet", 9, MaterialSource::Crafted);
+    g.add_material("fist_chest_t9", "Celestial Ki Robes", 9, MaterialSource::Crafted);
+    g.add_material("fist_hands_t9", "Celestial Ki Robes Gloves", 9, MaterialSource::Crafted);
+    g.add_material("fist_legs_t9", "Celestial Ki Robes Leggings", 9, MaterialSource::Crafted);
+    g.add_material("fist_feet_t9", "Celestial Ki Robes Slippers", 9, MaterialSource::Crafted);
     g.add_material("fist_weapon_t10", "Primordial Titanfist", 10, MaterialSource::Crafted);
-    g.add_material("fist_armor_t10", "Primordial Ascension Robes", 10, MaterialSource::Crafted);
+        g.add_material("fist_head_t10", "Primordial Ascension Robes Circlet", 10, MaterialSource::Crafted);
+    g.add_material("fist_chest_t10", "Primordial Ascension Robes", 10, MaterialSource::Crafted);
+    g.add_material("fist_hands_t10", "Primordial Ascension Robes Gloves", 10, MaterialSource::Crafted);
+    g.add_material("fist_legs_t10", "Primordial Ascension Robes Leggings", 10, MaterialSource::Crafted);
+    g.add_material("fist_feet_t10", "Primordial Ascension Robes Slippers", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_fist_weapon_t1", "Forge Crude Wraps",
         CraftingSkill::Tailoring, 1, 1,
         &[("woven_cloth", 2), ("herbal_paste", 1), ("faint_enchant_dust", 1), ("mana_shard", 1)],
         "fist_weapon_t1", 1);
-    g.add_recipe("eq_fist_armor_t1", "Craft Crude Ki Robes",
+        g.add_recipe("eq_fist_head_t1", "Craft Crude Ki Robes Circlet",
+        CraftingSkill::Tailoring, 1, 1,
+        &[("herbal_paste", 1), ("woven_cloth", 1), ("wolf_pelt", 1)],
+        "fist_head_t1", 1);
+    g.add_recipe("eq_fist_chest_t1", "Craft Crude Ki Robes",
         CraftingSkill::Tailoring, 1, 1,
         &[("herbal_paste", 2), ("woven_cloth", 1), ("faint_enchant_dust", 1), ("wolf_pelt", 1)],
-        "fist_armor_t1", 1);
+        "fist_chest_t1", 1);
+    g.add_recipe("eq_fist_hands_t1", "Craft Crude Ki Robes Gloves",
+        CraftingSkill::Tailoring, 1, 1,
+        &[("herbal_paste", 1), ("woven_cloth", 1), ("wolf_pelt", 1)],
+        "fist_hands_t1", 1);
+    g.add_recipe("eq_fist_legs_t1", "Craft Crude Ki Robes Leggings",
+        CraftingSkill::Tailoring, 1, 1,
+        &[("herbal_paste", 1), ("woven_cloth", 1), ("faint_enchant_dust", 1), ("wolf_pelt", 1)],
+        "fist_legs_t1", 1);
+    g.add_recipe("eq_fist_feet_t1", "Craft Crude Ki Robes Slippers",
+        CraftingSkill::Tailoring, 1, 1,
+        &[("herbal_paste", 1), ("woven_cloth", 1), ("wolf_pelt", 1)],
+        "fist_feet_t1", 1);
 
     g.add_recipe("eq_fist_weapon_t2", "Forge Iron-weighted Wraps",
         CraftingSkill::Tailoring, 2, 2,
         &[("silk_bolt", 2), ("refined_potion_base", 1), ("enchanted_thread", 1), ("dark_iron_ore", 1)],
         "fist_weapon_t2", 1);
-    g.add_recipe("eq_fist_armor_t2", "Craft Iron-hemmed Ki Robes",
+        g.add_recipe("eq_fist_head_t2", "Craft Iron-hemmed Ki Robes Circlet",
+        CraftingSkill::Tailoring, 2, 2,
+        &[("refined_potion_base", 1), ("silk_bolt", 1), ("venom_sac", 1)],
+        "fist_head_t2", 1);
+    g.add_recipe("eq_fist_chest_t2", "Craft Iron-hemmed Ki Robes",
         CraftingSkill::Tailoring, 2, 2,
         &[("refined_potion_base", 2), ("silk_bolt", 1), ("enchanted_thread", 1), ("venom_sac", 1)],
-        "fist_armor_t2", 1);
+        "fist_chest_t2", 1);
+    g.add_recipe("eq_fist_hands_t2", "Craft Iron-hemmed Ki Robes Gloves",
+        CraftingSkill::Tailoring, 2, 2,
+        &[("refined_potion_base", 1), ("silk_bolt", 1), ("venom_sac", 1)],
+        "fist_hands_t2", 1);
+    g.add_recipe("eq_fist_legs_t2", "Craft Iron-hemmed Ki Robes Leggings",
+        CraftingSkill::Tailoring, 2, 2,
+        &[("refined_potion_base", 1), ("silk_bolt", 1), ("enchanted_thread", 1), ("venom_sac", 1)],
+        "fist_legs_t2", 1);
+    g.add_recipe("eq_fist_feet_t2", "Craft Iron-hemmed Ki Robes Slippers",
+        CraftingSkill::Tailoring, 2, 2,
+        &[("refined_potion_base", 1), ("silk_bolt", 1), ("venom_sac", 1)],
+        "fist_feet_t2", 1);
 
     g.add_recipe("eq_fist_weapon_t3", "Forge Steel-threaded Wraps",
         CraftingSkill::Tailoring, 3, 3,
         &[("moonsilk", 2), ("alchemical_catalyst", 1), ("mana_weave", 1), ("orc_tusk", 1)],
         "fist_weapon_t3", 1);
-    g.add_recipe("eq_fist_armor_t3", "Craft Steel-clasped Ki Robes",
+        g.add_recipe("eq_fist_head_t3", "Craft Steel-clasped Ki Robes Circlet",
+        CraftingSkill::Tailoring, 3, 3,
+        &[("alchemical_catalyst", 1), ("moonsilk", 1), ("arcane_crystal", 1)],
+        "fist_head_t3", 1);
+    g.add_recipe("eq_fist_chest_t3", "Craft Steel-clasped Ki Robes",
         CraftingSkill::Tailoring, 3, 3,
         &[("alchemical_catalyst", 2), ("moonsilk", 1), ("mana_weave", 1), ("arcane_crystal", 1)],
-        "fist_armor_t3", 1);
+        "fist_chest_t3", 1);
+    g.add_recipe("eq_fist_hands_t3", "Craft Steel-clasped Ki Robes Gloves",
+        CraftingSkill::Tailoring, 3, 3,
+        &[("alchemical_catalyst", 1), ("moonsilk", 1), ("arcane_crystal", 1)],
+        "fist_hands_t3", 1);
+    g.add_recipe("eq_fist_legs_t3", "Craft Steel-clasped Ki Robes Leggings",
+        CraftingSkill::Tailoring, 3, 3,
+        &[("alchemical_catalyst", 1), ("moonsilk", 1), ("mana_weave", 1), ("arcane_crystal", 1)],
+        "fist_legs_t3", 1);
+    g.add_recipe("eq_fist_feet_t3", "Craft Steel-clasped Ki Robes Slippers",
+        CraftingSkill::Tailoring, 3, 3,
+        &[("alchemical_catalyst", 1), ("moonsilk", 1), ("arcane_crystal", 1)],
+        "fist_feet_t3", 1);
 
     g.add_recipe("eq_fist_weapon_t4", "Forge Dwarven Knuckles",
         CraftingSkill::Tailoring, 4, 4,
         &[("alchemical_silk", 2), ("alchemical_elixir_base", 1), ("alchemical_weave", 1), ("phase_venom", 1)],
         "fist_weapon_t4", 1);
-    g.add_recipe("eq_fist_armor_t4", "Craft Dwarven Ki Robes",
+        g.add_recipe("eq_fist_head_t4", "Craft Dwarven Ki Robes Circlet",
+        CraftingSkill::Tailoring, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_silk", 1), ("wraith_dust", 1)],
+        "fist_head_t4", 1);
+    g.add_recipe("eq_fist_chest_t4", "Craft Dwarven Ki Robes",
         CraftingSkill::Tailoring, 4, 4,
         &[("alchemical_elixir_base", 2), ("alchemical_silk", 1), ("alchemical_weave", 1), ("wraith_dust", 1)],
-        "fist_armor_t4", 1);
+        "fist_chest_t4", 1);
+    g.add_recipe("eq_fist_hands_t4", "Craft Dwarven Ki Robes Gloves",
+        CraftingSkill::Tailoring, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_silk", 1), ("wraith_dust", 1)],
+        "fist_hands_t4", 1);
+    g.add_recipe("eq_fist_legs_t4", "Craft Dwarven Ki Robes Leggings",
+        CraftingSkill::Tailoring, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_silk", 1), ("alchemical_weave", 1), ("wraith_dust", 1)],
+        "fist_legs_t4", 1);
+    g.add_recipe("eq_fist_feet_t4", "Craft Dwarven Ki Robes Slippers",
+        CraftingSkill::Tailoring, 4, 4,
+        &[("alchemical_elixir_base", 1), ("alchemical_silk", 1), ("wraith_dust", 1)],
+        "fist_feet_t4", 1);
 
     g.add_recipe("eq_fist_weapon_t5", "Forge Mithril Wraps",
         CraftingSkill::Tailoring, 5, 5,
         &[("enchanted_silk", 2), ("enchanted_elixir", 1), ("enchanted_mana_crystal", 1), ("naga_pearl", 1)],
         "fist_weapon_t5", 1);
-    g.add_recipe("eq_fist_armor_t5", "Craft Mithril Ki Robes",
+        g.add_recipe("eq_fist_head_t5", "Craft Mithril Ki Robes Circlet",
+        CraftingSkill::Tailoring, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_silk", 1), ("troll_blood", 1)],
+        "fist_head_t5", 1);
+    g.add_recipe("eq_fist_chest_t5", "Craft Mithril Ki Robes",
         CraftingSkill::Tailoring, 5, 5,
         &[("enchanted_elixir", 2), ("enchanted_silk", 1), ("enchanted_mana_crystal", 1), ("troll_blood", 1)],
-        "fist_armor_t5", 1);
+        "fist_chest_t5", 1);
+    g.add_recipe("eq_fist_hands_t5", "Craft Mithril Ki Robes Gloves",
+        CraftingSkill::Tailoring, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_silk", 1), ("troll_blood", 1)],
+        "fist_hands_t5", 1);
+    g.add_recipe("eq_fist_legs_t5", "Craft Mithril Ki Robes Leggings",
+        CraftingSkill::Tailoring, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_silk", 1), ("enchanted_mana_crystal", 1), ("troll_blood", 1)],
+        "fist_legs_t5", 1);
+    g.add_recipe("eq_fist_feet_t5", "Craft Mithril Ki Robes Slippers",
+        CraftingSkill::Tailoring, 5, 5,
+        &[("enchanted_elixir", 1), ("enchanted_silk", 1), ("troll_blood", 1)],
+        "fist_feet_t5", 1);
 
     g.add_recipe("eq_fist_weapon_t6", "Forge Rune Wraps",
         CraftingSkill::Tailoring, 6, 6,
         &[("arcane_tapestry", 2), ("arcane_elixir", 1), ("arcane_weave", 1), ("death_knight_shard", 1)],
         "fist_weapon_t6", 1);
-    g.add_recipe("eq_fist_armor_t6", "Craft Rune Ki Robes",
+        g.add_recipe("eq_fist_head_t6", "Craft Rune Ki Robes Circlet",
+        CraftingSkill::Tailoring, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_tapestry", 1), ("stalker_claw", 1)],
+        "fist_head_t6", 1);
+    g.add_recipe("eq_fist_chest_t6", "Craft Rune Ki Robes",
         CraftingSkill::Tailoring, 6, 6,
         &[("arcane_elixir", 2), ("arcane_tapestry", 1), ("arcane_weave", 1), ("stalker_claw", 1)],
-        "fist_armor_t6", 1);
+        "fist_chest_t6", 1);
+    g.add_recipe("eq_fist_hands_t6", "Craft Rune Ki Robes Gloves",
+        CraftingSkill::Tailoring, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_tapestry", 1), ("stalker_claw", 1)],
+        "fist_hands_t6", 1);
+    g.add_recipe("eq_fist_legs_t6", "Craft Rune Ki Robes Leggings",
+        CraftingSkill::Tailoring, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_tapestry", 1), ("arcane_weave", 1), ("stalker_claw", 1)],
+        "fist_legs_t6", 1);
+    g.add_recipe("eq_fist_feet_t6", "Craft Rune Ki Robes Slippers",
+        CraftingSkill::Tailoring, 6, 6,
+        &[("arcane_elixir", 1), ("arcane_tapestry", 1), ("stalker_claw", 1)],
+        "fist_feet_t6", 1);
 
     g.add_recipe("eq_fist_weapon_t7", "Forge Dragon Fist Wraps",
         CraftingSkill::Tailoring, 7, 7,
         &[("jeweled_tapestry", 2), ("jeweled_elixir", 1), ("jeweled_weave", 1), ("dragon_scale", 1)],
         "fist_weapon_t7", 1);
-    g.add_recipe("eq_fist_armor_t7", "Craft Dragon Ki Robes",
+        g.add_recipe("eq_fist_head_t7", "Craft Dragon Ki Robes Circlet",
+        CraftingSkill::Tailoring, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_tapestry", 1), ("elder_crystal", 1)],
+        "fist_head_t7", 1);
+    g.add_recipe("eq_fist_chest_t7", "Craft Dragon Ki Robes",
         CraftingSkill::Tailoring, 7, 7,
         &[("jeweled_elixir", 2), ("jeweled_tapestry", 1), ("jeweled_weave", 1), ("elder_crystal", 1)],
-        "fist_armor_t7", 1);
+        "fist_chest_t7", 1);
+    g.add_recipe("eq_fist_hands_t7", "Craft Dragon Ki Robes Gloves",
+        CraftingSkill::Tailoring, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_tapestry", 1), ("elder_crystal", 1)],
+        "fist_hands_t7", 1);
+    g.add_recipe("eq_fist_legs_t7", "Craft Dragon Ki Robes Leggings",
+        CraftingSkill::Tailoring, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_tapestry", 1), ("jeweled_weave", 1), ("elder_crystal", 1)],
+        "fist_legs_t7", 1);
+    g.add_recipe("eq_fist_feet_t7", "Craft Dragon Ki Robes Slippers",
+        CraftingSkill::Tailoring, 7, 7,
+        &[("jeweled_elixir", 1), ("jeweled_tapestry", 1), ("elder_crystal", 1)],
+        "fist_feet_t7", 1);
 
     g.add_recipe("eq_fist_weapon_t8", "Forge Voidstrike Wraps",
         CraftingSkill::Tailoring, 8, 8,
         &[("runic_tapestry", 2), ("runic_elixir", 1), ("runic_weave", 1), ("void_silk", 1)],
         "fist_weapon_t8", 1);
-    g.add_recipe("eq_fist_armor_t8", "Craft Void Ki Robes",
+        g.add_recipe("eq_fist_head_t8", "Craft Void Ki Robes Circlet",
+        CraftingSkill::Tailoring, 8, 8,
+        &[("runic_elixir", 1), ("runic_tapestry", 1), ("lich_phylactery", 1)],
+        "fist_head_t8", 1);
+    g.add_recipe("eq_fist_chest_t8", "Craft Void Ki Robes",
         CraftingSkill::Tailoring, 8, 8,
         &[("runic_elixir", 2), ("runic_tapestry", 1), ("runic_weave", 1), ("lich_phylactery", 1)],
-        "fist_armor_t8", 1);
+        "fist_chest_t8", 1);
+    g.add_recipe("eq_fist_hands_t8", "Craft Void Ki Robes Gloves",
+        CraftingSkill::Tailoring, 8, 8,
+        &[("runic_elixir", 1), ("runic_tapestry", 1), ("lich_phylactery", 1)],
+        "fist_hands_t8", 1);
+    g.add_recipe("eq_fist_legs_t8", "Craft Void Ki Robes Leggings",
+        CraftingSkill::Tailoring, 8, 8,
+        &[("runic_elixir", 1), ("runic_tapestry", 1), ("runic_weave", 1), ("lich_phylactery", 1)],
+        "fist_legs_t8", 1);
+    g.add_recipe("eq_fist_feet_t8", "Craft Void Ki Robes Slippers",
+        CraftingSkill::Tailoring, 8, 8,
+        &[("runic_elixir", 1), ("runic_tapestry", 1), ("lich_phylactery", 1)],
+        "fist_feet_t8", 1);
 
     g.add_recipe("eq_fist_weapon_t9", "Forge Celestial Wraps",
         CraftingSkill::Tailoring, 9, 9,
         &[("artificed_tapestry", 2), ("artificed_elixir", 1), ("artificed_weave", 1), ("arch_lich_dust", 1)],
         "fist_weapon_t9", 1);
-    g.add_recipe("eq_fist_armor_t9", "Craft Celestial Ki Robes",
+        g.add_recipe("eq_fist_head_t9", "Craft Celestial Ki Robes Circlet",
+        CraftingSkill::Tailoring, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_tapestry", 1), ("storm_essence", 1)],
+        "fist_head_t9", 1);
+    g.add_recipe("eq_fist_chest_t9", "Craft Celestial Ki Robes",
         CraftingSkill::Tailoring, 9, 9,
         &[("artificed_elixir", 2), ("artificed_tapestry", 1), ("artificed_weave", 1), ("storm_essence", 1)],
-        "fist_armor_t9", 1);
+        "fist_chest_t9", 1);
+    g.add_recipe("eq_fist_hands_t9", "Craft Celestial Ki Robes Gloves",
+        CraftingSkill::Tailoring, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_tapestry", 1), ("storm_essence", 1)],
+        "fist_hands_t9", 1);
+    g.add_recipe("eq_fist_legs_t9", "Craft Celestial Ki Robes Leggings",
+        CraftingSkill::Tailoring, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_tapestry", 1), ("artificed_weave", 1), ("storm_essence", 1)],
+        "fist_legs_t9", 1);
+    g.add_recipe("eq_fist_feet_t9", "Craft Celestial Ki Robes Slippers",
+        CraftingSkill::Tailoring, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_tapestry", 1), ("storm_essence", 1)],
+        "fist_feet_t9", 1);
 
     g.add_recipe("eq_fist_weapon_t10", "Forge Primordial Titanfist",
         CraftingSkill::Tailoring, 10, 10,
         &[("divine_tapestry", 2), ("divine_elixir", 1), ("divine_weave", 1), ("undying_essence", 1)],
         "fist_weapon_t10", 1);
-    g.add_recipe("eq_fist_armor_t10", "Craft Primordial Ascension Robes",
+        g.add_recipe("eq_fist_head_t10", "Craft Primordial Ascension Robes Circlet",
+        CraftingSkill::Tailoring, 10, 10,
+        &[("divine_elixir", 1), ("divine_tapestry", 1), ("wraith_lord_cloak", 1)],
+        "fist_head_t10", 1);
+    g.add_recipe("eq_fist_chest_t10", "Craft Primordial Ascension Robes",
         CraftingSkill::Tailoring, 10, 10,
         &[("divine_elixir", 2), ("divine_tapestry", 1), ("divine_weave", 1), ("wraith_lord_cloak", 1)],
-        "fist_armor_t10", 1);
+        "fist_chest_t10", 1);
+    g.add_recipe("eq_fist_hands_t10", "Craft Primordial Ascension Robes Gloves",
+        CraftingSkill::Tailoring, 10, 10,
+        &[("divine_elixir", 1), ("divine_tapestry", 1), ("wraith_lord_cloak", 1)],
+        "fist_hands_t10", 1);
+    g.add_recipe("eq_fist_legs_t10", "Craft Primordial Ascension Robes Leggings",
+        CraftingSkill::Tailoring, 10, 10,
+        &[("divine_elixir", 1), ("divine_tapestry", 1), ("divine_weave", 1), ("wraith_lord_cloak", 1)],
+        "fist_legs_t10", 1);
+    g.add_recipe("eq_fist_feet_t10", "Craft Primordial Ascension Robes Slippers",
+        CraftingSkill::Tailoring, 10, 10,
+        &[("divine_elixir", 1), ("divine_tapestry", 1), ("wraith_lord_cloak", 1)],
+        "fist_feet_t10", 1);
 
 
     // --- STAFF line: WW+EN+RC ---
     g.add_material("staff_weapon_t1", "Crude Staff", 1, MaterialSource::Crafted);
-    g.add_material("staff_armor_t1", "Crude Mage Robes", 1, MaterialSource::Crafted);
+        g.add_material("staff_head_t1", "Crude Mage Robes Circlet", 1, MaterialSource::Crafted);
+    g.add_material("staff_chest_t1", "Crude Mage Robes", 1, MaterialSource::Crafted);
+    g.add_material("staff_hands_t1", "Crude Mage Robes Gloves", 1, MaterialSource::Crafted);
+    g.add_material("staff_legs_t1", "Crude Mage Robes Leggings", 1, MaterialSource::Crafted);
+    g.add_material("staff_feet_t1", "Crude Mage Robes Slippers", 1, MaterialSource::Crafted);
     g.add_material("staff_weapon_t2", "Ironshod Staff", 2, MaterialSource::Crafted);
-    g.add_material("staff_armor_t2", "Iron-clasped Mage Robes", 2, MaterialSource::Crafted);
+        g.add_material("staff_head_t2", "Iron-clasped Mage Robes Circlet", 2, MaterialSource::Crafted);
+    g.add_material("staff_chest_t2", "Iron-clasped Mage Robes", 2, MaterialSource::Crafted);
+    g.add_material("staff_hands_t2", "Iron-clasped Mage Robes Gloves", 2, MaterialSource::Crafted);
+    g.add_material("staff_legs_t2", "Iron-clasped Mage Robes Leggings", 2, MaterialSource::Crafted);
+    g.add_material("staff_feet_t2", "Iron-clasped Mage Robes Slippers", 2, MaterialSource::Crafted);
     g.add_material("staff_weapon_t3", "Steel-capped Staff", 3, MaterialSource::Crafted);
-    g.add_material("staff_armor_t3", "Steel-trimmed Mage Robes", 3, MaterialSource::Crafted);
+        g.add_material("staff_head_t3", "Steel-trimmed Mage Robes Circlet", 3, MaterialSource::Crafted);
+    g.add_material("staff_chest_t3", "Steel-trimmed Mage Robes", 3, MaterialSource::Crafted);
+    g.add_material("staff_hands_t3", "Steel-trimmed Mage Robes Gloves", 3, MaterialSource::Crafted);
+    g.add_material("staff_legs_t3", "Steel-trimmed Mage Robes Leggings", 3, MaterialSource::Crafted);
+    g.add_material("staff_feet_t3", "Steel-trimmed Mage Robes Slippers", 3, MaterialSource::Crafted);
     g.add_material("staff_weapon_t4", "Dwarven Arcane Staff", 4, MaterialSource::Crafted);
-    g.add_material("staff_armor_t4", "Dwarven Mage Robes", 4, MaterialSource::Crafted);
+        g.add_material("staff_head_t4", "Dwarven Mage Robes Circlet", 4, MaterialSource::Crafted);
+    g.add_material("staff_chest_t4", "Dwarven Mage Robes", 4, MaterialSource::Crafted);
+    g.add_material("staff_hands_t4", "Dwarven Mage Robes Gloves", 4, MaterialSource::Crafted);
+    g.add_material("staff_legs_t4", "Dwarven Mage Robes Leggings", 4, MaterialSource::Crafted);
+    g.add_material("staff_feet_t4", "Dwarven Mage Robes Slippers", 4, MaterialSource::Crafted);
     g.add_material("staff_weapon_t5", "Mithril Staff", 5, MaterialSource::Crafted);
-    g.add_material("staff_armor_t5", "Mithril Mage Robes", 5, MaterialSource::Crafted);
+        g.add_material("staff_head_t5", "Mithril Mage Robes Circlet", 5, MaterialSource::Crafted);
+    g.add_material("staff_chest_t5", "Mithril Mage Robes", 5, MaterialSource::Crafted);
+    g.add_material("staff_hands_t5", "Mithril Mage Robes Gloves", 5, MaterialSource::Crafted);
+    g.add_material("staff_legs_t5", "Mithril Mage Robes Leggings", 5, MaterialSource::Crafted);
+    g.add_material("staff_feet_t5", "Mithril Mage Robes Slippers", 5, MaterialSource::Crafted);
     g.add_material("staff_weapon_t6", "Rune Staff", 6, MaterialSource::Crafted);
-    g.add_material("staff_armor_t6", "Rune Mage Robes", 6, MaterialSource::Crafted);
+        g.add_material("staff_head_t6", "Rune Mage Robes Circlet", 6, MaterialSource::Crafted);
+    g.add_material("staff_chest_t6", "Rune Mage Robes", 6, MaterialSource::Crafted);
+    g.add_material("staff_hands_t6", "Rune Mage Robes Gloves", 6, MaterialSource::Crafted);
+    g.add_material("staff_legs_t6", "Rune Mage Robes Leggings", 6, MaterialSource::Crafted);
+    g.add_material("staff_feet_t6", "Rune Mage Robes Slippers", 6, MaterialSource::Crafted);
     g.add_material("staff_weapon_t7", "Dragonwood Staff", 7, MaterialSource::Crafted);
-    g.add_material("staff_armor_t7", "Dragon Mage Robes", 7, MaterialSource::Crafted);
+        g.add_material("staff_head_t7", "Dragon Mage Robes Circlet", 7, MaterialSource::Crafted);
+    g.add_material("staff_chest_t7", "Dragon Mage Robes", 7, MaterialSource::Crafted);
+    g.add_material("staff_hands_t7", "Dragon Mage Robes Gloves", 7, MaterialSource::Crafted);
+    g.add_material("staff_legs_t7", "Dragon Mage Robes Leggings", 7, MaterialSource::Crafted);
+    g.add_material("staff_feet_t7", "Dragon Mage Robes Slippers", 7, MaterialSource::Crafted);
     g.add_material("staff_weapon_t8", "Voidtouched Staff", 8, MaterialSource::Crafted);
-    g.add_material("staff_armor_t8", "Void Mage Robes", 8, MaterialSource::Crafted);
+        g.add_material("staff_head_t8", "Void Mage Robes Circlet", 8, MaterialSource::Crafted);
+    g.add_material("staff_chest_t8", "Void Mage Robes", 8, MaterialSource::Crafted);
+    g.add_material("staff_hands_t8", "Void Mage Robes Gloves", 8, MaterialSource::Crafted);
+    g.add_material("staff_legs_t8", "Void Mage Robes Leggings", 8, MaterialSource::Crafted);
+    g.add_material("staff_feet_t8", "Void Mage Robes Slippers", 8, MaterialSource::Crafted);
     g.add_material("staff_weapon_t9", "Celestial Staff", 9, MaterialSource::Crafted);
-    g.add_material("staff_armor_t9", "Celestial Mage Robes", 9, MaterialSource::Crafted);
+        g.add_material("staff_head_t9", "Celestial Mage Robes Circlet", 9, MaterialSource::Crafted);
+    g.add_material("staff_chest_t9", "Celestial Mage Robes", 9, MaterialSource::Crafted);
+    g.add_material("staff_hands_t9", "Celestial Mage Robes Gloves", 9, MaterialSource::Crafted);
+    g.add_material("staff_legs_t9", "Celestial Mage Robes Leggings", 9, MaterialSource::Crafted);
+    g.add_material("staff_feet_t9", "Celestial Mage Robes Slippers", 9, MaterialSource::Crafted);
     g.add_material("staff_weapon_t10", "Primordial Worldstaff", 10, MaterialSource::Crafted);
-    g.add_material("staff_armor_t10", "Primordial Arcanum Robes", 10, MaterialSource::Crafted);
+        g.add_material("staff_head_t10", "Primordial Arcanum Robes Circlet", 10, MaterialSource::Crafted);
+    g.add_material("staff_chest_t10", "Primordial Arcanum Robes", 10, MaterialSource::Crafted);
+    g.add_material("staff_hands_t10", "Primordial Arcanum Robes Gloves", 10, MaterialSource::Crafted);
+    g.add_material("staff_legs_t10", "Primordial Arcanum Robes Leggings", 10, MaterialSource::Crafted);
+    g.add_material("staff_feet_t10", "Primordial Arcanum Robes Slippers", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_staff_weapon_t1", "Forge Crude Staff",
         CraftingSkill::Woodworking, 1, 1,
         &[("shaped_wood", 2), ("faint_enchant_dust", 1), ("bone_charm", 1), ("ectoplasm", 1)],
         "staff_weapon_t1", 1);
-    g.add_recipe("eq_staff_armor_t1", "Craft Crude Mage Robes",
+        g.add_recipe("eq_staff_head_t1", "Craft Crude Mage Robes Circlet",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("faint_enchant_dust", 1), ("shaped_wood", 1), ("venom_sac", 1)],
+        "staff_head_t1", 1);
+    g.add_recipe("eq_staff_chest_t1", "Craft Crude Mage Robes",
         CraftingSkill::Woodworking, 1, 1,
         &[("faint_enchant_dust", 2), ("shaped_wood", 1), ("bone_charm", 1), ("venom_sac", 1)],
-        "staff_armor_t1", 1);
+        "staff_chest_t1", 1);
+    g.add_recipe("eq_staff_hands_t1", "Craft Crude Mage Robes Gloves",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("faint_enchant_dust", 1), ("shaped_wood", 1), ("venom_sac", 1)],
+        "staff_hands_t1", 1);
+    g.add_recipe("eq_staff_legs_t1", "Craft Crude Mage Robes Leggings",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("faint_enchant_dust", 1), ("shaped_wood", 1), ("bone_charm", 1), ("venom_sac", 1)],
+        "staff_legs_t1", 1);
+    g.add_recipe("eq_staff_feet_t1", "Craft Crude Mage Robes Slippers",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("faint_enchant_dust", 1), ("shaped_wood", 1), ("venom_sac", 1)],
+        "staff_feet_t1", 1);
 
     g.add_recipe("eq_staff_weapon_t2", "Forge Ironshod Staff",
         CraftingSkill::Woodworking, 2, 2,
         &[("ironwood_plank", 2), ("enchanted_thread", 1), ("etched_rune", 1), ("tough_hide", 1)],
         "staff_weapon_t2", 1);
-    g.add_recipe("eq_staff_armor_t2", "Craft Iron-clasped Mage Robes",
+        g.add_recipe("eq_staff_head_t2", "Craft Iron-clasped Mage Robes Circlet",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("enchanted_thread", 1), ("ironwood_plank", 1), ("mana_shard", 1)],
+        "staff_head_t2", 1);
+    g.add_recipe("eq_staff_chest_t2", "Craft Iron-clasped Mage Robes",
         CraftingSkill::Woodworking, 2, 2,
         &[("enchanted_thread", 2), ("ironwood_plank", 1), ("etched_rune", 1), ("mana_shard", 1)],
-        "staff_armor_t2", 1);
+        "staff_chest_t2", 1);
+    g.add_recipe("eq_staff_hands_t2", "Craft Iron-clasped Mage Robes Gloves",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("enchanted_thread", 1), ("ironwood_plank", 1), ("mana_shard", 1)],
+        "staff_hands_t2", 1);
+    g.add_recipe("eq_staff_legs_t2", "Craft Iron-clasped Mage Robes Leggings",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("enchanted_thread", 1), ("ironwood_plank", 1), ("etched_rune", 1), ("mana_shard", 1)],
+        "staff_legs_t2", 1);
+    g.add_recipe("eq_staff_feet_t2", "Craft Iron-clasped Mage Robes Slippers",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("enchanted_thread", 1), ("ironwood_plank", 1), ("mana_shard", 1)],
+        "staff_feet_t2", 1);
 
     g.add_recipe("eq_staff_weapon_t3", "Forge Steel-capped Staff",
         CraftingSkill::Woodworking, 3, 3,
         &[("hardwood_beam", 2), ("mana_weave", 1), ("power_rune", 1), ("phase_silk", 1)],
         "staff_weapon_t3", 1);
-    g.add_recipe("eq_staff_armor_t3", "Craft Steel-trimmed Mage Robes",
+        g.add_recipe("eq_staff_head_t3", "Craft Steel-trimmed Mage Robes Circlet",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("mana_weave", 1), ("hardwood_beam", 1), ("dark_iron_ore", 1)],
+        "staff_head_t3", 1);
+    g.add_recipe("eq_staff_chest_t3", "Craft Steel-trimmed Mage Robes",
         CraftingSkill::Woodworking, 3, 3,
         &[("mana_weave", 2), ("hardwood_beam", 1), ("power_rune", 1), ("dark_iron_ore", 1)],
-        "staff_armor_t3", 1);
+        "staff_chest_t3", 1);
+    g.add_recipe("eq_staff_hands_t3", "Craft Steel-trimmed Mage Robes Gloves",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("mana_weave", 1), ("hardwood_beam", 1), ("dark_iron_ore", 1)],
+        "staff_hands_t3", 1);
+    g.add_recipe("eq_staff_legs_t3", "Craft Steel-trimmed Mage Robes Leggings",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("mana_weave", 1), ("hardwood_beam", 1), ("power_rune", 1), ("dark_iron_ore", 1)],
+        "staff_legs_t3", 1);
+    g.add_recipe("eq_staff_feet_t3", "Craft Steel-trimmed Mage Robes Slippers",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("mana_weave", 1), ("hardwood_beam", 1), ("dark_iron_ore", 1)],
+        "staff_feet_t3", 1);
 
     g.add_recipe("eq_staff_weapon_t4", "Forge Dwarven Arcane Staff",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_hardwood", 2), ("alchemical_weave", 1), ("alchemical_rune", 1), ("elemental_heart", 1)],
         "staff_weapon_t4", 1);
-    g.add_recipe("eq_staff_armor_t4", "Craft Dwarven Mage Robes",
+        g.add_recipe("eq_staff_head_t4", "Craft Dwarven Mage Robes Circlet",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_weave", 1), ("alchemical_hardwood", 1), ("orc_tusk", 1)],
+        "staff_head_t4", 1);
+    g.add_recipe("eq_staff_chest_t4", "Craft Dwarven Mage Robes",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_weave", 2), ("alchemical_hardwood", 1), ("alchemical_rune", 1), ("orc_tusk", 1)],
-        "staff_armor_t4", 1);
+        "staff_chest_t4", 1);
+    g.add_recipe("eq_staff_hands_t4", "Craft Dwarven Mage Robes Gloves",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_weave", 1), ("alchemical_hardwood", 1), ("orc_tusk", 1)],
+        "staff_hands_t4", 1);
+    g.add_recipe("eq_staff_legs_t4", "Craft Dwarven Mage Robes Leggings",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_weave", 1), ("alchemical_hardwood", 1), ("alchemical_rune", 1), ("orc_tusk", 1)],
+        "staff_legs_t4", 1);
+    g.add_recipe("eq_staff_feet_t4", "Craft Dwarven Mage Robes Slippers",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_weave", 1), ("alchemical_hardwood", 1), ("orc_tusk", 1)],
+        "staff_feet_t4", 1);
 
     g.add_recipe("eq_staff_weapon_t5", "Forge Mithril Staff",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_hardwood", 2), ("enchanted_mana_crystal", 1), ("enchanted_rune", 1), ("banshee_wail", 1)],
         "staff_weapon_t5", 1);
-    g.add_recipe("eq_staff_armor_t5", "Craft Mithril Mage Robes",
+        g.add_recipe("eq_staff_head_t5", "Craft Mithril Mage Robes Circlet",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_mana_crystal", 1), ("enchanted_hardwood", 1), ("phase_venom", 1)],
+        "staff_head_t5", 1);
+    g.add_recipe("eq_staff_chest_t5", "Craft Mithril Mage Robes",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_mana_crystal", 2), ("enchanted_hardwood", 1), ("enchanted_rune", 1), ("phase_venom", 1)],
-        "staff_armor_t5", 1);
+        "staff_chest_t5", 1);
+    g.add_recipe("eq_staff_hands_t5", "Craft Mithril Mage Robes Gloves",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_mana_crystal", 1), ("enchanted_hardwood", 1), ("phase_venom", 1)],
+        "staff_hands_t5", 1);
+    g.add_recipe("eq_staff_legs_t5", "Craft Mithril Mage Robes Leggings",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_mana_crystal", 1), ("enchanted_hardwood", 1), ("enchanted_rune", 1), ("phase_venom", 1)],
+        "staff_legs_t5", 1);
+    g.add_recipe("eq_staff_feet_t5", "Craft Mithril Mage Robes Slippers",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_mana_crystal", 1), ("enchanted_hardwood", 1), ("phase_venom", 1)],
+        "staff_feet_t5", 1);
 
     g.add_recipe("eq_staff_weapon_t6", "Forge Rune Staff",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_hardwood", 2), ("arcane_weave", 1), ("arcane_rune", 1), ("golem_core", 1)],
         "staff_weapon_t6", 1);
-    g.add_recipe("eq_staff_armor_t6", "Craft Rune Mage Robes",
+        g.add_recipe("eq_staff_head_t6", "Craft Rune Mage Robes Circlet",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_weave", 1), ("arcane_hardwood", 1), ("naga_pearl", 1)],
+        "staff_head_t6", 1);
+    g.add_recipe("eq_staff_chest_t6", "Craft Rune Mage Robes",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_weave", 2), ("arcane_hardwood", 1), ("arcane_rune", 1), ("naga_pearl", 1)],
-        "staff_armor_t6", 1);
+        "staff_chest_t6", 1);
+    g.add_recipe("eq_staff_hands_t6", "Craft Rune Mage Robes Gloves",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_weave", 1), ("arcane_hardwood", 1), ("naga_pearl", 1)],
+        "staff_hands_t6", 1);
+    g.add_recipe("eq_staff_legs_t6", "Craft Rune Mage Robes Leggings",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_weave", 1), ("arcane_hardwood", 1), ("arcane_rune", 1), ("naga_pearl", 1)],
+        "staff_legs_t6", 1);
+    g.add_recipe("eq_staff_feet_t6", "Craft Rune Mage Robes Slippers",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_weave", 1), ("arcane_hardwood", 1), ("naga_pearl", 1)],
+        "staff_feet_t6", 1);
 
     g.add_recipe("eq_staff_weapon_t7", "Forge Dragonwood Staff",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_hardwood", 2), ("jeweled_weave", 1), ("jeweled_rune", 1), ("gloom_silk", 1)],
         "staff_weapon_t7", 1);
-    g.add_recipe("eq_staff_armor_t7", "Craft Dragon Mage Robes",
+        g.add_recipe("eq_staff_head_t7", "Craft Dragon Mage Robes Circlet",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_weave", 1), ("jeweled_hardwood", 1), ("death_knight_shard", 1)],
+        "staff_head_t7", 1);
+    g.add_recipe("eq_staff_chest_t7", "Craft Dragon Mage Robes",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_weave", 2), ("jeweled_hardwood", 1), ("jeweled_rune", 1), ("death_knight_shard", 1)],
-        "staff_armor_t7", 1);
+        "staff_chest_t7", 1);
+    g.add_recipe("eq_staff_hands_t7", "Craft Dragon Mage Robes Gloves",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_weave", 1), ("jeweled_hardwood", 1), ("death_knight_shard", 1)],
+        "staff_hands_t7", 1);
+    g.add_recipe("eq_staff_legs_t7", "Craft Dragon Mage Robes Leggings",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_weave", 1), ("jeweled_hardwood", 1), ("jeweled_rune", 1), ("death_knight_shard", 1)],
+        "staff_legs_t7", 1);
+    g.add_recipe("eq_staff_feet_t7", "Craft Dragon Mage Robes Slippers",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_weave", 1), ("jeweled_hardwood", 1), ("death_knight_shard", 1)],
+        "staff_feet_t7", 1);
 
     g.add_recipe("eq_staff_weapon_t8", "Forge Voidtouched Staff",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_hardwood", 2), ("runic_weave", 1), ("runic_hide", 1), ("astral_fragment", 1)],
         "staff_weapon_t8", 1);
-    g.add_recipe("eq_staff_armor_t8", "Craft Void Mage Robes",
+        g.add_recipe("eq_staff_head_t8", "Craft Void Mage Robes Circlet",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_weave", 1), ("runic_hardwood", 1), ("dragon_scale", 1)],
+        "staff_head_t8", 1);
+    g.add_recipe("eq_staff_chest_t8", "Craft Void Mage Robes",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_weave", 2), ("runic_hardwood", 1), ("runic_hide", 1), ("dragon_scale", 1)],
-        "staff_armor_t8", 1);
+        "staff_chest_t8", 1);
+    g.add_recipe("eq_staff_hands_t8", "Craft Void Mage Robes Gloves",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_weave", 1), ("runic_hardwood", 1), ("dragon_scale", 1)],
+        "staff_hands_t8", 1);
+    g.add_recipe("eq_staff_legs_t8", "Craft Void Mage Robes Leggings",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_weave", 1), ("runic_hardwood", 1), ("runic_hide", 1), ("dragon_scale", 1)],
+        "staff_legs_t8", 1);
+    g.add_recipe("eq_staff_feet_t8", "Craft Void Mage Robes Slippers",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_weave", 1), ("runic_hardwood", 1), ("dragon_scale", 1)],
+        "staff_feet_t8", 1);
 
     g.add_recipe("eq_staff_weapon_t9", "Forge Celestial Staff",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_hardwood", 2), ("artificed_weave", 1), ("artificed_hide", 1), ("dracolich_fang", 1)],
         "staff_weapon_t9", 1);
-    g.add_recipe("eq_staff_armor_t9", "Craft Celestial Mage Robes",
+        g.add_recipe("eq_staff_head_t9", "Craft Celestial Mage Robes Circlet",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_weave", 1), ("artificed_hardwood", 1), ("void_silk", 1)],
+        "staff_head_t9", 1);
+    g.add_recipe("eq_staff_chest_t9", "Craft Celestial Mage Robes",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_weave", 2), ("artificed_hardwood", 1), ("artificed_hide", 1), ("void_silk", 1)],
-        "staff_armor_t9", 1);
+        "staff_chest_t9", 1);
+    g.add_recipe("eq_staff_hands_t9", "Craft Celestial Mage Robes Gloves",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_weave", 1), ("artificed_hardwood", 1), ("void_silk", 1)],
+        "staff_hands_t9", 1);
+    g.add_recipe("eq_staff_legs_t9", "Craft Celestial Mage Robes Leggings",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_weave", 1), ("artificed_hardwood", 1), ("artificed_hide", 1), ("void_silk", 1)],
+        "staff_legs_t9", 1);
+    g.add_recipe("eq_staff_feet_t9", "Craft Celestial Mage Robes Slippers",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_weave", 1), ("artificed_hardwood", 1), ("void_silk", 1)],
+        "staff_feet_t9", 1);
 
     g.add_recipe("eq_staff_weapon_t10", "Forge Primordial Worldstaff",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_hardwood", 2), ("divine_weave", 1), ("divine_hide", 1), ("primordial_heart", 1)],
         "staff_weapon_t10", 1);
-    g.add_recipe("eq_staff_armor_t10", "Craft Primordial Arcanum Robes",
+        g.add_recipe("eq_staff_head_t10", "Craft Primordial Arcanum Robes Circlet",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_weave", 1), ("divine_hardwood", 1), ("arch_lich_dust", 1)],
+        "staff_head_t10", 1);
+    g.add_recipe("eq_staff_chest_t10", "Craft Primordial Arcanum Robes",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_weave", 2), ("divine_hardwood", 1), ("divine_hide", 1), ("arch_lich_dust", 1)],
-        "staff_armor_t10", 1);
+        "staff_chest_t10", 1);
+    g.add_recipe("eq_staff_hands_t10", "Craft Primordial Arcanum Robes Gloves",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_weave", 1), ("divine_hardwood", 1), ("arch_lich_dust", 1)],
+        "staff_hands_t10", 1);
+    g.add_recipe("eq_staff_legs_t10", "Craft Primordial Arcanum Robes Leggings",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_weave", 1), ("divine_hardwood", 1), ("divine_hide", 1), ("arch_lich_dust", 1)],
+        "staff_legs_t10", 1);
+    g.add_recipe("eq_staff_feet_t10", "Craft Primordial Arcanum Robes Slippers",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_weave", 1), ("divine_hardwood", 1), ("arch_lich_dust", 1)],
+        "staff_feet_t10", 1);
 
 
     // --- WAND line: RC+TL+JC ---
     g.add_material("wand_weapon_t1", "Crude Wand", 1, MaterialSource::Crafted);
-    g.add_material("wand_armor_t1", "Crude Dark Vestments", 1, MaterialSource::Crafted);
+        g.add_material("wand_head_t1", "Crude Dark Vestments Circlet", 1, MaterialSource::Crafted);
+    g.add_material("wand_chest_t1", "Crude Dark Vestments", 1, MaterialSource::Crafted);
+    g.add_material("wand_hands_t1", "Crude Dark Vestments Gloves", 1, MaterialSource::Crafted);
+    g.add_material("wand_legs_t1", "Crude Dark Vestments Leggings", 1, MaterialSource::Crafted);
+    g.add_material("wand_feet_t1", "Crude Dark Vestments Slippers", 1, MaterialSource::Crafted);
     g.add_material("wand_weapon_t2", "Iron-tipped Wand", 2, MaterialSource::Crafted);
-    g.add_material("wand_armor_t2", "Iron-clasped Vestments", 2, MaterialSource::Crafted);
+        g.add_material("wand_head_t2", "Iron-clasped Vestments Circlet", 2, MaterialSource::Crafted);
+    g.add_material("wand_chest_t2", "Iron-clasped Vestments", 2, MaterialSource::Crafted);
+    g.add_material("wand_hands_t2", "Iron-clasped Vestments Gloves", 2, MaterialSource::Crafted);
+    g.add_material("wand_legs_t2", "Iron-clasped Vestments Leggings", 2, MaterialSource::Crafted);
+    g.add_material("wand_feet_t2", "Iron-clasped Vestments Slippers", 2, MaterialSource::Crafted);
     g.add_material("wand_weapon_t3", "Steel-cored Wand", 3, MaterialSource::Crafted);
-    g.add_material("wand_armor_t3", "Steel-trimmed Vestments", 3, MaterialSource::Crafted);
+        g.add_material("wand_head_t3", "Steel-trimmed Vestments Circlet", 3, MaterialSource::Crafted);
+    g.add_material("wand_chest_t3", "Steel-trimmed Vestments", 3, MaterialSource::Crafted);
+    g.add_material("wand_hands_t3", "Steel-trimmed Vestments Gloves", 3, MaterialSource::Crafted);
+    g.add_material("wand_legs_t3", "Steel-trimmed Vestments Leggings", 3, MaterialSource::Crafted);
+    g.add_material("wand_feet_t3", "Steel-trimmed Vestments Slippers", 3, MaterialSource::Crafted);
     g.add_material("wand_weapon_t4", "Dwarven Eldritch Wand", 4, MaterialSource::Crafted);
-    g.add_material("wand_armor_t4", "Dwarven Dark Vestments", 4, MaterialSource::Crafted);
+        g.add_material("wand_head_t4", "Dwarven Dark Vestments Circlet", 4, MaterialSource::Crafted);
+    g.add_material("wand_chest_t4", "Dwarven Dark Vestments", 4, MaterialSource::Crafted);
+    g.add_material("wand_hands_t4", "Dwarven Dark Vestments Gloves", 4, MaterialSource::Crafted);
+    g.add_material("wand_legs_t4", "Dwarven Dark Vestments Leggings", 4, MaterialSource::Crafted);
+    g.add_material("wand_feet_t4", "Dwarven Dark Vestments Slippers", 4, MaterialSource::Crafted);
     g.add_material("wand_weapon_t5", "Mithril Wand", 5, MaterialSource::Crafted);
-    g.add_material("wand_armor_t5", "Mithril Dark Vestments", 5, MaterialSource::Crafted);
+        g.add_material("wand_head_t5", "Mithril Dark Vestments Circlet", 5, MaterialSource::Crafted);
+    g.add_material("wand_chest_t5", "Mithril Dark Vestments", 5, MaterialSource::Crafted);
+    g.add_material("wand_hands_t5", "Mithril Dark Vestments Gloves", 5, MaterialSource::Crafted);
+    g.add_material("wand_legs_t5", "Mithril Dark Vestments Leggings", 5, MaterialSource::Crafted);
+    g.add_material("wand_feet_t5", "Mithril Dark Vestments Slippers", 5, MaterialSource::Crafted);
     g.add_material("wand_weapon_t6", "Rune Wand", 6, MaterialSource::Crafted);
-    g.add_material("wand_armor_t6", "Rune Dark Vestments", 6, MaterialSource::Crafted);
+        g.add_material("wand_head_t6", "Rune Dark Vestments Circlet", 6, MaterialSource::Crafted);
+    g.add_material("wand_chest_t6", "Rune Dark Vestments", 6, MaterialSource::Crafted);
+    g.add_material("wand_hands_t6", "Rune Dark Vestments Gloves", 6, MaterialSource::Crafted);
+    g.add_material("wand_legs_t6", "Rune Dark Vestments Leggings", 6, MaterialSource::Crafted);
+    g.add_material("wand_feet_t6", "Rune Dark Vestments Slippers", 6, MaterialSource::Crafted);
     g.add_material("wand_weapon_t7", "Dragonbone Wand", 7, MaterialSource::Crafted);
-    g.add_material("wand_armor_t7", "Dragon Dark Vestments", 7, MaterialSource::Crafted);
+        g.add_material("wand_head_t7", "Dragon Dark Vestments Circlet", 7, MaterialSource::Crafted);
+    g.add_material("wand_chest_t7", "Dragon Dark Vestments", 7, MaterialSource::Crafted);
+    g.add_material("wand_hands_t7", "Dragon Dark Vestments Gloves", 7, MaterialSource::Crafted);
+    g.add_material("wand_legs_t7", "Dragon Dark Vestments Leggings", 7, MaterialSource::Crafted);
+    g.add_material("wand_feet_t7", "Dragon Dark Vestments Slippers", 7, MaterialSource::Crafted);
     g.add_material("wand_weapon_t8", "Voidchannel Wand", 8, MaterialSource::Crafted);
-    g.add_material("wand_armor_t8", "Void Dark Vestments", 8, MaterialSource::Crafted);
+        g.add_material("wand_head_t8", "Void Dark Vestments Circlet", 8, MaterialSource::Crafted);
+    g.add_material("wand_chest_t8", "Void Dark Vestments", 8, MaterialSource::Crafted);
+    g.add_material("wand_hands_t8", "Void Dark Vestments Gloves", 8, MaterialSource::Crafted);
+    g.add_material("wand_legs_t8", "Void Dark Vestments Leggings", 8, MaterialSource::Crafted);
+    g.add_material("wand_feet_t8", "Void Dark Vestments Slippers", 8, MaterialSource::Crafted);
     g.add_material("wand_weapon_t9", "Celestial Wand", 9, MaterialSource::Crafted);
-    g.add_material("wand_armor_t9", "Celestial Vestments", 9, MaterialSource::Crafted);
+        g.add_material("wand_head_t9", "Celestial Vestments Circlet", 9, MaterialSource::Crafted);
+    g.add_material("wand_chest_t9", "Celestial Vestments", 9, MaterialSource::Crafted);
+    g.add_material("wand_hands_t9", "Celestial Vestments Gloves", 9, MaterialSource::Crafted);
+    g.add_material("wand_legs_t9", "Celestial Vestments Leggings", 9, MaterialSource::Crafted);
+    g.add_material("wand_feet_t9", "Celestial Vestments Slippers", 9, MaterialSource::Crafted);
     g.add_material("wand_weapon_t10", "Primordial Dominus Wand", 10, MaterialSource::Crafted);
-    g.add_material("wand_armor_t10", "Primordial Shadow Vestments", 10, MaterialSource::Crafted);
+        g.add_material("wand_head_t10", "Primordial Shadow Vestments Circlet", 10, MaterialSource::Crafted);
+    g.add_material("wand_chest_t10", "Primordial Shadow Vestments", 10, MaterialSource::Crafted);
+    g.add_material("wand_hands_t10", "Primordial Shadow Vestments Gloves", 10, MaterialSource::Crafted);
+    g.add_material("wand_legs_t10", "Primordial Shadow Vestments Leggings", 10, MaterialSource::Crafted);
+    g.add_material("wand_feet_t10", "Primordial Shadow Vestments Slippers", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_wand_weapon_t1", "Forge Crude Wand",
         CraftingSkill::Runecrafting, 1, 1,
         &[("bone_charm", 2), ("woven_cloth", 1), ("polished_quartz", 1), ("wolf_pelt", 1)],
         "wand_weapon_t1", 1);
-    g.add_recipe("eq_wand_armor_t1", "Craft Crude Dark Vestments",
+        g.add_recipe("eq_wand_head_t1", "Craft Crude Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 1, 1,
+        &[("woven_cloth", 1), ("bone_charm", 1), ("mana_shard", 1)],
+        "wand_head_t1", 1);
+    g.add_recipe("eq_wand_chest_t1", "Craft Crude Dark Vestments",
         CraftingSkill::Runecrafting, 1, 1,
         &[("woven_cloth", 2), ("bone_charm", 1), ("polished_quartz", 1), ("mana_shard", 1)],
-        "wand_armor_t1", 1);
+        "wand_chest_t1", 1);
+    g.add_recipe("eq_wand_hands_t1", "Craft Crude Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 1, 1,
+        &[("woven_cloth", 1), ("bone_charm", 1), ("mana_shard", 1)],
+        "wand_hands_t1", 1);
+    g.add_recipe("eq_wand_legs_t1", "Craft Crude Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 1, 1,
+        &[("woven_cloth", 1), ("bone_charm", 1), ("polished_quartz", 1), ("mana_shard", 1)],
+        "wand_legs_t1", 1);
+    g.add_recipe("eq_wand_feet_t1", "Craft Crude Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 1, 1,
+        &[("woven_cloth", 1), ("bone_charm", 1), ("mana_shard", 1)],
+        "wand_feet_t1", 1);
 
     g.add_recipe("eq_wand_weapon_t2", "Forge Iron-tipped Wand",
         CraftingSkill::Runecrafting, 2, 2,
         &[("etched_rune", 2), ("silk_bolt", 1), ("cut_gemstone", 1), ("shadow_thread", 1)],
         "wand_weapon_t2", 1);
-    g.add_recipe("eq_wand_armor_t2", "Craft Iron-clasped Vestments",
+        g.add_recipe("eq_wand_head_t2", "Craft Iron-clasped Vestments Circlet",
+        CraftingSkill::Runecrafting, 2, 2,
+        &[("silk_bolt", 1), ("etched_rune", 1), ("ectoplasm", 1)],
+        "wand_head_t2", 1);
+    g.add_recipe("eq_wand_chest_t2", "Craft Iron-clasped Vestments",
         CraftingSkill::Runecrafting, 2, 2,
         &[("silk_bolt", 2), ("etched_rune", 1), ("cut_gemstone", 1), ("ectoplasm", 1)],
-        "wand_armor_t2", 1);
+        "wand_chest_t2", 1);
+    g.add_recipe("eq_wand_hands_t2", "Craft Iron-clasped Vestments Gloves",
+        CraftingSkill::Runecrafting, 2, 2,
+        &[("silk_bolt", 1), ("etched_rune", 1), ("ectoplasm", 1)],
+        "wand_hands_t2", 1);
+    g.add_recipe("eq_wand_legs_t2", "Craft Iron-clasped Vestments Leggings",
+        CraftingSkill::Runecrafting, 2, 2,
+        &[("silk_bolt", 1), ("etched_rune", 1), ("cut_gemstone", 1), ("ectoplasm", 1)],
+        "wand_legs_t2", 1);
+    g.add_recipe("eq_wand_feet_t2", "Craft Iron-clasped Vestments Slippers",
+        CraftingSkill::Runecrafting, 2, 2,
+        &[("silk_bolt", 1), ("etched_rune", 1), ("ectoplasm", 1)],
+        "wand_feet_t2", 1);
 
     g.add_recipe("eq_wand_weapon_t3", "Forge Steel-cored Wand",
         CraftingSkill::Runecrafting, 3, 3,
         &[("power_rune", 2), ("moonsilk", 1), ("jeweled_setting", 1), ("elemental_core", 1)],
         "wand_weapon_t3", 1);
-    g.add_recipe("eq_wand_armor_t3", "Craft Steel-trimmed Vestments",
+        g.add_recipe("eq_wand_head_t3", "Craft Steel-trimmed Vestments Circlet",
+        CraftingSkill::Runecrafting, 3, 3,
+        &[("moonsilk", 1), ("power_rune", 1), ("tough_hide", 1)],
+        "wand_head_t3", 1);
+    g.add_recipe("eq_wand_chest_t3", "Craft Steel-trimmed Vestments",
         CraftingSkill::Runecrafting, 3, 3,
         &[("moonsilk", 2), ("power_rune", 1), ("jeweled_setting", 1), ("tough_hide", 1)],
-        "wand_armor_t3", 1);
+        "wand_chest_t3", 1);
+    g.add_recipe("eq_wand_hands_t3", "Craft Steel-trimmed Vestments Gloves",
+        CraftingSkill::Runecrafting, 3, 3,
+        &[("moonsilk", 1), ("power_rune", 1), ("tough_hide", 1)],
+        "wand_hands_t3", 1);
+    g.add_recipe("eq_wand_legs_t3", "Craft Steel-trimmed Vestments Leggings",
+        CraftingSkill::Runecrafting, 3, 3,
+        &[("moonsilk", 1), ("power_rune", 1), ("jeweled_setting", 1), ("tough_hide", 1)],
+        "wand_legs_t3", 1);
+    g.add_recipe("eq_wand_feet_t3", "Craft Steel-trimmed Vestments Slippers",
+        CraftingSkill::Runecrafting, 3, 3,
+        &[("moonsilk", 1), ("power_rune", 1), ("tough_hide", 1)],
+        "wand_feet_t3", 1);
 
     g.add_recipe("eq_wand_weapon_t4", "Forge Dwarven Eldritch Wand",
         CraftingSkill::Runecrafting, 4, 4,
         &[("alchemical_rune", 2), ("alchemical_silk", 1), ("alchemical_gem", 1), ("mummy_wrappings", 1)],
         "wand_weapon_t4", 1);
-    g.add_recipe("eq_wand_armor_t4", "Craft Dwarven Dark Vestments",
+        g.add_recipe("eq_wand_head_t4", "Craft Dwarven Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_rune", 1), ("phase_silk", 1)],
+        "wand_head_t4", 1);
+    g.add_recipe("eq_wand_chest_t4", "Craft Dwarven Dark Vestments",
         CraftingSkill::Runecrafting, 4, 4,
         &[("alchemical_silk", 2), ("alchemical_rune", 1), ("alchemical_gem", 1), ("phase_silk", 1)],
-        "wand_armor_t4", 1);
+        "wand_chest_t4", 1);
+    g.add_recipe("eq_wand_hands_t4", "Craft Dwarven Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_rune", 1), ("phase_silk", 1)],
+        "wand_hands_t4", 1);
+    g.add_recipe("eq_wand_legs_t4", "Craft Dwarven Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_rune", 1), ("alchemical_gem", 1), ("phase_silk", 1)],
+        "wand_legs_t4", 1);
+    g.add_recipe("eq_wand_feet_t4", "Craft Dwarven Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_rune", 1), ("phase_silk", 1)],
+        "wand_feet_t4", 1);
 
     g.add_recipe("eq_wand_weapon_t5", "Forge Mithril Wand",
         CraftingSkill::Runecrafting, 5, 5,
         &[("enchanted_rune", 2), ("enchanted_silk", 1), ("enchanted_gem", 1), ("giant_sinew", 1)],
         "wand_weapon_t5", 1);
-    g.add_recipe("eq_wand_armor_t5", "Craft Mithril Dark Vestments",
+        g.add_recipe("eq_wand_head_t5", "Craft Mithril Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_rune", 1), ("elemental_heart", 1)],
+        "wand_head_t5", 1);
+    g.add_recipe("eq_wand_chest_t5", "Craft Mithril Dark Vestments",
         CraftingSkill::Runecrafting, 5, 5,
         &[("enchanted_silk", 2), ("enchanted_rune", 1), ("enchanted_gem", 1), ("elemental_heart", 1)],
-        "wand_armor_t5", 1);
+        "wand_chest_t5", 1);
+    g.add_recipe("eq_wand_hands_t5", "Craft Mithril Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_rune", 1), ("elemental_heart", 1)],
+        "wand_hands_t5", 1);
+    g.add_recipe("eq_wand_legs_t5", "Craft Mithril Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_rune", 1), ("enchanted_gem", 1), ("elemental_heart", 1)],
+        "wand_legs_t5", 1);
+    g.add_recipe("eq_wand_feet_t5", "Craft Mithril Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_rune", 1), ("elemental_heart", 1)],
+        "wand_feet_t5", 1);
 
     g.add_recipe("eq_wand_weapon_t6", "Forge Rune Wand",
         CraftingSkill::Runecrafting, 6, 6,
         &[("arcane_rune", 2), ("arcane_tapestry", 1), ("arcane_gem", 1), ("nightwalker_shade", 1)],
         "wand_weapon_t6", 1);
-    g.add_recipe("eq_wand_armor_t6", "Craft Rune Dark Vestments",
+        g.add_recipe("eq_wand_head_t6", "Craft Rune Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_rune", 1), ("banshee_wail", 1)],
+        "wand_head_t6", 1);
+    g.add_recipe("eq_wand_chest_t6", "Craft Rune Dark Vestments",
         CraftingSkill::Runecrafting, 6, 6,
         &[("arcane_tapestry", 2), ("arcane_rune", 1), ("arcane_gem", 1), ("banshee_wail", 1)],
-        "wand_armor_t6", 1);
+        "wand_chest_t6", 1);
+    g.add_recipe("eq_wand_hands_t6", "Craft Rune Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_rune", 1), ("banshee_wail", 1)],
+        "wand_hands_t6", 1);
+    g.add_recipe("eq_wand_legs_t6", "Craft Rune Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_rune", 1), ("arcane_gem", 1), ("banshee_wail", 1)],
+        "wand_legs_t6", 1);
+    g.add_recipe("eq_wand_feet_t6", "Craft Rune Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_rune", 1), ("banshee_wail", 1)],
+        "wand_feet_t6", 1);
 
     g.add_recipe("eq_wand_weapon_t7", "Forge Dragonbone Wand",
         CraftingSkill::Runecrafting, 7, 7,
         &[("jeweled_rune", 2), ("jeweled_tapestry", 1), ("precious_diadem", 1), ("beholder_eye", 1)],
         "wand_weapon_t7", 1);
-    g.add_recipe("eq_wand_armor_t7", "Craft Dragon Dark Vestments",
+        g.add_recipe("eq_wand_head_t7", "Craft Dragon Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_rune", 1), ("golem_core", 1)],
+        "wand_head_t7", 1);
+    g.add_recipe("eq_wand_chest_t7", "Craft Dragon Dark Vestments",
         CraftingSkill::Runecrafting, 7, 7,
         &[("jeweled_tapestry", 2), ("jeweled_rune", 1), ("precious_diadem", 1), ("golem_core", 1)],
-        "wand_armor_t7", 1);
+        "wand_chest_t7", 1);
+    g.add_recipe("eq_wand_hands_t7", "Craft Dragon Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_rune", 1), ("golem_core", 1)],
+        "wand_hands_t7", 1);
+    g.add_recipe("eq_wand_legs_t7", "Craft Dragon Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_rune", 1), ("precious_diadem", 1), ("golem_core", 1)],
+        "wand_legs_t7", 1);
+    g.add_recipe("eq_wand_feet_t7", "Craft Dragon Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_rune", 1), ("golem_core", 1)],
+        "wand_feet_t7", 1);
 
     g.add_recipe("eq_wand_weapon_t8", "Forge Voidchannel Wand",
         CraftingSkill::Runecrafting, 8, 8,
         &[("runic_weave", 2), ("runic_tapestry", 1), ("runic_gem", 1), ("demilich_gem", 1)],
         "wand_weapon_t8", 1);
-    g.add_recipe("eq_wand_armor_t8", "Craft Void Dark Vestments",
+        g.add_recipe("eq_wand_head_t8", "Craft Void Dark Vestments Circlet",
+        CraftingSkill::Runecrafting, 8, 8,
+        &[("runic_tapestry", 1), ("runic_weave", 1), ("gloom_silk", 1)],
+        "wand_head_t8", 1);
+    g.add_recipe("eq_wand_chest_t8", "Craft Void Dark Vestments",
         CraftingSkill::Runecrafting, 8, 8,
         &[("runic_tapestry", 2), ("runic_weave", 1), ("runic_gem", 1), ("gloom_silk", 1)],
-        "wand_armor_t8", 1);
+        "wand_chest_t8", 1);
+    g.add_recipe("eq_wand_hands_t8", "Craft Void Dark Vestments Gloves",
+        CraftingSkill::Runecrafting, 8, 8,
+        &[("runic_tapestry", 1), ("runic_weave", 1), ("gloom_silk", 1)],
+        "wand_hands_t8", 1);
+    g.add_recipe("eq_wand_legs_t8", "Craft Void Dark Vestments Leggings",
+        CraftingSkill::Runecrafting, 8, 8,
+        &[("runic_tapestry", 1), ("runic_weave", 1), ("runic_gem", 1), ("gloom_silk", 1)],
+        "wand_legs_t8", 1);
+    g.add_recipe("eq_wand_feet_t8", "Craft Void Dark Vestments Slippers",
+        CraftingSkill::Runecrafting, 8, 8,
+        &[("runic_tapestry", 1), ("runic_weave", 1), ("gloom_silk", 1)],
+        "wand_feet_t8", 1);
 
     g.add_recipe("eq_wand_weapon_t9", "Forge Celestial Wand",
         CraftingSkill::Runecrafting, 9, 9,
         &[("artificed_weave", 2), ("artificed_tapestry", 1), ("artificed_gem", 1), ("titan_bone", 1)],
         "wand_weapon_t9", 1);
-    g.add_recipe("eq_wand_armor_t9", "Craft Celestial Vestments",
+        g.add_recipe("eq_wand_head_t9", "Craft Celestial Vestments Circlet",
+        CraftingSkill::Runecrafting, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_weave", 1), ("astral_fragment", 1)],
+        "wand_head_t9", 1);
+    g.add_recipe("eq_wand_chest_t9", "Craft Celestial Vestments",
         CraftingSkill::Runecrafting, 9, 9,
         &[("artificed_tapestry", 2), ("artificed_weave", 1), ("artificed_gem", 1), ("astral_fragment", 1)],
-        "wand_armor_t9", 1);
+        "wand_chest_t9", 1);
+    g.add_recipe("eq_wand_hands_t9", "Craft Celestial Vestments Gloves",
+        CraftingSkill::Runecrafting, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_weave", 1), ("astral_fragment", 1)],
+        "wand_hands_t9", 1);
+    g.add_recipe("eq_wand_legs_t9", "Craft Celestial Vestments Leggings",
+        CraftingSkill::Runecrafting, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_weave", 1), ("artificed_gem", 1), ("astral_fragment", 1)],
+        "wand_legs_t9", 1);
+    g.add_recipe("eq_wand_feet_t9", "Craft Celestial Vestments Slippers",
+        CraftingSkill::Runecrafting, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_weave", 1), ("astral_fragment", 1)],
+        "wand_feet_t9", 1);
 
     g.add_recipe("eq_wand_weapon_t10", "Forge Primordial Dominus Wand",
         CraftingSkill::Runecrafting, 10, 10,
         &[("divine_weave", 2), ("divine_tapestry", 1), ("divine_gem", 1), ("lurker_shadow", 1)],
         "wand_weapon_t10", 1);
-    g.add_recipe("eq_wand_armor_t10", "Craft Primordial Shadow Vestments",
+        g.add_recipe("eq_wand_head_t10", "Craft Primordial Shadow Vestments Circlet",
+        CraftingSkill::Runecrafting, 10, 10,
+        &[("divine_tapestry", 1), ("divine_weave", 1), ("dracolich_fang", 1)],
+        "wand_head_t10", 1);
+    g.add_recipe("eq_wand_chest_t10", "Craft Primordial Shadow Vestments",
         CraftingSkill::Runecrafting, 10, 10,
         &[("divine_tapestry", 2), ("divine_weave", 1), ("divine_gem", 1), ("dracolich_fang", 1)],
-        "wand_armor_t10", 1);
+        "wand_chest_t10", 1);
+    g.add_recipe("eq_wand_hands_t10", "Craft Primordial Shadow Vestments Gloves",
+        CraftingSkill::Runecrafting, 10, 10,
+        &[("divine_tapestry", 1), ("divine_weave", 1), ("dracolich_fang", 1)],
+        "wand_hands_t10", 1);
+    g.add_recipe("eq_wand_legs_t10", "Craft Primordial Shadow Vestments Leggings",
+        CraftingSkill::Runecrafting, 10, 10,
+        &[("divine_tapestry", 1), ("divine_weave", 1), ("divine_gem", 1), ("dracolich_fang", 1)],
+        "wand_legs_t10", 1);
+    g.add_recipe("eq_wand_feet_t10", "Craft Primordial Shadow Vestments Slippers",
+        CraftingSkill::Runecrafting, 10, 10,
+        &[("divine_tapestry", 1), ("divine_weave", 1), ("dracolich_fang", 1)],
+        "wand_feet_t10", 1);
 
 
     // --- SCEPTER line: SM+RC+TL ---
     g.add_material("scepter_weapon_t1", "Crude Scepter", 1, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t1", "Crude Priest Vestments", 1, MaterialSource::Crafted);
+        g.add_material("scepter_head_t1", "Crude Priest Vestments Helm", 1, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t1", "Crude Priest Vestments", 1, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t1", "Crude Priest Vestments Gauntlets", 1, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t1", "Crude Priest Vestments Greaves", 1, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t1", "Crude Priest Vestments Sabatons", 1, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t2", "Iron Scepter", 2, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t2", "Iron-clasped Priest Vestments", 2, MaterialSource::Crafted);
+        g.add_material("scepter_head_t2", "Iron-clasped Priest Vestments Helm", 2, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t2", "Iron-clasped Priest Vestments", 2, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t2", "Iron-clasped Priest Vestments Gauntlets", 2, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t2", "Iron-clasped Priest Vestments Greaves", 2, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t2", "Iron-clasped Priest Vestments Sabatons", 2, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t3", "Steel Holy Scepter", 3, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t3", "Steel-trimmed Priest Vestments", 3, MaterialSource::Crafted);
+        g.add_material("scepter_head_t3", "Steel-trimmed Priest Vestments Helm", 3, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t3", "Steel-trimmed Priest Vestments", 3, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t3", "Steel-trimmed Priest Vestments Gauntlets", 3, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t3", "Steel-trimmed Priest Vestments Greaves", 3, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t3", "Steel-trimmed Priest Vestments Sabatons", 3, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t4", "Dwarven Scepter", 4, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t4", "Dwarven Priest Vestments", 4, MaterialSource::Crafted);
+        g.add_material("scepter_head_t4", "Dwarven Priest Vestments Helm", 4, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t4", "Dwarven Priest Vestments", 4, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t4", "Dwarven Priest Vestments Gauntlets", 4, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t4", "Dwarven Priest Vestments Greaves", 4, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t4", "Dwarven Priest Vestments Sabatons", 4, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t5", "Mithril Scepter", 5, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t5", "Mithril Priest Vestments", 5, MaterialSource::Crafted);
+        g.add_material("scepter_head_t5", "Mithril Priest Vestments Helm", 5, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t5", "Mithril Priest Vestments", 5, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t5", "Mithril Priest Vestments Gauntlets", 5, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t5", "Mithril Priest Vestments Greaves", 5, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t5", "Mithril Priest Vestments Sabatons", 5, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t6", "Rune Scepter", 6, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t6", "Rune Priest Vestments", 6, MaterialSource::Crafted);
+        g.add_material("scepter_head_t6", "Rune Priest Vestments Helm", 6, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t6", "Rune Priest Vestments", 6, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t6", "Rune Priest Vestments Gauntlets", 6, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t6", "Rune Priest Vestments Greaves", 6, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t6", "Rune Priest Vestments Sabatons", 6, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t7", "Dragonforged Scepter", 7, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t7", "Dragon Priest Vestments", 7, MaterialSource::Crafted);
+        g.add_material("scepter_head_t7", "Dragon Priest Vestments Helm", 7, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t7", "Dragon Priest Vestments", 7, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t7", "Dragon Priest Vestments Gauntlets", 7, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t7", "Dragon Priest Vestments Greaves", 7, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t7", "Dragon Priest Vestments Sabatons", 7, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t8", "Voidforged Scepter", 8, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t8", "Void Priest Vestments", 8, MaterialSource::Crafted);
+        g.add_material("scepter_head_t8", "Void Priest Vestments Helm", 8, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t8", "Void Priest Vestments", 8, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t8", "Void Priest Vestments Gauntlets", 8, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t8", "Void Priest Vestments Greaves", 8, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t8", "Void Priest Vestments Sabatons", 8, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t9", "Celestial Scepter", 9, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t9", "Celestial Priest Vestments", 9, MaterialSource::Crafted);
+        g.add_material("scepter_head_t9", "Celestial Priest Vestments Helm", 9, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t9", "Celestial Priest Vestments", 9, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t9", "Celestial Priest Vestments Gauntlets", 9, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t9", "Celestial Priest Vestments Greaves", 9, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t9", "Celestial Priest Vestments Sabatons", 9, MaterialSource::Crafted);
     g.add_material("scepter_weapon_t10", "Primordial Divine Scepter", 10, MaterialSource::Crafted);
-    g.add_material("scepter_armor_t10", "Primordial High Priest Vestments", 10, MaterialSource::Crafted);
+        g.add_material("scepter_head_t10", "Primordial High Priest Vestments Helm", 10, MaterialSource::Crafted);
+    g.add_material("scepter_chest_t10", "Primordial High Priest Vestments", 10, MaterialSource::Crafted);
+    g.add_material("scepter_hands_t10", "Primordial High Priest Vestments Gauntlets", 10, MaterialSource::Crafted);
+    g.add_material("scepter_legs_t10", "Primordial High Priest Vestments Greaves", 10, MaterialSource::Crafted);
+    g.add_material("scepter_feet_t10", "Primordial High Priest Vestments Sabatons", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_scepter_weapon_t1", "Forge Crude Scepter",
         CraftingSkill::Smithing, 1, 1,
         &[("iron_nugget", 2), ("bone_charm", 1), ("woven_cloth", 1), ("venom_sac", 1)],
         "scepter_weapon_t1", 1);
-    g.add_recipe("eq_scepter_armor_t1", "Craft Crude Priest Vestments",
+        g.add_recipe("eq_scepter_head_t1", "Craft Crude Priest Vestments Helm",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "scepter_head_t1", 1);
+    g.add_recipe("eq_scepter_chest_t1", "Craft Crude Priest Vestments",
         CraftingSkill::Smithing, 1, 1,
         &[("bone_charm", 2), ("iron_nugget", 1), ("woven_cloth", 1), ("ectoplasm", 1)],
-        "scepter_armor_t1", 1);
+        "scepter_chest_t1", 1);
+    g.add_recipe("eq_scepter_hands_t1", "Craft Crude Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "scepter_hands_t1", 1);
+    g.add_recipe("eq_scepter_legs_t1", "Craft Crude Priest Vestments Greaves",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("woven_cloth", 1), ("ectoplasm", 1)],
+        "scepter_legs_t1", 1);
+    g.add_recipe("eq_scepter_feet_t1", "Craft Crude Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 1, 1,
+        &[("bone_charm", 1), ("iron_nugget", 1), ("ectoplasm", 1)],
+        "scepter_feet_t1", 1);
 
     g.add_recipe("eq_scepter_weapon_t2", "Forge Iron Scepter",
         CraftingSkill::Smithing, 2, 2,
         &[("iron_ingot", 2), ("etched_rune", 1), ("silk_bolt", 1), ("arcane_crystal", 1)],
         "scepter_weapon_t2", 1);
-    g.add_recipe("eq_scepter_armor_t2", "Craft Iron-clasped Priest Vestments",
+        g.add_recipe("eq_scepter_head_t2", "Craft Iron-clasped Priest Vestments Helm",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "scepter_head_t2", 1);
+    g.add_recipe("eq_scepter_chest_t2", "Craft Iron-clasped Priest Vestments",
         CraftingSkill::Smithing, 2, 2,
         &[("etched_rune", 2), ("iron_ingot", 1), ("silk_bolt", 1), ("wolf_pelt", 1)],
-        "scepter_armor_t2", 1);
+        "scepter_chest_t2", 1);
+    g.add_recipe("eq_scepter_hands_t2", "Craft Iron-clasped Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "scepter_hands_t2", 1);
+    g.add_recipe("eq_scepter_legs_t2", "Craft Iron-clasped Priest Vestments Greaves",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("silk_bolt", 1), ("wolf_pelt", 1)],
+        "scepter_legs_t2", 1);
+    g.add_recipe("eq_scepter_feet_t2", "Craft Iron-clasped Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 2, 2,
+        &[("etched_rune", 1), ("iron_ingot", 1), ("wolf_pelt", 1)],
+        "scepter_feet_t2", 1);
 
     g.add_recipe("eq_scepter_weapon_t3", "Forge Steel Holy Scepter",
         CraftingSkill::Smithing, 3, 3,
         &[("steel_plate", 2), ("power_rune", 1), ("moonsilk", 1), ("wraith_dust", 1)],
         "scepter_weapon_t3", 1);
-    g.add_recipe("eq_scepter_armor_t3", "Craft Steel-trimmed Priest Vestments",
+        g.add_recipe("eq_scepter_head_t3", "Craft Steel-trimmed Priest Vestments Helm",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "scepter_head_t3", 1);
+    g.add_recipe("eq_scepter_chest_t3", "Craft Steel-trimmed Priest Vestments",
         CraftingSkill::Smithing, 3, 3,
         &[("power_rune", 2), ("steel_plate", 1), ("moonsilk", 1), ("shadow_thread", 1)],
-        "scepter_armor_t3", 1);
+        "scepter_chest_t3", 1);
+    g.add_recipe("eq_scepter_hands_t3", "Craft Steel-trimmed Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "scepter_hands_t3", 1);
+    g.add_recipe("eq_scepter_legs_t3", "Craft Steel-trimmed Priest Vestments Greaves",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("moonsilk", 1), ("shadow_thread", 1)],
+        "scepter_legs_t3", 1);
+    g.add_recipe("eq_scepter_feet_t3", "Craft Steel-trimmed Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 3, 3,
+        &[("power_rune", 1), ("steel_plate", 1), ("shadow_thread", 1)],
+        "scepter_feet_t3", 1);
 
     g.add_recipe("eq_scepter_weapon_t4", "Forge Dwarven Scepter",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_steel", 2), ("alchemical_rune", 1), ("alchemical_silk", 1), ("troll_blood", 1)],
         "scepter_weapon_t4", 1);
-    g.add_recipe("eq_scepter_armor_t4", "Craft Dwarven Priest Vestments",
+        g.add_recipe("eq_scepter_head_t4", "Craft Dwarven Priest Vestments Helm",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "scepter_head_t4", 1);
+    g.add_recipe("eq_scepter_chest_t4", "Craft Dwarven Priest Vestments",
         CraftingSkill::Smithing, 4, 4,
         &[("alchemical_rune", 2), ("alchemical_steel", 1), ("alchemical_silk", 1), ("elemental_core", 1)],
-        "scepter_armor_t4", 1);
+        "scepter_chest_t4", 1);
+    g.add_recipe("eq_scepter_hands_t4", "Craft Dwarven Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "scepter_hands_t4", 1);
+    g.add_recipe("eq_scepter_legs_t4", "Craft Dwarven Priest Vestments Greaves",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("alchemical_silk", 1), ("elemental_core", 1)],
+        "scepter_legs_t4", 1);
+    g.add_recipe("eq_scepter_feet_t4", "Craft Dwarven Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 4, 4,
+        &[("alchemical_rune", 1), ("alchemical_steel", 1), ("elemental_core", 1)],
+        "scepter_feet_t4", 1);
 
     g.add_recipe("eq_scepter_weapon_t5", "Forge Mithril Scepter",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_steel", 2), ("enchanted_rune", 1), ("enchanted_silk", 1), ("stalker_claw", 1)],
         "scepter_weapon_t5", 1);
-    g.add_recipe("eq_scepter_armor_t5", "Craft Mithril Priest Vestments",
+        g.add_recipe("eq_scepter_head_t5", "Craft Mithril Priest Vestments Helm",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "scepter_head_t5", 1);
+    g.add_recipe("eq_scepter_chest_t5", "Craft Mithril Priest Vestments",
         CraftingSkill::Smithing, 5, 5,
         &[("enchanted_rune", 2), ("enchanted_steel", 1), ("enchanted_silk", 1), ("mummy_wrappings", 1)],
-        "scepter_armor_t5", 1);
+        "scepter_chest_t5", 1);
+    g.add_recipe("eq_scepter_hands_t5", "Craft Mithril Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "scepter_hands_t5", 1);
+    g.add_recipe("eq_scepter_legs_t5", "Craft Mithril Priest Vestments Greaves",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("enchanted_silk", 1), ("mummy_wrappings", 1)],
+        "scepter_legs_t5", 1);
+    g.add_recipe("eq_scepter_feet_t5", "Craft Mithril Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 5, 5,
+        &[("enchanted_rune", 1), ("enchanted_steel", 1), ("mummy_wrappings", 1)],
+        "scepter_feet_t5", 1);
 
     g.add_recipe("eq_scepter_weapon_t6", "Forge Rune Scepter",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_steel", 2), ("arcane_rune", 1), ("arcane_tapestry", 1), ("elder_crystal", 1)],
         "scepter_weapon_t6", 1);
-    g.add_recipe("eq_scepter_armor_t6", "Craft Rune Priest Vestments",
+        g.add_recipe("eq_scepter_head_t6", "Craft Rune Priest Vestments Helm",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "scepter_head_t6", 1);
+    g.add_recipe("eq_scepter_chest_t6", "Craft Rune Priest Vestments",
         CraftingSkill::Smithing, 6, 6,
         &[("arcane_rune", 2), ("arcane_steel", 1), ("arcane_tapestry", 1), ("giant_sinew", 1)],
-        "scepter_armor_t6", 1);
+        "scepter_chest_t6", 1);
+    g.add_recipe("eq_scepter_hands_t6", "Craft Rune Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "scepter_hands_t6", 1);
+    g.add_recipe("eq_scepter_legs_t6", "Craft Rune Priest Vestments Greaves",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("arcane_tapestry", 1), ("giant_sinew", 1)],
+        "scepter_legs_t6", 1);
+    g.add_recipe("eq_scepter_feet_t6", "Craft Rune Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 6, 6,
+        &[("arcane_rune", 1), ("arcane_steel", 1), ("giant_sinew", 1)],
+        "scepter_feet_t6", 1);
 
     g.add_recipe("eq_scepter_weapon_t7", "Forge Dragonforged Scepter",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_steel", 2), ("jeweled_rune", 1), ("jeweled_tapestry", 1), ("lich_phylactery", 1)],
         "scepter_weapon_t7", 1);
-    g.add_recipe("eq_scepter_armor_t7", "Craft Dragon Priest Vestments",
+        g.add_recipe("eq_scepter_head_t7", "Craft Dragon Priest Vestments Helm",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "scepter_head_t7", 1);
+    g.add_recipe("eq_scepter_chest_t7", "Craft Dragon Priest Vestments",
         CraftingSkill::Smithing, 7, 7,
         &[("jeweled_rune", 2), ("jeweled_steel", 1), ("jeweled_tapestry", 1), ("nightwalker_shade", 1)],
-        "scepter_armor_t7", 1);
+        "scepter_chest_t7", 1);
+    g.add_recipe("eq_scepter_hands_t7", "Craft Dragon Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "scepter_hands_t7", 1);
+    g.add_recipe("eq_scepter_legs_t7", "Craft Dragon Priest Vestments Greaves",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("jeweled_tapestry", 1), ("nightwalker_shade", 1)],
+        "scepter_legs_t7", 1);
+    g.add_recipe("eq_scepter_feet_t7", "Craft Dragon Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 7, 7,
+        &[("jeweled_rune", 1), ("jeweled_steel", 1), ("nightwalker_shade", 1)],
+        "scepter_feet_t7", 1);
 
     g.add_recipe("eq_scepter_weapon_t8", "Forge Voidforged Scepter",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_steel", 2), ("runic_elixir", 1), ("runic_tapestry", 1), ("storm_essence", 1)],
         "scepter_weapon_t8", 1);
-    g.add_recipe("eq_scepter_armor_t8", "Craft Void Priest Vestments",
+        g.add_recipe("eq_scepter_head_t8", "Craft Void Priest Vestments Helm",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_elixir", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "scepter_head_t8", 1);
+    g.add_recipe("eq_scepter_chest_t8", "Craft Void Priest Vestments",
         CraftingSkill::Smithing, 8, 8,
         &[("runic_elixir", 2), ("runic_steel", 1), ("runic_tapestry", 1), ("beholder_eye", 1)],
-        "scepter_armor_t8", 1);
+        "scepter_chest_t8", 1);
+    g.add_recipe("eq_scepter_hands_t8", "Craft Void Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_elixir", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "scepter_hands_t8", 1);
+    g.add_recipe("eq_scepter_legs_t8", "Craft Void Priest Vestments Greaves",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_elixir", 1), ("runic_steel", 1), ("runic_tapestry", 1), ("beholder_eye", 1)],
+        "scepter_legs_t8", 1);
+    g.add_recipe("eq_scepter_feet_t8", "Craft Void Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 8, 8,
+        &[("runic_elixir", 1), ("runic_steel", 1), ("beholder_eye", 1)],
+        "scepter_feet_t8", 1);
 
     g.add_recipe("eq_scepter_weapon_t9", "Forge Celestial Scepter",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_steel", 2), ("artificed_elixir", 1), ("artificed_tapestry", 1), ("wraith_lord_cloak", 1)],
         "scepter_weapon_t9", 1);
-    g.add_recipe("eq_scepter_armor_t9", "Craft Celestial Priest Vestments",
+        g.add_recipe("eq_scepter_head_t9", "Craft Celestial Priest Vestments Helm",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "scepter_head_t9", 1);
+    g.add_recipe("eq_scepter_chest_t9", "Craft Celestial Priest Vestments",
         CraftingSkill::Smithing, 9, 9,
         &[("artificed_elixir", 2), ("artificed_steel", 1), ("artificed_tapestry", 1), ("demilich_gem", 1)],
-        "scepter_armor_t9", 1);
+        "scepter_chest_t9", 1);
+    g.add_recipe("eq_scepter_hands_t9", "Craft Celestial Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "scepter_hands_t9", 1);
+    g.add_recipe("eq_scepter_legs_t9", "Craft Celestial Priest Vestments Greaves",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_steel", 1), ("artificed_tapestry", 1), ("demilich_gem", 1)],
+        "scepter_legs_t9", 1);
+    g.add_recipe("eq_scepter_feet_t9", "Craft Celestial Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 9, 9,
+        &[("artificed_elixir", 1), ("artificed_steel", 1), ("demilich_gem", 1)],
+        "scepter_feet_t9", 1);
 
     g.add_recipe("eq_scepter_weapon_t10", "Forge Primordial Divine Scepter",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_steel", 2), ("divine_elixir", 1), ("divine_tapestry", 1), ("arcanum_core", 1)],
         "scepter_weapon_t10", 1);
-    g.add_recipe("eq_scepter_armor_t10", "Craft Primordial High Priest Vestments",
+        g.add_recipe("eq_scepter_head_t10", "Craft Primordial High Priest Vestments Helm",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_elixir", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "scepter_head_t10", 1);
+    g.add_recipe("eq_scepter_chest_t10", "Craft Primordial High Priest Vestments",
         CraftingSkill::Smithing, 10, 10,
         &[("divine_elixir", 2), ("divine_steel", 1), ("divine_tapestry", 1), ("titan_bone", 1)],
-        "scepter_armor_t10", 1);
+        "scepter_chest_t10", 1);
+    g.add_recipe("eq_scepter_hands_t10", "Craft Primordial High Priest Vestments Gauntlets",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_elixir", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "scepter_hands_t10", 1);
+    g.add_recipe("eq_scepter_legs_t10", "Craft Primordial High Priest Vestments Greaves",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_elixir", 1), ("divine_steel", 1), ("divine_tapestry", 1), ("titan_bone", 1)],
+        "scepter_legs_t10", 1);
+    g.add_recipe("eq_scepter_feet_t10", "Craft Primordial High Priest Vestments Sabatons",
+        CraftingSkill::Smithing, 10, 10,
+        &[("divine_elixir", 1), ("divine_steel", 1), ("titan_bone", 1)],
+        "scepter_feet_t10", 1);
 
 
     // --- SONG line: WW+TL+JC ---
     g.add_material("song_weapon_t1", "Crude Lute", 1, MaterialSource::Crafted);
-    g.add_material("song_armor_t1", "Crude Performer Garb", 1, MaterialSource::Crafted);
+        g.add_material("song_head_t1", "Crude Performer Garb Circlet", 1, MaterialSource::Crafted);
+    g.add_material("song_chest_t1", "Crude Performer Garb", 1, MaterialSource::Crafted);
+    g.add_material("song_hands_t1", "Crude Performer Garb Gloves", 1, MaterialSource::Crafted);
+    g.add_material("song_legs_t1", "Crude Performer Garb Leggings", 1, MaterialSource::Crafted);
+    g.add_material("song_feet_t1", "Crude Performer Garb Slippers", 1, MaterialSource::Crafted);
     g.add_material("song_weapon_t2", "Wooden Lyre", 2, MaterialSource::Crafted);
-    g.add_material("song_armor_t2", "Iron-clasped Performer Garb", 2, MaterialSource::Crafted);
+        g.add_material("song_head_t2", "Iron-clasped Performer Garb Circlet", 2, MaterialSource::Crafted);
+    g.add_material("song_chest_t2", "Iron-clasped Performer Garb", 2, MaterialSource::Crafted);
+    g.add_material("song_hands_t2", "Iron-clasped Performer Garb Gloves", 2, MaterialSource::Crafted);
+    g.add_material("song_legs_t2", "Iron-clasped Performer Garb Leggings", 2, MaterialSource::Crafted);
+    g.add_material("song_feet_t2", "Iron-clasped Performer Garb Slippers", 2, MaterialSource::Crafted);
     g.add_material("song_weapon_t3", "Steel-strung Lyre", 3, MaterialSource::Crafted);
-    g.add_material("song_armor_t3", "Steel-trimmed Performer Garb", 3, MaterialSource::Crafted);
+        g.add_material("song_head_t3", "Steel-trimmed Performer Garb Circlet", 3, MaterialSource::Crafted);
+    g.add_material("song_chest_t3", "Steel-trimmed Performer Garb", 3, MaterialSource::Crafted);
+    g.add_material("song_hands_t3", "Steel-trimmed Performer Garb Gloves", 3, MaterialSource::Crafted);
+    g.add_material("song_legs_t3", "Steel-trimmed Performer Garb Leggings", 3, MaterialSource::Crafted);
+    g.add_material("song_feet_t3", "Steel-trimmed Performer Garb Slippers", 3, MaterialSource::Crafted);
     g.add_material("song_weapon_t4", "Dwarven Warhorn", 4, MaterialSource::Crafted);
-    g.add_material("song_armor_t4", "Dwarven Performer Garb", 4, MaterialSource::Crafted);
+        g.add_material("song_head_t4", "Dwarven Performer Garb Circlet", 4, MaterialSource::Crafted);
+    g.add_material("song_chest_t4", "Dwarven Performer Garb", 4, MaterialSource::Crafted);
+    g.add_material("song_hands_t4", "Dwarven Performer Garb Gloves", 4, MaterialSource::Crafted);
+    g.add_material("song_legs_t4", "Dwarven Performer Garb Leggings", 4, MaterialSource::Crafted);
+    g.add_material("song_feet_t4", "Dwarven Performer Garb Slippers", 4, MaterialSource::Crafted);
     g.add_material("song_weapon_t5", "Mithril Harp", 5, MaterialSource::Crafted);
-    g.add_material("song_armor_t5", "Mithril Performer Garb", 5, MaterialSource::Crafted);
+        g.add_material("song_head_t5", "Mithril Performer Garb Circlet", 5, MaterialSource::Crafted);
+    g.add_material("song_chest_t5", "Mithril Performer Garb", 5, MaterialSource::Crafted);
+    g.add_material("song_hands_t5", "Mithril Performer Garb Gloves", 5, MaterialSource::Crafted);
+    g.add_material("song_legs_t5", "Mithril Performer Garb Leggings", 5, MaterialSource::Crafted);
+    g.add_material("song_feet_t5", "Mithril Performer Garb Slippers", 5, MaterialSource::Crafted);
     g.add_material("song_weapon_t6", "Rune Lute", 6, MaterialSource::Crafted);
-    g.add_material("song_armor_t6", "Rune Performer Garb", 6, MaterialSource::Crafted);
+        g.add_material("song_head_t6", "Rune Performer Garb Circlet", 6, MaterialSource::Crafted);
+    g.add_material("song_chest_t6", "Rune Performer Garb", 6, MaterialSource::Crafted);
+    g.add_material("song_hands_t6", "Rune Performer Garb Gloves", 6, MaterialSource::Crafted);
+    g.add_material("song_legs_t6", "Rune Performer Garb Leggings", 6, MaterialSource::Crafted);
+    g.add_material("song_feet_t6", "Rune Performer Garb Slippers", 6, MaterialSource::Crafted);
     g.add_material("song_weapon_t7", "Dragonsung Lyre", 7, MaterialSource::Crafted);
-    g.add_material("song_armor_t7", "Dragon Performer Garb", 7, MaterialSource::Crafted);
+        g.add_material("song_head_t7", "Dragon Performer Garb Circlet", 7, MaterialSource::Crafted);
+    g.add_material("song_chest_t7", "Dragon Performer Garb", 7, MaterialSource::Crafted);
+    g.add_material("song_hands_t7", "Dragon Performer Garb Gloves", 7, MaterialSource::Crafted);
+    g.add_material("song_legs_t7", "Dragon Performer Garb Leggings", 7, MaterialSource::Crafted);
+    g.add_material("song_feet_t7", "Dragon Performer Garb Slippers", 7, MaterialSource::Crafted);
     g.add_material("song_weapon_t8", "Voidecho Harp", 8, MaterialSource::Crafted);
-    g.add_material("song_armor_t8", "Void Performer Garb", 8, MaterialSource::Crafted);
+        g.add_material("song_head_t8", "Void Performer Garb Circlet", 8, MaterialSource::Crafted);
+    g.add_material("song_chest_t8", "Void Performer Garb", 8, MaterialSource::Crafted);
+    g.add_material("song_hands_t8", "Void Performer Garb Gloves", 8, MaterialSource::Crafted);
+    g.add_material("song_legs_t8", "Void Performer Garb Leggings", 8, MaterialSource::Crafted);
+    g.add_material("song_feet_t8", "Void Performer Garb Slippers", 8, MaterialSource::Crafted);
     g.add_material("song_weapon_t9", "Celestial Lyre", 9, MaterialSource::Crafted);
-    g.add_material("song_armor_t9", "Celestial Performer Garb", 9, MaterialSource::Crafted);
+        g.add_material("song_head_t9", "Celestial Performer Garb Circlet", 9, MaterialSource::Crafted);
+    g.add_material("song_chest_t9", "Celestial Performer Garb", 9, MaterialSource::Crafted);
+    g.add_material("song_hands_t9", "Celestial Performer Garb Gloves", 9, MaterialSource::Crafted);
+    g.add_material("song_legs_t9", "Celestial Performer Garb Leggings", 9, MaterialSource::Crafted);
+    g.add_material("song_feet_t9", "Celestial Performer Garb Slippers", 9, MaterialSource::Crafted);
     g.add_material("song_weapon_t10", "Primordial Worldsong", 10, MaterialSource::Crafted);
-    g.add_material("song_armor_t10", "Primordial Maestro Garb", 10, MaterialSource::Crafted);
+        g.add_material("song_head_t10", "Primordial Maestro Garb Circlet", 10, MaterialSource::Crafted);
+    g.add_material("song_chest_t10", "Primordial Maestro Garb", 10, MaterialSource::Crafted);
+    g.add_material("song_hands_t10", "Primordial Maestro Garb Gloves", 10, MaterialSource::Crafted);
+    g.add_material("song_legs_t10", "Primordial Maestro Garb Leggings", 10, MaterialSource::Crafted);
+    g.add_material("song_feet_t10", "Primordial Maestro Garb Slippers", 10, MaterialSource::Crafted);
 
     g.add_recipe("eq_song_weapon_t1", "Forge Crude Lute",
         CraftingSkill::Woodworking, 1, 1,
         &[("shaped_wood", 2), ("woven_cloth", 1), ("polished_quartz", 1), ("mana_shard", 1)],
         "song_weapon_t1", 1);
-    g.add_recipe("eq_song_armor_t1", "Craft Crude Performer Garb",
+        g.add_recipe("eq_song_head_t1", "Craft Crude Performer Garb Circlet",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("woven_cloth", 1), ("shaped_wood", 1), ("wolf_pelt", 1)],
+        "song_head_t1", 1);
+    g.add_recipe("eq_song_chest_t1", "Craft Crude Performer Garb",
         CraftingSkill::Woodworking, 1, 1,
         &[("woven_cloth", 2), ("shaped_wood", 1), ("polished_quartz", 1), ("wolf_pelt", 1)],
-        "song_armor_t1", 1);
+        "song_chest_t1", 1);
+    g.add_recipe("eq_song_hands_t1", "Craft Crude Performer Garb Gloves",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("woven_cloth", 1), ("shaped_wood", 1), ("wolf_pelt", 1)],
+        "song_hands_t1", 1);
+    g.add_recipe("eq_song_legs_t1", "Craft Crude Performer Garb Leggings",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("woven_cloth", 1), ("shaped_wood", 1), ("polished_quartz", 1), ("wolf_pelt", 1)],
+        "song_legs_t1", 1);
+    g.add_recipe("eq_song_feet_t1", "Craft Crude Performer Garb Slippers",
+        CraftingSkill::Woodworking, 1, 1,
+        &[("woven_cloth", 1), ("shaped_wood", 1), ("wolf_pelt", 1)],
+        "song_feet_t1", 1);
 
     g.add_recipe("eq_song_weapon_t2", "Forge Wooden Lyre",
         CraftingSkill::Woodworking, 2, 2,
         &[("ironwood_plank", 2), ("silk_bolt", 1), ("cut_gemstone", 1), ("dark_iron_ore", 1)],
         "song_weapon_t2", 1);
-    g.add_recipe("eq_song_armor_t2", "Craft Iron-clasped Performer Garb",
+        g.add_recipe("eq_song_head_t2", "Craft Iron-clasped Performer Garb Circlet",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("silk_bolt", 1), ("ironwood_plank", 1), ("venom_sac", 1)],
+        "song_head_t2", 1);
+    g.add_recipe("eq_song_chest_t2", "Craft Iron-clasped Performer Garb",
         CraftingSkill::Woodworking, 2, 2,
         &[("silk_bolt", 2), ("ironwood_plank", 1), ("cut_gemstone", 1), ("venom_sac", 1)],
-        "song_armor_t2", 1);
+        "song_chest_t2", 1);
+    g.add_recipe("eq_song_hands_t2", "Craft Iron-clasped Performer Garb Gloves",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("silk_bolt", 1), ("ironwood_plank", 1), ("venom_sac", 1)],
+        "song_hands_t2", 1);
+    g.add_recipe("eq_song_legs_t2", "Craft Iron-clasped Performer Garb Leggings",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("silk_bolt", 1), ("ironwood_plank", 1), ("cut_gemstone", 1), ("venom_sac", 1)],
+        "song_legs_t2", 1);
+    g.add_recipe("eq_song_feet_t2", "Craft Iron-clasped Performer Garb Slippers",
+        CraftingSkill::Woodworking, 2, 2,
+        &[("silk_bolt", 1), ("ironwood_plank", 1), ("venom_sac", 1)],
+        "song_feet_t2", 1);
 
     g.add_recipe("eq_song_weapon_t3", "Forge Steel-strung Lyre",
         CraftingSkill::Woodworking, 3, 3,
         &[("hardwood_beam", 2), ("moonsilk", 1), ("jeweled_setting", 1), ("orc_tusk", 1)],
         "song_weapon_t3", 1);
-    g.add_recipe("eq_song_armor_t3", "Craft Steel-trimmed Performer Garb",
+        g.add_recipe("eq_song_head_t3", "Craft Steel-trimmed Performer Garb Circlet",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("moonsilk", 1), ("hardwood_beam", 1), ("arcane_crystal", 1)],
+        "song_head_t3", 1);
+    g.add_recipe("eq_song_chest_t3", "Craft Steel-trimmed Performer Garb",
         CraftingSkill::Woodworking, 3, 3,
         &[("moonsilk", 2), ("hardwood_beam", 1), ("jeweled_setting", 1), ("arcane_crystal", 1)],
-        "song_armor_t3", 1);
+        "song_chest_t3", 1);
+    g.add_recipe("eq_song_hands_t3", "Craft Steel-trimmed Performer Garb Gloves",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("moonsilk", 1), ("hardwood_beam", 1), ("arcane_crystal", 1)],
+        "song_hands_t3", 1);
+    g.add_recipe("eq_song_legs_t3", "Craft Steel-trimmed Performer Garb Leggings",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("moonsilk", 1), ("hardwood_beam", 1), ("jeweled_setting", 1), ("arcane_crystal", 1)],
+        "song_legs_t3", 1);
+    g.add_recipe("eq_song_feet_t3", "Craft Steel-trimmed Performer Garb Slippers",
+        CraftingSkill::Woodworking, 3, 3,
+        &[("moonsilk", 1), ("hardwood_beam", 1), ("arcane_crystal", 1)],
+        "song_feet_t3", 1);
 
     g.add_recipe("eq_song_weapon_t4", "Forge Dwarven Warhorn",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_hardwood", 2), ("alchemical_silk", 1), ("alchemical_gem", 1), ("phase_venom", 1)],
         "song_weapon_t4", 1);
-    g.add_recipe("eq_song_armor_t4", "Craft Dwarven Performer Garb",
+        g.add_recipe("eq_song_head_t4", "Craft Dwarven Performer Garb Circlet",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_hardwood", 1), ("wraith_dust", 1)],
+        "song_head_t4", 1);
+    g.add_recipe("eq_song_chest_t4", "Craft Dwarven Performer Garb",
         CraftingSkill::Woodworking, 4, 4,
         &[("alchemical_silk", 2), ("alchemical_hardwood", 1), ("alchemical_gem", 1), ("wraith_dust", 1)],
-        "song_armor_t4", 1);
+        "song_chest_t4", 1);
+    g.add_recipe("eq_song_hands_t4", "Craft Dwarven Performer Garb Gloves",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_hardwood", 1), ("wraith_dust", 1)],
+        "song_hands_t4", 1);
+    g.add_recipe("eq_song_legs_t4", "Craft Dwarven Performer Garb Leggings",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_hardwood", 1), ("alchemical_gem", 1), ("wraith_dust", 1)],
+        "song_legs_t4", 1);
+    g.add_recipe("eq_song_feet_t4", "Craft Dwarven Performer Garb Slippers",
+        CraftingSkill::Woodworking, 4, 4,
+        &[("alchemical_silk", 1), ("alchemical_hardwood", 1), ("wraith_dust", 1)],
+        "song_feet_t4", 1);
 
     g.add_recipe("eq_song_weapon_t5", "Forge Mithril Harp",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_hardwood", 2), ("enchanted_silk", 1), ("enchanted_gem", 1), ("naga_pearl", 1)],
         "song_weapon_t5", 1);
-    g.add_recipe("eq_song_armor_t5", "Craft Mithril Performer Garb",
+        g.add_recipe("eq_song_head_t5", "Craft Mithril Performer Garb Circlet",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_hardwood", 1), ("troll_blood", 1)],
+        "song_head_t5", 1);
+    g.add_recipe("eq_song_chest_t5", "Craft Mithril Performer Garb",
         CraftingSkill::Woodworking, 5, 5,
         &[("enchanted_silk", 2), ("enchanted_hardwood", 1), ("enchanted_gem", 1), ("troll_blood", 1)],
-        "song_armor_t5", 1);
+        "song_chest_t5", 1);
+    g.add_recipe("eq_song_hands_t5", "Craft Mithril Performer Garb Gloves",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_hardwood", 1), ("troll_blood", 1)],
+        "song_hands_t5", 1);
+    g.add_recipe("eq_song_legs_t5", "Craft Mithril Performer Garb Leggings",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_hardwood", 1), ("enchanted_gem", 1), ("troll_blood", 1)],
+        "song_legs_t5", 1);
+    g.add_recipe("eq_song_feet_t5", "Craft Mithril Performer Garb Slippers",
+        CraftingSkill::Woodworking, 5, 5,
+        &[("enchanted_silk", 1), ("enchanted_hardwood", 1), ("troll_blood", 1)],
+        "song_feet_t5", 1);
 
     g.add_recipe("eq_song_weapon_t6", "Forge Rune Lute",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_hardwood", 2), ("arcane_tapestry", 1), ("arcane_gem", 1), ("death_knight_shard", 1)],
         "song_weapon_t6", 1);
-    g.add_recipe("eq_song_armor_t6", "Craft Rune Performer Garb",
+        g.add_recipe("eq_song_head_t6", "Craft Rune Performer Garb Circlet",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_hardwood", 1), ("stalker_claw", 1)],
+        "song_head_t6", 1);
+    g.add_recipe("eq_song_chest_t6", "Craft Rune Performer Garb",
         CraftingSkill::Woodworking, 6, 6,
         &[("arcane_tapestry", 2), ("arcane_hardwood", 1), ("arcane_gem", 1), ("stalker_claw", 1)],
-        "song_armor_t6", 1);
+        "song_chest_t6", 1);
+    g.add_recipe("eq_song_hands_t6", "Craft Rune Performer Garb Gloves",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_hardwood", 1), ("stalker_claw", 1)],
+        "song_hands_t6", 1);
+    g.add_recipe("eq_song_legs_t6", "Craft Rune Performer Garb Leggings",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_hardwood", 1), ("arcane_gem", 1), ("stalker_claw", 1)],
+        "song_legs_t6", 1);
+    g.add_recipe("eq_song_feet_t6", "Craft Rune Performer Garb Slippers",
+        CraftingSkill::Woodworking, 6, 6,
+        &[("arcane_tapestry", 1), ("arcane_hardwood", 1), ("stalker_claw", 1)],
+        "song_feet_t6", 1);
 
     g.add_recipe("eq_song_weapon_t7", "Forge Dragonsung Lyre",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_hardwood", 2), ("jeweled_tapestry", 1), ("precious_diadem", 1), ("dragon_scale", 1)],
         "song_weapon_t7", 1);
-    g.add_recipe("eq_song_armor_t7", "Craft Dragon Performer Garb",
+        g.add_recipe("eq_song_head_t7", "Craft Dragon Performer Garb Circlet",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_hardwood", 1), ("elder_crystal", 1)],
+        "song_head_t7", 1);
+    g.add_recipe("eq_song_chest_t7", "Craft Dragon Performer Garb",
         CraftingSkill::Woodworking, 7, 7,
         &[("jeweled_tapestry", 2), ("jeweled_hardwood", 1), ("precious_diadem", 1), ("elder_crystal", 1)],
-        "song_armor_t7", 1);
+        "song_chest_t7", 1);
+    g.add_recipe("eq_song_hands_t7", "Craft Dragon Performer Garb Gloves",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_hardwood", 1), ("elder_crystal", 1)],
+        "song_hands_t7", 1);
+    g.add_recipe("eq_song_legs_t7", "Craft Dragon Performer Garb Leggings",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_hardwood", 1), ("precious_diadem", 1), ("elder_crystal", 1)],
+        "song_legs_t7", 1);
+    g.add_recipe("eq_song_feet_t7", "Craft Dragon Performer Garb Slippers",
+        CraftingSkill::Woodworking, 7, 7,
+        &[("jeweled_tapestry", 1), ("jeweled_hardwood", 1), ("elder_crystal", 1)],
+        "song_feet_t7", 1);
 
     g.add_recipe("eq_song_weapon_t8", "Forge Voidecho Harp",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_hardwood", 2), ("runic_tapestry", 1), ("runic_gem", 1), ("void_silk", 1)],
         "song_weapon_t8", 1);
-    g.add_recipe("eq_song_armor_t8", "Craft Void Performer Garb",
+        g.add_recipe("eq_song_head_t8", "Craft Void Performer Garb Circlet",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_tapestry", 1), ("runic_hardwood", 1), ("lich_phylactery", 1)],
+        "song_head_t8", 1);
+    g.add_recipe("eq_song_chest_t8", "Craft Void Performer Garb",
         CraftingSkill::Woodworking, 8, 8,
         &[("runic_tapestry", 2), ("runic_hardwood", 1), ("runic_gem", 1), ("lich_phylactery", 1)],
-        "song_armor_t8", 1);
+        "song_chest_t8", 1);
+    g.add_recipe("eq_song_hands_t8", "Craft Void Performer Garb Gloves",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_tapestry", 1), ("runic_hardwood", 1), ("lich_phylactery", 1)],
+        "song_hands_t8", 1);
+    g.add_recipe("eq_song_legs_t8", "Craft Void Performer Garb Leggings",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_tapestry", 1), ("runic_hardwood", 1), ("runic_gem", 1), ("lich_phylactery", 1)],
+        "song_legs_t8", 1);
+    g.add_recipe("eq_song_feet_t8", "Craft Void Performer Garb Slippers",
+        CraftingSkill::Woodworking, 8, 8,
+        &[("runic_tapestry", 1), ("runic_hardwood", 1), ("lich_phylactery", 1)],
+        "song_feet_t8", 1);
 
     g.add_recipe("eq_song_weapon_t9", "Forge Celestial Lyre",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_hardwood", 2), ("artificed_tapestry", 1), ("artificed_gem", 1), ("arch_lich_dust", 1)],
         "song_weapon_t9", 1);
-    g.add_recipe("eq_song_armor_t9", "Craft Celestial Performer Garb",
+        g.add_recipe("eq_song_head_t9", "Craft Celestial Performer Garb Circlet",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_hardwood", 1), ("storm_essence", 1)],
+        "song_head_t9", 1);
+    g.add_recipe("eq_song_chest_t9", "Craft Celestial Performer Garb",
         CraftingSkill::Woodworking, 9, 9,
         &[("artificed_tapestry", 2), ("artificed_hardwood", 1), ("artificed_gem", 1), ("storm_essence", 1)],
-        "song_armor_t9", 1);
+        "song_chest_t9", 1);
+    g.add_recipe("eq_song_hands_t9", "Craft Celestial Performer Garb Gloves",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_hardwood", 1), ("storm_essence", 1)],
+        "song_hands_t9", 1);
+    g.add_recipe("eq_song_legs_t9", "Craft Celestial Performer Garb Leggings",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_hardwood", 1), ("artificed_gem", 1), ("storm_essence", 1)],
+        "song_legs_t9", 1);
+    g.add_recipe("eq_song_feet_t9", "Craft Celestial Performer Garb Slippers",
+        CraftingSkill::Woodworking, 9, 9,
+        &[("artificed_tapestry", 1), ("artificed_hardwood", 1), ("storm_essence", 1)],
+        "song_feet_t9", 1);
 
     g.add_recipe("eq_song_weapon_t10", "Forge Primordial Worldsong",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_hardwood", 2), ("divine_tapestry", 1), ("divine_gem", 1), ("undying_essence", 1)],
         "song_weapon_t10", 1);
-    g.add_recipe("eq_song_armor_t10", "Craft Primordial Maestro Garb",
+        g.add_recipe("eq_song_head_t10", "Craft Primordial Maestro Garb Circlet",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_tapestry", 1), ("divine_hardwood", 1), ("wraith_lord_cloak", 1)],
+        "song_head_t10", 1);
+    g.add_recipe("eq_song_chest_t10", "Craft Primordial Maestro Garb",
         CraftingSkill::Woodworking, 10, 10,
         &[("divine_tapestry", 2), ("divine_hardwood", 1), ("divine_gem", 1), ("wraith_lord_cloak", 1)],
-        "song_armor_t10", 1);
+        "song_chest_t10", 1);
+    g.add_recipe("eq_song_hands_t10", "Craft Primordial Maestro Garb Gloves",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_tapestry", 1), ("divine_hardwood", 1), ("wraith_lord_cloak", 1)],
+        "song_hands_t10", 1);
+    g.add_recipe("eq_song_legs_t10", "Craft Primordial Maestro Garb Leggings",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_tapestry", 1), ("divine_hardwood", 1), ("divine_gem", 1), ("wraith_lord_cloak", 1)],
+        "song_legs_t10", 1);
+    g.add_recipe("eq_song_feet_t10", "Craft Primordial Maestro Garb Slippers",
+        CraftingSkill::Woodworking, 10, 10,
+        &[("divine_tapestry", 1), ("divine_hardwood", 1), ("wraith_lord_cloak", 1)],
+        "song_feet_t10", 1);
 
     g.analyze_usage();
     g
@@ -2730,29 +4730,32 @@ pub fn material_to_item(graph: &CraftingGraph, material_id: &str) -> Option<Item
 /// Returns None if the material_id is not an equipment item (e.g., intermediate materials).
 pub fn equipment_to_item(material_id: &str) -> Option<Item> {
     // Equipment IDs follow pattern: {line}_{type}_t{tier}
-    // e.g., "blade_weapon_t3", "bow_armor_t5"
+    // e.g., "blade_weapon_t3", "bow_chest_t5", "holy_head_t2"
     let parts: Vec<&str> = material_id.split('_').collect();
     if parts.len() < 3 { return None; }
 
-    let line = parts[0];  // blade, axe, holy, dagger, bow, fist, staff, wand, scepter, song
-    let eq_type = parts[1]; // weapon, sword, armor
+    let line = parts[0];
+    let eq_type = parts[1]; // weapon, head, chest, hands, legs, feet (legacy: armor, sword)
     let tier_str = parts.last()?;
     let tier: u8 = tier_str.strip_prefix('t')?.parse().ok()?;
 
-    // Only handle weapon/armor equipment types
-    if eq_type != "weapon" && eq_type != "armor" && eq_type != "sword" {
-        return None;
-    }
-
     let graph = &*CRAFTING_GRAPH;
-    let mat = graph.materials.get(material_id)?;
 
-    let is_weapon = eq_type != "armor";
-
-    if is_weapon {
-        Some(make_weapon(line, tier, &mat.name))
+    // For legacy armor IDs, remap to chest slot
+    let (lookup_id, actual_type) = if eq_type == "armor" {
+        (format!("{}_chest_t{}", line, tier), "chest")
     } else {
-        Some(make_armor(line, tier, &mat.name))
+        (material_id.to_string(), eq_type)
+    };
+
+    let mat = graph.materials.get(lookup_id.as_str())?;
+
+    match actual_type {
+        "weapon" | "sword" => Some(make_weapon(line, tier, &mat.name)),
+        "head" | "chest" | "hands" | "legs" | "feet" => {
+            Some(make_armor_piece(line, actual_type, tier, &mat.name))
+        }
+        _ => None,
     }
 }
 
@@ -2821,42 +4824,65 @@ fn material_id_for_weapon(line: &str, tier: u8) -> String {
     format!("{}_weapon_t{}", line, tier)
 }
 
-fn make_armor(line: &str, tier: u8, name: &str) -> Item {
+fn make_armor_piece(line: &str, slot: &str, tier: u8, name: &str) -> Item {
     use super::equipment::EquipSlot;
 
-    // Armor AC scales with tier; armor weight class depends on equipment line
-    let (ac_base, special) = match line {
-        // Heavy armor (no DEX bonus)
+    // AC shares: head 15%, chest 35%, hands 10%, legs 25%, feet 15%
+    let (ac_fraction, equip_slot, weight_fraction) = match slot {
+        "head"  => (0.15, EquipSlot::Head,  0.20),
+        "chest" => (0.35, EquipSlot::Chest, 0.35),
+        "hands" => (0.10, EquipSlot::Hands, 0.10),
+        "legs"  => (0.25, EquipSlot::Legs,  0.20),
+        "feet"  => (0.15, EquipSlot::Feet,  0.15),
+        _       => (0.35, EquipSlot::Chest, 0.35), // fallback
+    };
+
+    // Full set AC by weight class
+    let (full_ac, special) = match line {
         "blade" | "axe" | "holy" | "scepter" => {
-            let ac = 13 + tier as i32;
-            (ac, Some("no_dex".to_string()))
+            (13 + tier as i32, Some("no_dex".to_string()))
         }
-        // Medium armor (DEX capped at +2)
         "bow" | "dagger" => {
-            let ac = 11 + tier as i32;
-            (ac, Some("dex_cap_2".to_string()))
+            (11 + tier as i32, Some("dex_cap_2".to_string()))
         }
-        // Light armor (full DEX)
         _ => {
-            let ac = 10 + tier as i32;
-            (ac, None)
+            (10 + tier as i32, None)
         }
     };
 
+    // This slot's AC contribution (rounded, minimum 1 for all slots)
+    let slot_ac = ((full_ac as f64 * ac_fraction).round() as i32).max(1);
+
+    // Value proportional to AC share
+    let full_value = tier_to_value(tier) * 4;
+    let slot_value = ((full_value as f64 * ac_fraction).round() as u32).max(1);
+
+    // Weight proportional
+    let base_weight: f64 = if special.as_deref() == Some("no_dex") { 15.0 } else { 5.0 };
+    let slot_weight = ((base_weight * weight_fraction * 10.0).round() / 10.0) as f32;
+
+    // Slot-specific bonuses
+    let mut stats = ItemStats {
+        ac_base: Some(slot_ac),
+        special: special.clone(),
+        ..ItemStats::default()
+    };
+
+    // Hands give +1 attack bonus
+    if slot == "hands" {
+        stats.attack_bonus = 1;
+    }
+
     Item {
-        id: format!("{}_armor_t{}", line, tier),
+        id: format!("{}_{}_t{}", line, slot, tier),
         name: name.to_string(),
-        description: format!("Tier {} {} armor", tier, line),
+        description: format!("Tier {} {} {} ({})", tier, line, slot, if special.is_some() { "heavy" } else { "light" }),
         item_type: ItemType::Armor,
-        slot: Some(EquipSlot::Chest),
+        slot: Some(equip_slot),
         rarity: tier_to_rarity(tier),
-        weight: if special.as_deref() == Some("no_dex") { 15.0 } else { 5.0 },
-        value_gp: tier_to_value(tier) * 4,
-        stats: ItemStats {
-            ac_base: Some(ac_base),
-            special,
-            ..ItemStats::default()
-        },
+        weight: slot_weight,
+        value_gp: slot_value,
+        stats,
         enchantment: None,
         quantity: 1,
         tier,
@@ -2886,14 +4912,31 @@ mod tests {
 
     #[test]
     fn test_equipment_to_item_armor() {
-        let item = equipment_to_item("blade_armor_t1").expect("Should produce blade armor T1");
+        // v5: armor split into 5 slots; "armor" ID is legacy -> maps to chest
+        let item = equipment_to_item("blade_chest_t1").expect("Should produce blade chest T1");
         assert_eq!(item.item_type, ItemType::Armor);
         assert_eq!(item.tier, 1);
         assert!(item.slot.is_some());
         assert!(item.stats.ac_base.is_some());
-        // Blade armor = heavy (13 + tier)
-        assert_eq!(item.stats.ac_base.unwrap(), 14); // 13 + 1
+        // Blade chest = heavy, 35% of (13+1=14) = round(4.9) = 5
+        assert_eq!(item.stats.ac_base.unwrap(), 5);
         assert_eq!(item.stats.special.as_deref(), Some("no_dex"));
+
+        // Test other slots exist
+        let head = equipment_to_item("blade_head_t1").expect("head");
+        assert_eq!(head.stats.ac_base.unwrap(), 2); // 15% of 14 = 2.1 -> 2
+        let hands = equipment_to_item("blade_hands_t1").expect("hands");
+        assert_eq!(hands.stats.attack_bonus, 1); // hands give +1 attack
+        let legs = equipment_to_item("blade_legs_t1").expect("legs");
+        assert!(legs.stats.ac_base.unwrap() >= 3); // 25% of 14 = 3.5 -> 4
+        let feet = equipment_to_item("blade_feet_t1").expect("feet");
+        assert!(feet.stats.ac_base.unwrap() >= 2); // 15% of 14
+
+        // Sum of all slot ACs should approximate full AC
+        let total = head.stats.ac_base.unwrap() + item.stats.ac_base.unwrap()
+            + hands.stats.ac_base.unwrap() + legs.stats.ac_base.unwrap()
+            + feet.stats.ac_base.unwrap();
+        assert!((total - 14).abs() <= 1, "Total AC {} should be ~14", total);
     }
 
     #[test]
@@ -2923,19 +4966,23 @@ mod tests {
 
     #[test]
     fn test_equipment_to_item_light_armor() {
-        let item = equipment_to_item("fist_armor_t3").expect("Should produce fist armor T3");
+        // v5: test chest slot specifically
+        let item = equipment_to_item("fist_chest_t3").expect("Should produce fist chest T3");
         assert_eq!(item.item_type, ItemType::Armor);
-        // Fist = light armor (10 + tier)
-        assert_eq!(item.stats.ac_base.unwrap(), 13); // 10 + 3
+        // Fist = light, full AC = 10+3=13, chest share = 35% of 13 = ~5
+        assert_eq!(item.stats.ac_base.unwrap(), 5); // round(13*0.35) = 4.55 -> 5
         assert!(item.stats.special.is_none()); // Light = full DEX
+        // Legacy "armor" ID should also work
+        let legacy = equipment_to_item("fist_armor_t3").expect("Legacy armor ID should work");
+        assert_eq!(legacy.stats.ac_base.unwrap(), 5);
     }
 
     #[test]
     fn test_equipment_to_item_medium_armor() {
-        let item = equipment_to_item("bow_armor_t5").expect("Should produce bow armor T5");
+        let item = equipment_to_item("bow_chest_t5").expect("Should produce bow chest T5");
         assert_eq!(item.item_type, ItemType::Armor);
-        // Bow = medium armor (11 + tier)
-        assert_eq!(item.stats.ac_base.unwrap(), 16); // 11 + 5
+        // Bow = medium, full AC = 11+5=16, chest = 35% of 16 = ~6
+        assert_eq!(item.stats.ac_base.unwrap(), 6); // round(16*0.35) = 5.6 -> 6
         assert_eq!(item.stats.special.as_deref(), Some("dex_cap_2"));
     }
 
@@ -2970,17 +5017,20 @@ mod tests {
     #[test]
     fn test_all_equipment_lines_produce_items() {
         let lines = vec!["blade", "axe", "holy", "dagger", "bow", "fist", "staff", "wand", "scepter", "song"];
+        let slots = vec!["head", "chest", "hands", "legs", "feet"];
         for line in &lines {
             let wep_id = format!("{}_weapon_t1", line);
-            let arm_id = format!("{}_armor_t1", line);
             assert!(
                 equipment_to_item(&wep_id).is_some(),
                 "Missing weapon for line: {}", line
             );
-            assert!(
-                equipment_to_item(&arm_id).is_some(),
-                "Missing armor for line: {}", line
-            );
+            for slot in &slots {
+                let slot_id = format!("{}_{}_{}", line, slot, "t1");
+                assert!(
+                    equipment_to_item(&slot_id).is_some(),
+                    "Missing {} {} for line: {}", slot, "t1", line
+                );
+            }
         }
     }
 }
