@@ -305,6 +305,10 @@ struct EnemyInput {
     ac: i32,
     #[serde(default)]
     attacks: Vec<EnemyAttackInput>,
+    #[serde(default)]
+    enemy_type: Option<String>,
+    #[serde(default)]
+    tier: Option<u8>,
 }
 
 fn default_ac() -> i32 {
@@ -2210,9 +2214,17 @@ async fn engine_combat(
                     damage_modifier: a.damage_modifier, to_hit_bonus: a.to_hit_bonus,
                 }).collect()
             };
+            let parsed_type = e.enemy_type.as_deref().and_then(|t| match t.to_lowercase().as_str() {
+                "brute" => Some(EnemyType::Brute),
+                "skulker" => Some(EnemyType::Skulker),
+                "mystic" => Some(EnemyType::Mystic),
+                "undead" => Some(EnemyType::Undead),
+                _ => None,
+            });
+            let enemy_tier = e.tier.unwrap_or(tier as u8);
             Enemy {
                 name: e.name, hp: e.hp, max_hp: e.hp, ac: e.ac, attacks,
-                enemy_type: None, tier: Some(tier as u8),
+                enemy_type: parsed_type, tier: Some(enemy_tier),
             }
         }).collect()
     };
