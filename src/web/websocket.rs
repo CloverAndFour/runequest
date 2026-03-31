@@ -52,6 +52,7 @@ use crate::storage::friends_store::FriendsStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
 use crate::engine::drops::generate_drops;
 use crate::engine::rate_limit::{self, ActionCategory};
+use crate::engine::actions;
 
 const ALLOWED_MODELS: &[&str] = &[
     "grok-4-1-fast-reasoning",
@@ -310,6 +311,8 @@ fn client_msg_tag(msg: &ClientMsg) -> &'static str {
         ClientMsg::TowerTeleport { .. } => "tower_teleport",
         ClientMsg::Travel { .. } => "travel",
         ClientMsg::Work => "work",
+        ClientMsg::GetActions => "read_only",
+        ClientMsg::Action { .. } => "read_only",
         _ => "read_only",
     }
 }
@@ -1843,6 +1846,91 @@ async fn handle_client_msg(
                 send_msg(sender, &ServerMsg::LocationPlayers {
                     location: "Unknown".to_string(),
                     players: vec![],
+                }).await;
+            }
+        }
+
+        // Unified action menu
+        ClientMsg::GetActions => {
+            let sess = session.lock().await;
+            if let Some(ref adv) = sess.adventure {
+                let state_json = build_state_with_map(adv);
+                let map_view = crate::engine::world_map::build_map_view(
+                    &adv.world_position, &adv.discovery, false,
+                );
+                let menu = actions::build_action_menu(adv, &map_view, state_json);
+                send_msg(sender, &ServerMsg::Actions {
+                    fixed_actions: menu.fixed_actions,
+                    combat_actions: menu.combat_actions,
+                    llm_actions: menu.llm_actions,
+                    state: menu.state,
+                }).await;
+            }
+        }
+
+        ClientMsg::Action { action, params } => {
+            // Dispatch to the appropriate existing handler by converting to the right ClientMsg
+            // This keeps the WS action dispatch simple — just re-route to existing handlers
+            let redirect: Option<ClientMsg> = match action.as_str() {
+                "travel" => Some(ClientMsg::Travel { direction: params["direction"].as_str().unwrap_or("").to_string() }),
+                "gather" => Some(ClientMsg::Gather),
+                "work" => Some(ClientMsg::Work),
+                "shop_view" => Some(ClientMsg::ViewShop),
+                "shop_buy" => Some(ClientMsg::ShopBuy {
+                    item_id: params["item_id"].as_str().unwrap_or("").to_string(),
+                    quantity: params["quantity"].as_u64().unwrap_or(1) as u32,
+                }),
+                "shop_sell" => Some(ClientMsg::ShopSell {
+                    item_name: params["item_name"].as_str().unwrap_or("").to_string(),
+                }),
+                "equip" => Some(ClientMsg::EquipItem {
+                    item_name: params["item_name"].as_str().unwrap_or("").to_string(),
+                }),
+                "unequip" => Some(ClientMsg::UnequipItem {
+                    slot: params["slot"].as_str().unwrap_or("").to_string(),
+                }),
+                "craft" => Some(ClientMsg::CraftItem {
+                    recipe_id: params["recipe_id"].as_str().unwrap_or("").to_string(),
+                }),
+                "combat" => Some(ClientMsg::CombatAction {
+                    action_id: params["action_id"].as_str().unwrap_or("").to_string(),
+                    target: params["target"].as_str().map(|s| s.to_string()),
+                    item_name: params["item_name"].as_str().map(|s| s.to_string()),
+                }),
+                "dungeon_enter" => Some(ClientMsg::DungeonEnter {
+                    seed: params["seed"].as_u64(),
+                    tier: params["tier"].as_u64().map(|t| t as u32),
+                }),
+                "dungeon_move" => Some(ClientMsg::DungeonMove {
+                    direction: params["direction"].as_str().unwrap_or("").to_string(),
+                }),
+                "dungeon_retreat" => Some(ClientMsg::DungeonRetreat),
+                "tower_enter" => Some(ClientMsg::TowerEnter {
+                    tower_id: params["tower_id"].as_str().unwrap_or("").to_string(),
+                }),
+                "tower_move" => Some(ClientMsg::TowerMove {
+                    direction: params["direction"].as_str().unwrap_or("").to_string(),
+                }),
+                "tower_ascend" => Some(ClientMsg::TowerAscend),
+                "send_message" => Some(ClientMsg::SendMessage {
+                    content: params["content"].as_str().unwrap_or("").to_string(),
+                }),
+                "choice" => Some(ClientMsg::SelectChoice {
+                    index: params["index"].as_u64().unwrap_or(0) as usize,
+                    text: params["text"].as_str().unwrap_or("").to_string(),
+                }),
+                _ => None,
+            };
+            if let Some(msg) = redirect {
+                // Redirect to existing handler (Box::pin to avoid async recursion issue)
+                return Box::pin(handle_client_msg(
+                    msg, session, xai_client, sender,
+                    shop_store, friends_store, presence, user_store, user_role,
+                )).await;
+            } else {
+                send_msg(sender, &ServerMsg::Error {
+                    code: "unknown_action".into(),
+                    message: format!("Unknown action: {}", action),
                 }).await;
             }
         }

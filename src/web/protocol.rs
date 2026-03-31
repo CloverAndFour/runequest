@@ -153,6 +153,12 @@ pub enum ClientMsg {
         direction: String,
     },
     Work,
+    GetActions,
+    Action {
+        action: String,
+        #[serde(default)]
+        params: serde_json::Value,
+    },
     GetLocationPlayers,
     // Display history pagination
     LoadOlderHistory {
@@ -296,6 +302,18 @@ pub enum ServerMsg {
         victory: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         drops: Vec<String>,
+    },
+    Actions {
+        fixed_actions: Vec<crate::engine::actions::FixedAction>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        combat_actions: Option<Vec<crate::engine::actions::CombatActionInfo>>,
+        llm_actions: Option<serde_json::Value>,
+        state: serde_json::Value,
+    },
+    ActionResultMsg {
+        success: bool,
+        action: String,
+        result: serde_json::Value,
     },
     WorkResult {
         job: String,
