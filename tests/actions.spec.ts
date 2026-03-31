@@ -154,22 +154,24 @@ test.describe('Unified Action Menu', () => {
     }
   });
 
-  test('old endpoints still work (backward compat)', async () => {
+  test('all actions go through unified /action endpoint', async () => {
     // End combat first if active
     const state = await api('GET', `/api/adventures/${advId}`);
-    if (state.data.state.combat?.active) {
-      // Kill enemy via engine
+    if (state.data.state?.combat?.active) {
       for (let i = 0; i < 20; i++) {
-        const r = await api('POST', `/api/adventures/${advId}/combat`, {
-          action_id: 'attack', target: 'MenuRat',
+        const r = await api('POST', `/api/adventures/${advId}/action`, {
+          action: 'combat', params: { action_id: 'attack', target: 'MenuRat' },
         });
-        if (!r.data.state?.combat?.active) break;
+        if (!r.data.actions?.combat_actions) break;
       }
     }
 
-    // Old gather endpoint
-    const r = await api('POST', `/api/adventures/${advId}/gather`);
+    // Gather via unified endpoint
+    const r = await api('POST', `/api/adventures/${advId}/action`, {
+      action: 'gather', params: {},
+    });
     expect(r.status).toBe(200);
+    expect(r.data.success).toBe(true);
   });
 
   test('unknown action returns error with menu', async () => {

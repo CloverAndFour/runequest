@@ -489,10 +489,7 @@ pub async fn run_api_server(
         .route("/api/adventures/:id/choice", post(send_choice))
         .route("/api/adventures/:id/roll", post(roll_dice))
         // Combat
-        .route("/api/adventures/:id/combat", post(combat_action))
         // Equipment
-        .route("/api/adventures/:id/equip", post(equip_item))
-        .route("/api/adventures/:id/unequip", post(unequip_item))
         // Direct engine endpoints
         .route("/api/adventures/:id/engine/hp", post(engine_hp))
         .route("/api/adventures/:id/engine/item", post(engine_item))
@@ -508,31 +505,13 @@ pub async fn run_api_server(
         .route("/api/recipes", get(list_recipes))
         .route("/api/recipes/:recipe_id", get(get_recipe))
         .route("/api/materials", get(list_materials))
-        .route("/api/adventures/:id/craft", post(craft_item))
-        .route("/api/adventures/:id/gather", post(gather_materials))
-        .route("/api/adventures/:id/work", post(work_handler))
-        .route("/api/adventures/:id/travel", post(travel_handler))
         // Skills
         .route("/api/adventures/:id/engine/skill", post(engine_skill))
         // Shop
-        .route("/api/adventures/:id/shop", get(shop_view))
-        .route("/api/adventures/:id/shop/buy", post(shop_buy))
-        .route("/api/adventures/:id/shop/sell", post(shop_sell))
         // Dungeon
-        .route("/api/adventures/:id/dungeon/enter", post(dungeon_enter))
-        .route("/api/adventures/:id/dungeon/move", post(dungeon_move))
-        .route("/api/adventures/:id/dungeon/skill-check", post(dungeon_skill_check))
-        .route("/api/adventures/:id/dungeon/activate-point", post(dungeon_activate_point))
-        .route("/api/adventures/:id/dungeon/retreat", post(dungeon_retreat))
-        .route("/api/adventures/:id/dungeon/status", get(dungeon_status))
         // Tower
         .route("/api/towers", get(tower_list))
         .route("/api/towers/:tower_id/floor/:floor_num", get(tower_floor_status))
-        .route("/api/adventures/:id/tower/enter", post(tower_enter))
-        .route("/api/adventures/:id/tower/move", post(tower_move))
-        .route("/api/adventures/:id/tower/ascend", post(tower_ascend))
-        .route("/api/adventures/:id/tower/checkpoint", post(tower_checkpoint))
-        .route("/api/adventures/:id/tower/teleport", post(tower_teleport))
         // Backgrounds
         .route("/api/backgrounds", get(list_backgrounds))
         // Friends

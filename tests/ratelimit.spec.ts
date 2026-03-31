@@ -54,12 +54,12 @@ test.describe('Rate Limiting', () => {
 
   test('fixed action is rate limited at 4s', async () => {
     // First gather should succeed
-    const r1 = await api('POST', `/api/adventures/${advId}/gather`, {});
+    const r1 = await api('POST', `/api/adventures/${advId}/action`, { action: 'gather', params: {} });
     expect(r1.status).toBe(200);
 
     // Immediate second gather should be rate limited
-    const r2 = await api('POST', `/api/adventures/${advId}/gather`, {});
-    expect(r2.status).toBe(429);
+    const r2 = await api('POST', `/api/adventures/${advId}/action`, { action: 'gather', params: {} });
+    expect(r2.data.success).toBe(false);
     expect(r2.data.code).toBe('cooldown');
     expect(r2.data.remaining_ms).toBeGreaterThan(0);
     expect(r2.data.remaining_ms).toBeLessThanOrEqual(4000);
@@ -78,28 +78,28 @@ test.describe('Rate Limiting', () => {
     await new Promise(r => setTimeout(r, 7000));
 
     // Do a fixed action (gather) — should succeed
-    const r1 = await api('POST', `/api/adventures/${advId}/gather`, {});
+    const r1 = await api('POST', `/api/adventures/${advId}/action`, { action: 'gather', params: {} });
     expect(r1.status).toBe(200);
 
     // Immediately do another fixed action — should be rate limited
-    const r2 = await api('POST', `/api/adventures/${advId}/gather`, {});
-    expect(r2.status).toBe(429);
+    const r2 = await api('POST', `/api/adventures/${advId}/action`, { action: 'gather', params: {} });
+    expect(r2.data.success).toBe(false);
     expect(r2.data.code).toBe('cooldown');
 
-    // But equip (also fixed, shares cooldown) should also be blocked
-    const r3 = await api('POST', `/api/adventures/${advId}/equip`, { item_name: 'nothing' });
-    expect(r3.status).toBe(429);
+    // Another fixed action should also be blocked (same cooldown category)
+    const r3 = await api('POST', `/api/adventures/${advId}/action`, { action: 'work', params: {} });
+    expect(r3.data.success).toBe(false);
   });
 
   test('cooldown error includes remaining time', async () => {
     // Immediate action should fail with proper cooldown info
-    const r = await api('POST', `/api/adventures/${advId}/gather`, {});
-    if (r.status === 429) {
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'gather', params: {} });
+    if (r.data.success === false && r.data.code === 'cooldown') {
       expect(r.data.remaining_ms).toBeDefined();
       expect(typeof r.data.remaining_ms).toBe('number');
       expect(r.data.error).toContain('cooldown');
     }
-    // If 200, cooldown expired — that's also fine
+    // If success=true, cooldown expired — that's also fine
   });
 });
 
@@ -116,11 +116,11 @@ test.describe('Admin Exemption', () => {
     });
     const id = cr.data.state.id;
 
-    const r1 = await api('POST', `/api/adventures/${id}/gather`, {});
+    const r1 = await api('POST', `/api/adventures/${id}/action`, { action: 'gather', params: {} });
     expect(r1.status).toBe(200);
 
-    const r2 = await api('POST', `/api/adventures/${id}/gather`, {});
-    expect(r2.status).toBe(429);
+    const r2 = await api('POST', `/api/adventures/${id}/action`, { action: 'gather', params: {} });
+    expect(r2.data.success).toBe(false);
 
     await api('DELETE', `/api/adventures/${id}`);
   });

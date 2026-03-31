@@ -46,7 +46,10 @@ async function deleteAdventure(id: string) {
 
 // Helper: get state from the response (handles both {state:{...}} and direct state)
 function getState(data: any) {
-  return data.state || data;
+  // Unified /action endpoint: data.actions.state
+  // Old endpoints: data.state
+  // Fallback: data itself
+  return data.actions?.state || data.state || data;
 }
 
 // === AUTH ===
@@ -192,14 +195,14 @@ test.describe('Equipment System', () => {
   });
 
   test('equip moves item from inventory to slot', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/equip`, { item_name: 'Rapier' });
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'equip', params: { item_name: 'Rapier' } });
     expect(r.status).toBe(200);
     const s = getState(r.data);
     expect(s.equipment.main_hand.name).toContain('Rapier');
   });
 
   test('unequip moves item back to inventory', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/unequip`, { slot: 'main_hand' });
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'unequip', params: { slot: 'main_hand' } });
     expect(r.status).toBe(200);
     const s = getState(r.data);
     expect(s.equipment.main_hand).toBeFalsy();
@@ -207,7 +210,7 @@ test.describe('Equipment System', () => {
 
   test('equip armor changes AC', async () => {
     await api('POST', `/api/adventures/${advId}/engine/item`, { item_id: 'plate_armor' });
-    const r = await api('POST', `/api/adventures/${advId}/equip`, { item_name: 'Plate Armor' });
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'equip', params: { item_name: 'Plate Armor' } });
     const s = getState(r.data);
     expect(s.character.ac).toBeGreaterThanOrEqual(18);
   });
@@ -308,7 +311,7 @@ test.describe('Combat System', () => {
     await api('POST', `/api/adventures/${advId}/engine/hp`, { delta: 100, reason: 'prep' });
     // Re-equip weapon in case it was unequipped
     await api('POST', `/api/adventures/${advId}/engine/item`, { item_id: 'longsword' });
-    await api('POST', `/api/adventures/${advId}/equip`, { item_name: 'Longsword' });
+    await api('POST', `/api/adventures/${advId}/action`, { action: 'equip', params: { item_name: 'Longsword' } });
   });
   test.afterAll(async () => { await deleteAdventure(advId); });
 
@@ -326,12 +329,12 @@ test.describe('Combat System', () => {
   });
 
   test('combat attack works', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/combat`, { action_id: 'attack', target: 'Goblin' });
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'combat', params: { action_id: 'attack', target: 'Goblin' } });
     expect(r.status).toBe(200);
   });
 
   test('combat end_turn advances turn', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/combat`, { action_id: 'end_turn' });
+    const r = await api('POST', `/api/adventures/${advId}/action`, { action: 'combat', params: { action_id: 'end_turn' } });
     // Might be 200 or 400 depending on combat state (goblin might be dead)
     // Just verify we get a response
     expect([200, 400]).toContain(r.status);

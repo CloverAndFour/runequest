@@ -9,6 +9,10 @@ const USER = 'test-user';
 const PASS = 'test-password1';
 let token = '';
 
+function getState(data: any) {
+  return data.actions?.state || data.state || data;
+}
+
 async function api(method: string, path: string, body?: any): Promise<any> {
   const res = await fetch(`${API}${path}`, {
     method,
@@ -49,7 +53,7 @@ test.describe('Bug Fixes', () => {
 
     // Check inventory
     const r = await api('GET', `/api/adventures/${id}`);
-    const items = r.data.state.inventory.items;
+    const items = getState(r.data).inventory.items;
     const ratHides = items.filter((i: any) => i.id === 'rat_hide' || i.name === 'Rat Hide');
 
     // Should be 1 entry with quantity 3, not 3 entries with quantity 1
@@ -68,7 +72,7 @@ test.describe('Bug Fixes', () => {
     });
 
     // Try to travel — should be blocked
-    const r = await api('POST', `/api/adventures/${id}/travel`, { direction: 'east' });
+    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'travel', params: { direction: 'east' } });
     expect(r.status).toBe(400);
     expect(r.data.error).toContain('Cannot travel during combat');
 
@@ -84,9 +88,7 @@ test.describe('Bug Fixes', () => {
     });
 
     // Attack — the narrative will contain dice notation
-    const r = await api('POST', `/api/adventures/${id}/combat`, {
-      action_id: 'attack', target: 'DiceRat',
-    });
+    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'DiceRat' } });
 
     // The narrative should contain "1d" prefix (e.g., "1d6", "1d4")
     // not bare "d6" without the count
@@ -97,7 +99,7 @@ test.describe('Bug Fixes', () => {
       // Narrative format: "Hero attacks Rat with Unarmed (rolled X vs AC Y): HIT for Z damage!"
       // The dice info is in the combat log, not directly in narrative
       // Let's just verify the combat state is valid
-      expect(r.data.state.combat).toBeDefined();
+      expect(getState(r.data).combat).toBeDefined();
     }
 
     await api('DELETE', `/api/adventures/${id}`);
@@ -110,14 +112,13 @@ test.describe('Bug Fixes', () => {
       enemies: [{ name: 'StateRat', hp: 50, max_hp: 50, ac: 5 }],
     });
 
-    const r = await api('POST', `/api/adventures/${id}/combat`, {
-      action_id: 'attack', target: 'StateRat',
-    });
+    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'StateRat' } });
 
-    expect(r.data.state).toBeDefined();
-    expect(r.data.state).not.toBeNull();
-    expect(r.data.state.character).toBeDefined();
-    expect(r.data.state.combat).toBeDefined();
+    const state = getState(r.data);
+    expect(state).toBeDefined();
+    expect(state).not.toBeNull();
+    expect(state.character).toBeDefined();
+    expect(state.combat).toBeDefined();
 
     await api('DELETE', `/api/adventures/${id}`);
   });
@@ -130,11 +131,9 @@ test.describe('Bug Fixes', () => {
       enemies: [{ name: 'WeakRat', hp: 100, max_hp: 100, ac: 1 }],
     });
 
-    const r = await api('POST', `/api/adventures/${id}/combat`, {
-      action_id: 'attack', target: 'WeakRat',
-    });
+    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'WeakRat' } });
 
-    const enemies = r.data.state.combat.enemies;
+    const enemies = getState(r.data).combat.enemies;
     const rat = enemies.find((e: any) => e.name === 'WeakRat');
     expect(rat).toBeDefined();
     // HP should be less than 100 (we hit with AC 1)
