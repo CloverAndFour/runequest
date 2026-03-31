@@ -40,6 +40,7 @@ async function createAdventure(name: string) {
   });
   expect(r.status).toBe(200);
   advId = r.data.state.id;
+  await api('POST', '/api/session/activate', { adventure_id: advId });
 }
 
 test.describe('Rate Limiting', () => {
