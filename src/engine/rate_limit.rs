@@ -34,7 +34,7 @@ pub fn classify_action(tag: &str) -> ActionCategory {
         "send_message" | "select_choice" | "combat_action" => ActionCategory::Llm,
 
         // Fixed/engine actions
-        "gather" | "craft_item" | "shop_buy" | "shop_sell" | "travel"
+        "gather" | "craft_item" | "shop_buy" | "shop_sell" | "travel" | "work"
         | "dungeon_move" | "dungeon_enter" | "dungeon_skill_check"
         | "dungeon_activate_point" | "dungeon_retreat"
         | "tower_move" | "tower_enter" | "tower_ascend" | "tower_teleport" => ActionCategory::Fixed,

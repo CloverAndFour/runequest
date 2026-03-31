@@ -1192,7 +1192,13 @@ pub fn execute_tool_call_with_shop(
             let idx = state.inventory.items.iter().position(|i| i.name.to_lowercase() == item_name.to_lowercase());
             match idx {
                 Some(idx) => {
-                    let item = state.inventory.items.remove(idx);
+                    // Decrement quantity; only remove if stack is empty
+                    let item = state.inventory.items[idx].clone();
+                    if state.inventory.items[idx].quantity > 1 {
+                        state.inventory.items[idx].quantity -= 1;
+                    } else {
+                        state.inventory.items.remove(idx);
+                    }
                     if let Some(shop_store) = shop_store {
                         let q = state.world_position.county_q;
                         let r = state.world_position.county_r;
@@ -1497,7 +1503,62 @@ pub fn execute_tool_call_with_shop(
 
         // -----------------------------------------------------------------------
         // Skill tools
-        // -----------------------------------------------------------------------
+        
+        "work" => {
+            // Menial labour — low-paying jobs available at most locations.
+            // Pay scales slightly with county tier. Grants small XP.
+            let county = world_map::current_county(&state.world_position);
+            let (biome_str, tier, has_town) = county
+                .map(|c| (format!("{}", c.biome), c.tier, c.has_town))
+                .unwrap_or(("Plains".to_string(), 0.0, false));
+
+            let mut rng = rand::thread_rng();
+
+            // Job depends on location features and biome
+            let jobs: Vec<(&str, &str, u32, u32)> = {
+                // (job_name, skill_id, base_gold, base_xp)
+                let mut j = Vec::new();
+                // Universal jobs
+                j.push(("Chopping firewood", "woodworking", 1, 5));
+                j.push(("Hauling cargo", "fortitude", 1, 5));
+                // Town jobs
+                if has_town {
+                    j.push(("Serving tables at the tavern", "charm", 2, 5));
+                    j.push(("Sweeping the market square", "fortitude", 1, 3));
+                    j.push(("Running errands for merchants", "charm", 2, 5));
+                }
+                // Biome-specific jobs
+                match biome_str.as_str() {
+                    "Forest" => j.push(("Collecting kindling", "survival", 1, 5)),
+                    "Hills" | "Mountains" => j.push(("Breaking rocks", "smithing", 1, 5)),
+                    "Coast" => j.push(("Mending fishing nets", "leatherworking", 1, 5)),
+                    "Swamp" => j.push(("Draining ditches", "fortitude", 1, 3)),
+                    "Desert" => j.push(("Digging wells", "fortitude", 2, 5)),
+                    _ => j.push(("Tending crops", "survival", 1, 5)),
+                }
+                j
+            };
+
+            let job = jobs[rand::Rng::gen_range(&mut rng, 0..jobs.len())];
+            let (job_name, skill_id, base_gold, base_xp) = job;
+
+            // Gold scales with tier (slightly): base + tier/2 rounded
+            let tier_bonus = (tier / 2.0).floor() as u32;
+            let gold = base_gold + tier_bonus;
+            state.character.gold += gold;
+
+            // Small skill XP
+            let _ = state.skills.gain_xp(skill_id, base_xp);
+
+            Ok(ToolExecResult::Immediate(serde_json::json!({
+                "job": job_name,
+                "gold_earned": gold,
+                "skill": skill_id,
+                "skill_xp": base_xp,
+            })))
+        }
+
+// -----------------------------------------------------------------------
 
         "award_skill_xp" => {
             let skill_id = args["skill_id"].as_str().unwrap_or("");

@@ -496,6 +496,7 @@ pub async fn run_api_server(
         .route("/api/materials", get(list_materials))
         .route("/api/adventures/:id/craft", post(craft_item))
         .route("/api/adventures/:id/gather", post(gather_materials))
+        .route("/api/adventures/:id/work", post(work_handler))
         .route("/api/adventures/:id/travel", post(travel_handler))
         // Skills
         .route("/api/adventures/:id/engine/skill", post(engine_skill))
@@ -2506,6 +2507,41 @@ async fn travel_handler(
         }
         Err(e) => {
             (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response()
+        }
+    }
+}
+
+async fn work_handler(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    // Rate limit check
+    if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
+        return resp.into_response();
+    }
+    rate_limit::stamp_cooldown(&mut adventure, ActionCategory::Fixed);
+
+    let args = serde_json::json!({});
+    match execute_tool_call(&mut adventure, "work", &args) {
+        Ok(ToolExecResult::Immediate(result)) => {
+            store.save_adventure(&adventure).ok();
+            Json(serde_json::json!({
+                "job": result["job"],
+                "gold_earned": result["gold_earned"],
+                "skill": result["skill"],
+                "skill_xp": result["skill_xp"],
+                "state": build_state_with_map(&adventure),
+            })).into_response()
+        }
+        _ => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Work failed"}))).into_response()
         }
     }
 }

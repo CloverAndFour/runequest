@@ -309,6 +309,7 @@ fn client_msg_tag(msg: &ClientMsg) -> &'static str {
         ClientMsg::TowerAscend => "tower_ascend",
         ClientMsg::TowerTeleport { .. } => "tower_teleport",
         ClientMsg::Travel { .. } => "travel",
+        ClientMsg::Work => "work",
         _ => "read_only",
     }
 }
@@ -1843,6 +1844,38 @@ async fn handle_client_msg(
                     location: "Unknown".to_string(),
                     players: vec![],
                 }).await;
+            }
+        }
+
+        // Work (menial labour — fixed engine action)
+        ClientMsg::Work => {
+            let (result_opt, state_opt) = {
+                let mut sess = session.lock().await;
+                if let Some(ref mut adv) = sess.adventure {
+                    let args = serde_json::json!({});
+                    match execute_tool_call(adv, "work", &args) {
+                        Ok(ToolExecResult::Immediate(result)) => {
+                            let adv_clone = adv.clone();
+                            let _ = sess.store.save_adventure(&adv_clone);
+                            let state = build_state_with_map(&adv_clone);
+                            (Some(result), Some(state))
+                        }
+                        _ => (None, None)
+                    }
+                } else {
+                    (None, None)
+                }
+            };
+            if let Some(result) = result_opt {
+                send_msg(sender, &ServerMsg::WorkResult {
+                    job: result["job"].as_str().unwrap_or("").to_string(),
+                    gold_earned: result["gold_earned"].as_u64().unwrap_or(0) as u32,
+                    skill: result["skill"].as_str().unwrap_or("").to_string(),
+                    skill_xp: result["skill_xp"].as_u64().unwrap_or(0) as u32,
+                }).await;
+                if let Some(state) = state_opt {
+                    send_msg(sender, &ServerMsg::StateUpdate { state }).await;
+                }
             }
         }
 

@@ -152,6 +152,7 @@ pub enum ClientMsg {
     Travel {
         direction: String,
     },
+    Work,
     GetLocationPlayers,
     // Display history pagination
     LoadOlderHistory {
@@ -295,6 +296,12 @@ pub enum ServerMsg {
         victory: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         drops: Vec<String>,
+    },
+    WorkResult {
+        job: String,
+        gold_earned: u32,
+        skill: String,
+        skill_xp: u32,
     },
     TravelResult {
         county_name: String,

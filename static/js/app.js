@@ -232,6 +232,15 @@ function handleServerMsg(msg) {
         case 'friend_chat_history':
             handleFriendChatHistory(msg);
             break;
+        case 'work_result':
+            hideLoadingSpinner();
+            if (msg.gold_earned > 0) {
+                var workMsg = msg.job + ' — earned ' + msg.gold_earned + ' gold';
+                if (msg.skill_xp > 0) workMsg += ' (+' + msg.skill_xp + ' ' + msg.skill + ' XP)';
+                showToast(workMsg);
+            }
+            renderFixedActions();
+            break;
         case 'travel_result':
             hideLoadingSpinner();
             if (msg.encounter) {
@@ -723,7 +732,7 @@ function applyCooldownUI() {
     // Fixed action buttons: gather type uses fixed cooldown, others use LLM cooldown
     document.querySelectorAll('.fixed-choice').forEach(function(btn) {
         var type = btn.dataset.type;
-        var isFixed = (type === 'gather' || type === 'shop');
+        var isFixed = (type === 'gather' || type === 'shop' || type === 'work');
         var remaining = isFixed ? cooldowns.fixed : cooldowns.llm;
         if (remaining > 0) {
             btn.disabled = true;
@@ -1008,6 +1017,8 @@ function renderFixedActions() {
             if (current.stations && current.stations.length > 0) buttons.push({ label: 'Craft', icon: '\uD83D\uDD28', action: 'open_crafting', type: 'crafting' });
             // Gather is always available — every biome has resources
             buttons.push({ label: 'Gather Resources', icon: '\u{1FAB5}', action: 'gather', type: 'gather' });
+            // Work is always available — menial labour for gold
+            buttons.push({ label: 'Do Odd Jobs', icon: '\u{1F528}', action: 'work', type: 'work' });
         }
     }
 
@@ -1078,6 +1089,9 @@ function handleFixedAction(action, type) {
     } else if (type === 'gather') {
         showLoadingSpinner();
         ws.send({ type: 'gather' });
+    } else if (type === 'work') {
+        showLoadingSpinner();
+        ws.send({ type: 'work' });
     } else if (type === 'crafting') {
         ws.send({ type: 'list_recipes' });
     } else if (type === 'guild_hall') {
