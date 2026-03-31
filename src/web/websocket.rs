@@ -1881,6 +1881,20 @@ async fn handle_client_msg(
 
         // Travel (fixed engine action — no LLM)
         ClientMsg::Travel { direction } => {
+            // Block travel during combat
+            {
+                let sess = session.lock().await;
+                if let Some(ref adv) = sess.adventure {
+                    if adv.combat.active {
+                        send_msg(sender, &ServerMsg::Error {
+                            code: "in_combat".to_string(),
+                            message: "Cannot travel during combat".to_string(),
+                        }).await;
+                        drop(sess);
+                        return Ok(());
+                    }
+                }
+            }
             let travel_result = {
                 let mut sess = session.lock().await;
                 if let Some(mut adv) = sess.adventure.take() {

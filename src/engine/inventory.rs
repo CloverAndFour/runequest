@@ -99,8 +99,8 @@ impl Inventory {
     }
 
     pub fn add(&mut self, item: Item) {
-        // For stackable items (potions, scrolls), try to merge quantities
-        if matches!(item.item_type, ItemType::Potion | ItemType::Scroll) {
+        // For stackable items (potions, scrolls, materials), try to merge quantities
+        if matches!(item.item_type, ItemType::Potion | ItemType::Scroll | ItemType::Material) {
             if let Some(existing) = self.items.iter_mut().find(|i| i.id == item.id) {
                 existing.quantity += item.quantity;
                 return;

@@ -2468,6 +2468,11 @@ async fn travel_handler(
         Err(_) => return err_not_found("Adventure not found").into_response(),
     };
 
+    // Cannot travel during combat
+    if adventure.combat.active {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Cannot travel during combat"}))).into_response();
+    }
+
     // Rate limit check
     if let Some(resp) = check_api_cooldown(&adventure, ActionCategory::Fixed, &user.role) {
         return resp.into_response();

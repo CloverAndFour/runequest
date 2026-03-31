@@ -50,7 +50,7 @@ impl DiceRoller {
         let total = sum as i32 + modifier;
 
         DiceResult {
-            dice_type: format!("d{}", sides),
+            dice_type: format!("{}d{}", count, sides),
             rolls,
             total,
             modifier,
