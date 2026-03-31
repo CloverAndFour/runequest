@@ -16,6 +16,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::auth::middleware::{require_auth, AuthMode, AuthState, AuthUser};
 use crate::engine::rate_limit::{self, ActionCategory};
 use crate::engine::actions::{self, ActionMenu};
+use crate::web::session::SessionStore;
 use crate::auth::{JwtManager, UserStore};
 use crate::engine::adventure::AdventureState;
 use crate::engine::drops::generate_drops;
@@ -53,6 +54,7 @@ pub struct ApiState {
     pub jwt_manager: Arc<JwtManager>,
     pub shop_store: ShopStore,
     pub presence: PresenceRegistry,
+    pub sessions: SessionStore,
     pub adventure_cache: AdventureCache,
 }
 
@@ -277,6 +279,11 @@ struct TravelApiRequest {
 }
 
 #[derive(Deserialize)]
+struct ActivateRequest {
+    adventure_id: String,
+}
+
+#[derive(Deserialize)]
 struct ActionRequestBody {
     action: String,
     #[serde(default)]
@@ -452,6 +459,7 @@ pub async fn run_api_server(
         shop_store,
         presence,
         adventure_cache: new_adventure_cache(),
+        sessions: SessionStore::new(),
     });
 
     let auth_state = Arc::new(AuthState {
@@ -477,8 +485,11 @@ pub async fn run_api_server(
         .route("/api/auth/api-keys", post(create_api_key_handler))
         .route("/api/auth/api-keys/:key_id", delete(revoke_api_key_handler))
         // Adventure CRUD
-        .route("/api/adventures/:id/actions", get(get_actions))
-        .route("/api/adventures/:id/action", post(execute_action))
+        .route("/api/session/activate", post(session_activate))
+        .route("/api/session/deactivate", post(session_deactivate))
+        .route("/api/session/status", get(session_status))
+        .route("/api/actions", get(get_actions_active))
+        .route("/api/action", post(execute_action_active))
         .route("/api/adventures", get(list_adventures))
         .route("/api/adventures", post(create_adventure))
         .route("/api/adventures/:id", get(get_adventure))
@@ -1135,7 +1146,172 @@ async fn login_handler(
 }
 
 // ---------------------------------------------------------------------------
-// Unified Action Menu
+// Session Management
+// ---------------------------------------------------------------------------
+
+async fn session_activate(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<ActivateRequest>,
+) -> impl IntoResponse {
+    // Verify the adventure exists and belongs to this user
+    let store = make_store(&state, &user.username);
+    let adventure = match store.load_adventure(&req.adventure_id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    let previous = state.sessions.activate(&user.username, &req.adventure_id).await;
+    let state_json = build_state_with_map(&adventure);
+    let map_view = crate::engine::world_map::build_map_view(
+        &adventure.world_position, &adventure.discovery, false,
+    );
+    let menu = actions::build_action_menu(&adventure, &map_view, state_json);
+
+    Json(serde_json::json!({
+        "active": true,
+        "adventure_id": req.adventure_id,
+        "character_name": adventure.character.name,
+        "previous_adventure": previous,
+        "actions": menu,
+    })).into_response()
+}
+
+async fn session_deactivate(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    let deactivated = state.sessions.deactivate(&user.username).await;
+    Json(serde_json::json!({
+        "active": false,
+        "deactivated_adventure": deactivated,
+    })).into_response()
+}
+
+async fn session_status(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    match state.sessions.peek(&user.username).await {
+        Some(session) => Json(serde_json::json!({
+            "active": true,
+            "adventure_id": session.adventure_id,
+            "activated_at": session.activated_at.to_rfc3339(),
+            "last_activity": session.last_activity.to_rfc3339(),
+        })).into_response(),
+        None => Json(serde_json::json!({
+            "active": false,
+        })).into_response(),
+    }
+}
+
+/// Helper: load the active adventure for a session, touching the session timer.
+async fn load_active_adventure(
+    state: &Arc<ApiState>,
+    username: &str,
+) -> Result<(crate::storage::adventure_store::AdventureStore, crate::engine::adventure::AdventureState, String), axum::response::Response> {
+    let adventure_id = state.sessions.touch(username).await
+        .ok_or_else(|| (StatusCode::FORBIDDEN, Json(serde_json::json!({
+            "error": "No active session. Use POST /api/session/activate first.",
+            "code": "no_session",
+        }))).into_response())?;
+
+    let store = make_store(state, username);
+    let adventure = store.load_adventure(&adventure_id)
+        .map_err(|_| err_not_found("Adventure not found").into_response())?;
+
+    Ok((store, adventure, adventure_id))
+}
+
+// Session-based game action endpoints (no :id in URL)
+async fn get_actions_active(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+) -> impl IntoResponse {
+    let (_, adventure, _) = match load_active_adventure(&state, &user.username).await {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+
+    let state_json = build_state_with_map(&adventure);
+    let map_view = crate::engine::world_map::build_map_view(
+        &adventure.world_position, &adventure.discovery, false,
+    );
+    let menu = actions::build_action_menu(&adventure, &map_view, state_json);
+    Json(menu).into_response()
+}
+
+async fn execute_action_active(
+    Extension(user): Extension<AuthUser>,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<ActionRequestBody>,
+) -> impl IntoResponse {
+    let adventure_id = match state.sessions.touch(&user.username).await {
+        Some(id) => id,
+        None => return (StatusCode::FORBIDDEN, Json(serde_json::json!({
+            "error": "No active session. Use POST /api/session/activate first.",
+            "code": "no_session",
+        }))).into_response(),
+    };
+
+    // Delegate to the existing execute_action with the session's adventure_id
+    let store = make_store(&state, &user.username);
+    let mut adventure = match store.load_adventure(&adventure_id) {
+        Ok(a) => a,
+        Err(_) => return err_not_found("Adventure not found").into_response(),
+    };
+
+    // Rate limiting (admin exempt)
+    let category = rate_limit::classify_action(&req.action);
+    if category != ActionCategory::ReadOnly && user.role != "admin" {
+        if let Err(remaining_ms) = rate_limit::check_cooldown(
+            category,
+            adventure.last_llm_action_at,
+            adventure.last_fixed_action_at,
+        ) {
+            let state_json = build_state_with_map(&adventure);
+            let map_view = crate::engine::world_map::build_map_view(
+                &adventure.world_position, &adventure.discovery, false,
+            );
+            let menu = actions::build_action_menu(&adventure, &map_view, state_json);
+            return Json(serde_json::json!({
+                "success": false,
+                "error": format!("Action on cooldown. Wait {}s.", (remaining_ms as f64 / 1000.0).ceil() as u64),
+                "code": "cooldown",
+                "remaining_ms": remaining_ms,
+                "actions": menu,
+            })).into_response();
+        }
+        rate_limit::stamp_cooldown(&mut adventure, category);
+    }
+
+    // Dispatch (reuse the same match block from execute_action)
+    let result = dispatch_game_action(&mut adventure, &req.action, &req.params, &state).await;
+
+    store.save_adventure(&adventure).ok();
+
+    let state_json = build_state_with_map(&adventure);
+    let map_view = crate::engine::world_map::build_map_view(
+        &adventure.world_position, &adventure.discovery, false,
+    );
+    let menu = actions::build_action_menu(&adventure, &map_view, state_json);
+
+    match result {
+        Ok(data) => Json(serde_json::json!({
+            "success": true,
+            "result": data,
+            "actions": menu,
+        })).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "success": false,
+            "error": e,
+            "actions": menu,
+        }))).into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unified Action Menu (legacy :id-based, kept for backward compat during migration)
 // ---------------------------------------------------------------------------
 
 async fn get_actions(
@@ -1155,6 +1331,254 @@ async fn get_actions(
     );
     let menu = actions::build_action_menu(&adventure, &map_view, state_json);
     Json(menu).into_response()
+}
+
+
+/// Shared dispatch logic for game actions.
+async fn dispatch_game_action(
+    mut adventure: &mut crate::engine::adventure::AdventureState,
+    action: &str,
+    params: &serde_json::Value,
+    state: &Arc<ApiState>,
+) -> Result<serde_json::Value, String> {
+    match action {
+        "travel" => {
+            let direction = params["direction"].as_str().unwrap_or("");
+            if adventure.combat.active {
+                Err("Cannot travel during combat".into())
+            } else {
+                match crate::engine::world_map::travel(
+                    &mut adventure.world_position, &mut adventure.discovery, direction,
+                ) {
+                    Ok(result) => {
+                        adventure.current_scene.location = result.county_name.clone();
+                        adventure.current_scene.description = format!(
+                            "{} -- {} (Tier {:.0})", result.region, result.biome, result.county_tier
+                        );
+                        let encounter = if let Some(ref enemies) = result.encounter {
+                            if !enemies.is_empty() {
+                                let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+                                adventure.combat.start(enemies.clone(), dex_mod);
+                                true
+                            } else { false }
+                        } else { false };
+                        Ok(serde_json::json!({
+                            "county_name": result.county_name,
+                            "county_tier": result.county_tier,
+                            "biome": result.biome,
+                            "region": result.region,
+                            "encounter": encounter,
+                        }))
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+        }
+        "gather" => {
+            let args = serde_json::json!({});
+            match crate::engine::executor::execute_tool_call(adventure, "gather", &args) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Gather failed".into()),
+            }
+        }
+        "work" => {
+            let args = serde_json::json!({});
+            match crate::engine::executor::execute_tool_call(adventure, "work", &args) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Work failed".into()),
+            }
+        }
+        "shop_view" => {
+            let args = serde_json::json!({});
+            match crate::engine::executor::execute_tool_call_with_shop(adventure, "view_shop", &args, Some(&state.shop_store)) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Shop view failed".into()),
+            }
+        }
+        "shop_buy" => {
+            let item_id = params["item_id"].as_str().unwrap_or("");
+            let qty = params["quantity"].as_u64().unwrap_or(1);
+            let args = serde_json::json!({"item_id": item_id, "quantity": qty});
+            match crate::engine::executor::execute_tool_call_with_shop(adventure, "shop_buy", &args, Some(&state.shop_store)) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Shop buy failed".into()),
+            }
+        }
+        "shop_sell" => {
+            let item_name = params["item_name"].as_str().unwrap_or("");
+            let args = serde_json::json!({"item_name": item_name});
+            match crate::engine::executor::execute_tool_call_with_shop(adventure, "shop_sell", &args, Some(&state.shop_store)) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Shop sell failed".into()),
+            }
+        }
+        "equip" => {
+            let item_name = params["item_name"].as_str().unwrap_or("");
+            let args = serde_json::json!({"item_name": item_name});
+            match crate::engine::executor::execute_tool_call(adventure, "equip_item", &args) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Equip failed".into()),
+            }
+        }
+        "unequip" => {
+            let slot = params["slot"].as_str().unwrap_or("");
+            let args = serde_json::json!({"slot": slot});
+            match crate::engine::executor::execute_tool_call(adventure, "unequip_slot", &args) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Unequip failed".into()),
+            }
+        }
+        "craft" => {
+            let recipe_id = params["recipe_id"].as_str().unwrap_or("");
+            let args = serde_json::json!({"recipe_id": recipe_id});
+            match crate::engine::executor::execute_tool_call(adventure, "craft_item", &args) {
+                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
+                _ => Err("Craft failed".into()),
+            }
+        }
+        "dungeon_enter" => {
+            let seed = params["seed"].as_u64();
+            let tier = params["tier"].as_u64().map(|t| t as u32);
+            let county_tier = crate::engine::world_map::current_county(&adventure.world_position)
+                .map(|c| c.tier.round() as u32).unwrap_or(0);
+            let dungeon_tier = tier.unwrap_or(county_tier);
+            let dungeon_seed = seed.unwrap_or_else(|| rand::Rng::gen(&mut rand::thread_rng()));
+            let dungeon = crate::engine::dungeon::generate_tiered_dungeon(dungeon_seed, dungeon_tier);
+            let room = dungeon.current_room().map(|r| serde_json::to_value(r).unwrap_or_default());
+            adventure.dungeon = Some(dungeon);
+            Ok(serde_json::json!({ "entered": true, "tier": dungeon_tier, "room": room }))
+        }
+        "dungeon_retreat" => {
+            adventure.dungeon = None;
+            Ok(serde_json::json!({ "retreated": true }))
+        }
+        "combat" => {
+            let action_id = params["action_id"].as_str().unwrap_or("");
+            let target = params["target"].as_str().map(|s| s.to_string());
+            if !adventure.combat.active {
+                Err("Not in combat".into())
+            } else if action_id == "flee" {
+                if adventure.combat.action_economy.actions == 0 {
+                    Err("No actions remaining".into())
+                } else {
+                    adventure.combat.action_economy.actions -= 1;
+                    let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
+                    let living = adventure.combat.living_enemies().len() as i32;
+                    let flee_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
+                    let roll = crate::engine::dice::DiceRoller::roll("d20", 1, dex_mod);
+                    if roll.total >= flee_dc {
+                        adventure.combat.end();
+                        Ok(serde_json::json!({ "fled": true, "roll": roll.total, "dc": flee_dc }))
+                    } else {
+                        adventure.combat.flee_attempts += 1;
+                        // Auto end turn after failed flee
+                        adventure.combat.next_turn();
+                        run_enemy_turns(adventure);
+                        Ok(serde_json::json!({ "fled": false, "roll": roll.total, "dc": flee_dc,
+                            "combat": adventure.combat.active, "player_hp": adventure.character.hp,
+                        }))
+                    }
+                }
+            } else if action_id == "attack" {
+                if adventure.combat.action_economy.actions == 0 {
+                    Err("No actions remaining".into())
+                } else {
+                    adventure.combat.action_economy.actions -= 1;
+                    let target_name = target.as_deref().unwrap_or("");
+                    let target_ac = adventure.combat.find_enemy_mut(target_name)
+                        .map(|e| e.ac).unwrap_or(10);
+
+                    // Include proficiency + equipment bonuses (match old combat endpoint)
+                    let (weapon_name, to_hit, damage_dice, damage_mod) = if let Some(weapon) = adventure.equipment.equipped_weapon() {
+                        let stat_name = weapon.stats.damage_modifier_stat.as_deref().unwrap_or("str");
+                        let stat_mod = if weapon.stats.is_finesse {
+                            std::cmp::max(
+                                adventure.character.stats.modifier_for("str").unwrap_or(0),
+                                adventure.character.stats.modifier_for("dex").unwrap_or(0),
+                            )
+                        } else {
+                            adventure.character.stats.modifier_for(stat_name).unwrap_or(0)
+                        };
+                        let prof = adventure.character.proficiency_bonus();
+                        let equip_atk = adventure.equipment.stat_bonuses().attack_bonus;
+                        let hit_bonus = stat_mod + prof + weapon.stats.attack_bonus + equip_atk;
+                        let dmg_mod = stat_mod + weapon.stats.attack_bonus;
+                        (weapon.display_name(), hit_bonus, weapon.stats.damage_dice.clone().unwrap_or("1d6".into()), dmg_mod)
+                    } else {
+                        let str_mod = adventure.character.stats.modifier_for("str").unwrap_or(0);
+                        let prof = adventure.character.proficiency_bonus();
+                        ("Unarmed".to_string(), str_mod + prof, "1d4".to_string(), str_mod)
+                    };
+
+                    let attack_roll = crate::engine::dice::DiceRoller::roll("d20", 1, to_hit);
+                    let hit = attack_roll.total >= target_ac;
+                    let dmg = if hit {
+                        let d = crate::engine::dice::DiceRoller::roll(&damage_dice, 1, damage_mod);
+                        let final_dmg = d.total.max(1);
+                        if let Some(enemy) = adventure.combat.find_enemy_mut(target_name) {
+                            enemy.hp -= final_dmg;
+                        }
+                        final_dmg
+                    } else { 0 };
+
+                    // Check victory
+                    let victory = adventure.combat.all_enemies_dead();
+                    let mut drops = Vec::new();
+                    if victory {
+                        let xp = adventure.combat.enemies.len() as u32 * 50;
+                        drops = crate::engine::drops::generate_drops(&adventure.combat.enemies)
+                            .into_iter().map(|i| { let n = i.name.clone(); adventure.inventory.add(i); n }).collect();
+                        adventure.combat.end();
+                        adventure.character.xp += xp;
+                        adventure.character.check_level_up();
+                    } else {
+                        // Auto end turn and run enemy turns
+                        adventure.combat.next_turn();
+                        run_enemy_turns(adventure);
+                    }
+
+                    let dead = adventure.character.hp <= 0;
+                    Ok(serde_json::json!({
+                        "hit": hit, "damage": dmg, "roll": attack_roll.total, "ac": target_ac,
+                        "target": target_name, "weapon": weapon_name,
+                        "victory": victory, "drops": drops,
+                        "combat": adventure.combat.active,
+                        "player_hp": adventure.character.hp,
+                        "player_dead": dead,
+                        "enemies": adventure.combat.enemies.iter().map(|e| serde_json::json!({
+                            "name": e.name, "hp": e.hp, "max_hp": e.max_hp,
+                        })).collect::<Vec<_>>(),
+                    }))
+                }
+            } else if action_id == "dodge" {
+                if adventure.combat.action_economy.actions == 0 {
+                    Err("No actions remaining".into())
+                } else {
+                    adventure.combat.action_economy.actions -= 1;
+                    adventure.combat.player_dodging = true;
+                    adventure.combat.next_turn();
+                    run_enemy_turns(adventure);
+                    Ok(serde_json::json!({ "dodging": true, "combat": adventure.combat.active, "player_hp": adventure.character.hp }))
+                }
+            } else if action_id == "end_turn" {
+                adventure.combat.next_turn();
+                run_enemy_turns(adventure);
+                Ok(serde_json::json!({ "next_turn": true, "combat": adventure.combat.active, "player_hp": adventure.character.hp,
+                    "enemies": adventure.combat.enemies.iter().map(|e| serde_json::json!({
+                        "name": e.name, "hp": e.hp, "max_hp": e.max_hp,
+                    })).collect::<Vec<_>>(),
+                }))
+            } else {
+                Err(format!("Unknown combat action: {}", action_id))
+            }
+        }
+        "send_message" | "choice" | "roll" => {
+            // LLM actions — these need the full LLM pipeline
+            // For now, return a hint to use the dedicated endpoints
+            Err(format!("LLM action '{}' requires the dedicated endpoint /api/adventures/:id/{}", action, action))
+        }
+        _ => Err(format!("Unknown action: {}", action)),
+    }
 }
 
 async fn execute_action(
@@ -1194,191 +1618,7 @@ async fn execute_action(
     }
 
     // Dispatch to internal handler
-    let result: Result<serde_json::Value, String> = match req.action.as_str() {
-        "travel" => {
-            let direction = req.params["direction"].as_str().unwrap_or("");
-            if adventure.combat.active {
-                Err("Cannot travel during combat".into())
-            } else {
-                match crate::engine::world_map::travel(
-                    &mut adventure.world_position, &mut adventure.discovery, direction,
-                ) {
-                    Ok(result) => {
-                        adventure.current_scene.location = result.county_name.clone();
-                        adventure.current_scene.description = format!(
-                            "{} -- {} (Tier {:.0})", result.region, result.biome, result.county_tier
-                        );
-                        let encounter = if let Some(ref enemies) = result.encounter {
-                            if !enemies.is_empty() {
-                                let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
-                                adventure.combat.start(enemies.clone(), dex_mod);
-                                true
-                            } else { false }
-                        } else { false };
-                        Ok(serde_json::json!({
-                            "county_name": result.county_name,
-                            "county_tier": result.county_tier,
-                            "biome": result.biome,
-                            "region": result.region,
-                            "encounter": encounter,
-                        }))
-                    }
-                    Err(e) => Err(e),
-                }
-            }
-        }
-        "gather" => {
-            let args = serde_json::json!({});
-            match crate::engine::executor::execute_tool_call(&mut adventure, "gather", &args) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Gather failed".into()),
-            }
-        }
-        "work" => {
-            let args = serde_json::json!({});
-            match crate::engine::executor::execute_tool_call(&mut adventure, "work", &args) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Work failed".into()),
-            }
-        }
-        "shop_view" => {
-            let args = serde_json::json!({});
-            match crate::engine::executor::execute_tool_call_with_shop(&mut adventure, "view_shop", &args, Some(&state.shop_store)) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Shop view failed".into()),
-            }
-        }
-        "shop_buy" => {
-            let item_id = req.params["item_id"].as_str().unwrap_or("");
-            let qty = req.params["quantity"].as_u64().unwrap_or(1);
-            let args = serde_json::json!({"item_id": item_id, "quantity": qty});
-            match crate::engine::executor::execute_tool_call_with_shop(&mut adventure, "shop_buy", &args, Some(&state.shop_store)) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Shop buy failed".into()),
-            }
-        }
-        "shop_sell" => {
-            let item_name = req.params["item_name"].as_str().unwrap_or("");
-            let args = serde_json::json!({"item_name": item_name});
-            match crate::engine::executor::execute_tool_call_with_shop(&mut adventure, "shop_sell", &args, Some(&state.shop_store)) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Shop sell failed".into()),
-            }
-        }
-        "equip" => {
-            let item_name = req.params["item_name"].as_str().unwrap_or("");
-            let args = serde_json::json!({"item_name": item_name});
-            match crate::engine::executor::execute_tool_call(&mut adventure, "equip_item", &args) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Equip failed".into()),
-            }
-        }
-        "unequip" => {
-            let slot = req.params["slot"].as_str().unwrap_or("");
-            let args = serde_json::json!({"slot": slot});
-            match crate::engine::executor::execute_tool_call(&mut adventure, "unequip_slot", &args) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Unequip failed".into()),
-            }
-        }
-        "craft" => {
-            let recipe_id = req.params["recipe_id"].as_str().unwrap_or("");
-            let args = serde_json::json!({"recipe_id": recipe_id});
-            match crate::engine::executor::execute_tool_call(&mut adventure, "craft_item", &args) {
-                Ok(crate::engine::executor::ToolExecResult::Immediate(r)) => Ok(r),
-                _ => Err("Craft failed".into()),
-            }
-        }
-        "dungeon_enter" => {
-            let seed = req.params["seed"].as_u64();
-            let tier = req.params["tier"].as_u64().map(|t| t as u32);
-            let county_tier = crate::engine::world_map::current_county(&adventure.world_position)
-                .map(|c| c.tier.round() as u32).unwrap_or(0);
-            let dungeon_tier = tier.unwrap_or(county_tier);
-            let dungeon_seed = seed.unwrap_or_else(|| rand::Rng::gen(&mut rand::thread_rng()));
-            let dungeon = crate::engine::dungeon::generate_tiered_dungeon(dungeon_seed, dungeon_tier);
-            let room = dungeon.current_room().map(|r| serde_json::to_value(r).unwrap_or_default());
-            adventure.dungeon = Some(dungeon);
-            Ok(serde_json::json!({ "entered": true, "tier": dungeon_tier, "room": room }))
-        }
-        "dungeon_retreat" => {
-            adventure.dungeon = None;
-            Ok(serde_json::json!({ "retreated": true }))
-        }
-        "combat" => {
-            // This is complex — delegate to existing combat handler logic
-            // For now, return error pointing to the old endpoint
-            let action_id = req.params["action_id"].as_str().unwrap_or("");
-            let target = req.params["target"].as_str().map(|s| s.to_string());
-            if !adventure.combat.active {
-                Err("Not in combat".into())
-            } else if action_id == "flee" {
-                let dex_mod = adventure.character.stats.modifier_for("dex").unwrap_or(0);
-                let living = adventure.combat.enemies.iter().filter(|e| e.hp > 0).count() as i32;
-                let flee_dc = (10 + living * 2 - adventure.combat.flee_attempts as i32 * 2).max(5);
-                let roll = crate::engine::dice::DiceRoller::roll("d20", 1, dex_mod);
-                if roll.total >= flee_dc {
-                    adventure.combat.end();
-                    Ok(serde_json::json!({ "fled": true, "roll": roll.total, "dc": flee_dc }))
-                } else {
-                    adventure.combat.flee_attempts += 1;
-                    Ok(serde_json::json!({ "fled": false, "roll": roll.total, "dc": flee_dc }))
-                }
-            } else if action_id == "attack" {
-                let target_name = target.as_deref().unwrap_or("");
-                let target_ac = adventure.combat.find_enemy_mut(target_name)
-                    .map(|e| e.ac).unwrap_or(10);
-                let (to_hit, damage_dice, damage_mod) = if let Some(weapon) = adventure.equipment.equipped_weapon() {
-                    let str_mod = adventure.character.stats.modifier_for("str").unwrap_or(0);
-                    let hit_bonus = str_mod + weapon.stats.attack_bonus + (adventure.character.level as i32 / 4);
-                    let dmg_mod = str_mod + weapon.stats.attack_bonus;
-                    (hit_bonus, weapon.stats.damage_dice.clone().unwrap_or("1d6".into()), dmg_mod)
-                } else {
-                    let str_mod = adventure.character.stats.modifier_for("str").unwrap_or(0);
-                    (str_mod, "1d4".to_string(), str_mod)
-                };
-                let attack_roll = crate::engine::dice::DiceRoller::roll("d20", 1, to_hit);
-                let hit = attack_roll.total >= target_ac;
-                let dmg = if hit {
-                    let d = crate::engine::dice::DiceRoller::roll(&damage_dice, 1, damage_mod);
-                    let final_dmg = d.total.max(1);
-                    if let Some(enemy) = adventure.combat.find_enemy_mut(target_name) {
-                        enemy.hp -= final_dmg;
-                    }
-                    final_dmg
-                } else { 0 };
-
-                // Check victory
-                let victory = adventure.combat.all_enemies_dead();
-                let mut drops = Vec::new();
-                if victory {
-                    let xp = adventure.combat.enemies.len() as u32 * 50;
-                    drops = crate::engine::drops::generate_drops(&adventure.combat.enemies)
-                        .into_iter().map(|i| { let n = i.name.clone(); adventure.inventory.add(i); n }).collect();
-                    adventure.combat.end();
-                    adventure.character.xp += xp;
-                    adventure.character.check_level_up();
-                }
-
-                Ok(serde_json::json!({
-                    "hit": hit, "damage": dmg, "roll": attack_roll.total, "ac": target_ac,
-                    "target": target_name, "victory": victory, "drops": drops,
-                }))
-            } else if action_id == "end_turn" {
-                adventure.combat.next_turn();
-                Ok(serde_json::json!({ "next_turn": true }))
-            } else {
-                Err(format!("Unknown combat action: {}", action_id))
-            }
-        }
-        "send_message" | "choice" | "roll" => {
-            // LLM actions — these need the full LLM pipeline
-            // For now, return a hint to use the dedicated endpoints
-            Err(format!("LLM action '{}' requires the dedicated endpoint /api/adventures/:id/{}", req.action, req.action))
-        }
-        _ => Err(format!("Unknown action: {}", req.action)),
-    };
-
+    let result = dispatch_game_action(&mut adventure, &req.action, &req.params, &state).await;
     store.save_adventure(&adventure).ok();
 
     // Build updated action menu

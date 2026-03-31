@@ -54,6 +54,21 @@ enum Commands {
         tls_key: Option<PathBuf>,
     },
 
+    /// Run crafting graph analysis
+    Crafting {
+        /// Full balance report
+        #[arg(long)]
+        analyze: bool,
+
+        /// Equipment cost report
+        #[arg(long)]
+        equipment: bool,
+
+        /// Single tier report
+        #[arg(long)]
+        tier: Option<u8>,
+    },
+
     /// Run battle simulations
     Simulate {
         /// Run full class x enemy sweep
@@ -239,6 +254,20 @@ async fn main() -> Result<()> {
                         Err(e) => eprintln!("Wiki server task error: {}", e),
                     }
                 }
+            }
+        }
+
+        Commands::Crafting { analyze, equipment, tier } => {
+            use runequest::engine::crafting::CRAFTING_GRAPH;
+            let graph = &*CRAFTING_GRAPH;
+            if analyze || (!equipment && tier.is_none()) {
+                print!("{}", graph.balance_report());
+            }
+            if equipment {
+                print!("{}", graph.equipment_report());
+            }
+            if let Some(t) = tier {
+                print!("{}", graph.tier_report(t));
             }
         }
 

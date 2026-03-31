@@ -38,6 +38,7 @@ test.describe('Unified Action Menu', () => {
       stats: { strength: 18, dexterity: 14, constitution: 14, intelligence: 8, wisdom: 10, charisma: 8 },
     });
     advId = r.data.state.id;
+    await api('POST', '/api/session/activate', { adventure_id: advId });
   });
 
   test.afterAll(async () => {
@@ -45,7 +46,7 @@ test.describe('Unified Action Menu', () => {
   });
 
   test('GET /actions returns action menu with categories', async () => {
-    const r = await api('GET', `/api/adventures/${advId}/actions`);
+    const r = await api('GET', `/api/actions`);
     expect(r.status).toBe(200);
     expect(Array.isArray(r.data.fixed_actions)).toBe(true);
     expect(r.data.fixed_actions.length).toBeGreaterThan(0);
@@ -74,7 +75,7 @@ test.describe('Unified Action Menu', () => {
   });
 
   test('POST /action executes gather and returns updated menu', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: 'gather', params: {},
     });
     expect(r.status).toBe(200);
@@ -89,12 +90,12 @@ test.describe('Unified Action Menu', () => {
 
   test('POST /action executes travel from menu', async () => {
     // Fetch menu
-    const menu = await api('GET', `/api/adventures/${advId}/actions`);
+    const menu = await api('GET', `/api/actions`);
     const travel = menu.data.fixed_actions.find((a: any) => a.category === 'travel');
     expect(travel).toBeTruthy();
 
     // Execute the travel action using action + params from the menu
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: travel.action, params: travel.params,
     });
     expect(r.status).toBe(200);
@@ -103,7 +104,7 @@ test.describe('Unified Action Menu', () => {
   });
 
   test('POST /action executes work', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: 'work', params: {},
     });
     expect(r.status).toBe(200);
@@ -118,7 +119,7 @@ test.describe('Unified Action Menu', () => {
       enemies: [{ name: 'MenuRat', hp: 5, max_hp: 5, ac: 8, enemy_type: 'Brute', tier: 0 }],
     });
 
-    const menu = await api('GET', `/api/adventures/${advId}/actions`);
+    const menu = await api('GET', `/api/actions`);
     expect(menu.data.combat_actions).toBeTruthy();
     expect(menu.data.combat_actions.length).toBeGreaterThan(0);
 
@@ -134,7 +135,7 @@ test.describe('Unified Action Menu', () => {
   });
 
   test('POST /action combat attack works', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: 'combat', params: { action_id: 'attack', target: 'MenuRat' },
     });
     expect(r.status).toBe(200);
@@ -144,9 +145,9 @@ test.describe('Unified Action Menu', () => {
 
   test('travel blocked during combat via /action', async () => {
     // If still in combat, travel should fail
-    const menu = await api('GET', `/api/adventures/${advId}/actions`);
+    const menu = await api('GET', `/api/actions`);
     if (menu.data.combat_actions) {
-      const r = await api('POST', `/api/adventures/${advId}/action`, {
+      const r = await api('POST', `/api/action`, {
         action: 'travel', params: { direction: 'east' },
       });
       expect(r.data.success).toBe(false);
@@ -159,7 +160,7 @@ test.describe('Unified Action Menu', () => {
     const state = await api('GET', `/api/adventures/${advId}`);
     if (state.data.state?.combat?.active) {
       for (let i = 0; i < 20; i++) {
-        const r = await api('POST', `/api/adventures/${advId}/action`, {
+        const r = await api('POST', `/api/action`, {
           action: 'combat', params: { action_id: 'attack', target: 'MenuRat' },
         });
         if (!r.data.actions?.combat_actions) break;
@@ -167,7 +168,7 @@ test.describe('Unified Action Menu', () => {
     }
 
     // Gather via unified endpoint
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: 'gather', params: {},
     });
     expect(r.status).toBe(200);
@@ -175,7 +176,7 @@ test.describe('Unified Action Menu', () => {
   });
 
   test('unknown action returns error with menu', async () => {
-    const r = await api('POST', `/api/adventures/${advId}/action`, {
+    const r = await api('POST', `/api/action`, {
       action: 'nonexistent', params: {},
     });
     expect(r.status).toBe(400);

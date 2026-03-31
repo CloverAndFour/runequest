@@ -37,7 +37,9 @@ async function createAdventure(name: string) {
     name, character_name: name + 'Hero', race: 'human', class: 'warrior',
     stats: { strength: 18, dexterity: 14, constitution: 14, intelligence: 8, wisdom: 10, charisma: 8 },
   });
-  return r.data.state.id;
+  const id = r.data.state.id;
+  await api('POST', '/api/session/activate', { adventure_id: id });
+  return id;
 }
 
 test.describe('Bug Fixes', () => {
@@ -72,7 +74,7 @@ test.describe('Bug Fixes', () => {
     });
 
     // Try to travel — should be blocked
-    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'travel', params: { direction: 'east' } });
+    const r = await api('POST', `/api/action`, { action: 'travel', params: { direction: 'east' } });
     expect(r.status).toBe(400);
     expect(r.data.error).toContain('Cannot travel during combat');
 
@@ -88,7 +90,7 @@ test.describe('Bug Fixes', () => {
     });
 
     // Attack — the narrative will contain dice notation
-    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'DiceRat' } });
+    const r = await api('POST', `/api/action`, { action: 'combat', params: { action_id: 'attack', target: 'DiceRat' } });
 
     // The narrative should contain "1d" prefix (e.g., "1d6", "1d4")
     // not bare "d6" without the count
@@ -112,7 +114,7 @@ test.describe('Bug Fixes', () => {
       enemies: [{ name: 'StateRat', hp: 50, max_hp: 50, ac: 5 }],
     });
 
-    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'StateRat' } });
+    const r = await api('POST', `/api/action`, { action: 'combat', params: { action_id: 'attack', target: 'StateRat' } });
 
     const state = getState(r.data);
     expect(state).toBeDefined();
@@ -131,7 +133,7 @@ test.describe('Bug Fixes', () => {
       enemies: [{ name: 'WeakRat', hp: 100, max_hp: 100, ac: 1 }],
     });
 
-    const r = await api('POST', `/api/adventures/${id}/action`, { action: 'combat', params: { action_id: 'attack', target: 'WeakRat' } });
+    const r = await api('POST', `/api/action`, { action: 'combat', params: { action_id: 'attack', target: 'WeakRat' } });
 
     const enemies = getState(r.data).combat.enemies;
     const rat = enemies.find((e: any) => e.name === 'WeakRat');
