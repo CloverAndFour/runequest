@@ -50,6 +50,7 @@ use crate::web::protocol::{ActionInfo, ChatMessageInfo, ClientMsg, EnemyInfo, Fr
 use crate::web::presence::{FriendEvent, PresenceRegistry};
 use crate::storage::friends_store::FriendsStore;
 use crate::engine::crafting::CRAFTING_GRAPH;
+use crate::engine::drops::generate_drops;
 use crate::engine::rate_limit::{self, ActionCategory};
 
 const ALLOWED_MODELS: &[&str] = &[
@@ -2491,7 +2492,7 @@ async fn handle_combat_turn_start(
                         adventure.combat.end();
                         sess.store.save_adventure(&adventure)?;
                         sess.adventure = Some(adventure);
-                        send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false }).await;
+                        send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false, drops: vec![] }).await;
                         return Ok(());
                     }
                 }
@@ -2596,6 +2597,12 @@ async fn handle_combat_action(
             // Check if all enemies dead
             if adventure.combat.all_enemies_dead() {
                 let xp = adventure.combat.enemies.len() as u32 * 50;
+                // Generate drops BEFORE combat.end() clears the enemy list
+                let drops = generate_drops(&adventure.combat.enemies);
+                let drop_names: Vec<String> = drops.iter().map(|i| i.name.clone()).collect();
+                for item in drops {
+                    adventure.inventory.add(item);
+                }
                 adventure.combat.end();
                 adventure.character.xp += xp;
                 adventure.character.check_level_up();
@@ -2603,7 +2610,7 @@ async fn handle_combat_action(
 
                 let state = build_state_with_map(&adventure);
                 send_msg(sender, &ServerMsg::StateUpdate { state }).await;
-                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: xp, victory: true }).await;
+                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: xp, victory: true, drops: drop_names }).await;
 
                 sess.adventure = Some(adventure);
                 sess.messages.push(ChatMessage::user("Combat is over. All enemies defeated. Narrate the victory and present choices for what to do next."));
@@ -2768,7 +2775,7 @@ async fn handle_combat_action(
                     actor: adventure.character.name.clone(), action: "Flee".to_string(),
                     description: desc, roll: Some(roll.total), hit: None, damage: None,
                 }).await;
-                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false }).await;
+                send_msg(sender, &ServerMsg::CombatEnded { xp_reward: 0, victory: false, drops: vec![] }).await;
 
                 sess.adventure = Some(adventure);
                 sess.messages.push(ChatMessage::user("The player successfully fled from combat. Narrate their narrow escape and present choices for what to do next."));

@@ -17,6 +17,7 @@ use crate::auth::middleware::{require_auth, AuthMode, AuthState, AuthUser};
 use crate::engine::rate_limit::{self, ActionCategory};
 use crate::auth::{JwtManager, UserStore};
 use crate::engine::adventure::AdventureState;
+use crate::engine::drops::generate_drops;
 use crate::engine::character::{Class, Race, Stats};
 use crate::engine::combat::{CombatantId, Enemy, EnemyAttack, EnemyType};
 use crate::engine::monsters::{generate_monster, generate_random_monster};
@@ -1680,6 +1681,12 @@ async fn combat_action(
             // Check if all enemies dead
             if adventure.combat.all_enemies_dead() {
                 let xp = adventure.combat.enemies.len() as u32 * 50;
+                // Generate drops BEFORE combat.end() clears the enemy list
+                let drops = generate_drops(&adventure.combat.enemies);
+                let drop_names: Vec<String> = drops.iter().map(|i| i.name.clone()).collect();
+                for item in drops {
+                    adventure.inventory.add(item);
+                }
                 adventure.combat.end();
                 adventure.character.xp += xp;
                 adventure.character.check_level_up();

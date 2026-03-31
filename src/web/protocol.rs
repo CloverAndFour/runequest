@@ -293,6 +293,8 @@ pub enum ServerMsg {
     CombatEnded {
         xp_reward: u32,
         victory: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        drops: Vec<String>,
     },
     TravelResult {
         county_name: String,
