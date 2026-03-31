@@ -2,7 +2,7 @@
 
 ## Overview
 
-10 equipment lines, each producing a weapon + armor at every tier (T1-T10) = **200 equipment items total**. Each line targets a different combat specialization and requires a unique combination of crafting skills.
+10 equipment lines, each producing a weapon + 5 armor slot pieces at every tier (T1-T10) = **600 equipment items total** (100 weapons + 500 armor pieces). Each line targets a different combat specialization and requires a unique combination of crafting skills.
 
 ## The 10 Equipment Lines
 
@@ -263,22 +263,54 @@ All weapons use the same damage/attack scaling. The weapon line determines prope
 
 Equipment values are derived from the material tier value:
 - **Weapon value:** tier_to_value(tier) * 3
-- **Armor value:** tier_to_value(tier) * 4
+- **Armor value (full set):** tier_to_value(tier) * 4 (distributed across 5 slots proportional to AC share)
+  - Head: 15% of full armor value
+  - Chest: 35% of full armor value
+  - Hands: 10% of full armor value
+  - Legs: 25% of full armor value
+  - Feet: 15% of full armor value
 
 Shops sell pre-made equipment at a 3x markup on these values (up to T5 only).
 
 ## Equipment IDs
 
-Equipment items follow the pattern: `{line}_weapon_t{N}` or `{line}_armor_t{N}`.
+Equipment IDs follow the pattern: `{line}_{slot}_t{N}`.
 
-Examples: `blade_weapon_t1`, `bow_armor_t5`, `staff_weapon_t10`.
+- **Weapons:** `{line}_weapon_t{N}` (e.g., `blade_weapon_t1`, `bow_weapon_t5`)
+- **Armor:** `{line}_{slot}_t{N}` where slot is one of: head, chest, hands, legs, feet (e.g., `blade_chest_t5`, `bow_head_t3`, `staff_feet_t10`)
+
+**Legacy compatibility:** Old `{line}_armor_t{N}` IDs map to the chest slot for backward compatibility. For example, `blade_armor_t5` resolves to `blade_chest_t5`.
 
 ## Equipment Slots
 
 - **Weapons:** MainHand slot
-- **Armor:** Chest slot
+- **Armor:** Split across 5 slots -- Head, Chest, Hands, Legs, Feet
 
 Full equipment system has 10 slots: Head, Amulet, MainHand, OffHand, Chest, Hands, Ring, Legs, Feet, Back.
+
+### AC Distribution by Armor Slot
+
+Each armor piece contributes a proportion of the line's total AC:
+
+| Slot | AC Share | Notes |
+|------|----------|-------|
+| Head | 15% | |
+| Chest | 35% | Most valuable piece |
+| Hands | 10% | +1 attack bonus |
+| Legs | 25% | |
+| Feet | 15% | |
+
+**Total AC when fully geared across all 5 slots = same as the single-armor AC values listed above.** For example, a full set of T5 Heavy Plate (blade line) still totals AC 18. The AC is distributed proportionally across the slots:
+
+| Slot | T5 Heavy AC Contribution |
+|------|--------------------------|
+| Head | 2.7 (rounds contextually) |
+| Chest | 6.3 |
+| Hands | 1.8 (+1 attack bonus) |
+| Legs | 4.5 |
+| Feet | 2.7 |
+
+**Armor value** is proportional to AC share -- chest is the most expensive piece at 35% of the full armor value, while hands is the cheapest at 10%.
 
 ## Rarity by Tier
 

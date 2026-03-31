@@ -515,6 +515,8 @@ The spinner is automatically removed when the first narrative chunk arrives.
 
 **10 slots:** Head, Amulet, MainHand, OffHand, Chest, Hands, Ring, Legs, Feet, Back
 
+**5-slot armor system:** Crafted armor splits across Head, Chest, Hands, Legs, Feet. Each slot contributes a proportion of the total AC: Head 15%, Chest 35%, Hands 10% (+1 attack bonus), Legs 25%, Feet 15%. Total AC when fully geared equals the old single-armor values. Equipment IDs use the pattern {line}_{slot}_t{N} -- e.g. blade_chest_t5. Legacy {line}_armor_t{N} IDs map to chest for backward compat. 600 total equipment items: 100 weapons + 500 armor pieces.
+
 **AC calculation:**
 - Light armor: base AC + full DEX mod
 - Medium armor (dex_cap_2): base AC + min(DEX mod, 2)
@@ -782,7 +784,7 @@ All characters have access to all 44 skills (34 combat + 10 crafting). Skills ha
 
 The crafting system is built on a directed acyclic graph (DAG) of materials and recipes spanning tiers T0-T10 with 10 crafting skills.
 
-**Graph statistics:** 336 materials, 282 recipes (82 intermediate + 200 equipment).
+**Graph statistics:** 336 materials, 682 recipes (82 intermediate + 600 equipment).
 
 **Intermediate crafting chain (T0-T10):**
 - T0: 14 raw materials (gathered + monster drops)
@@ -790,7 +792,7 @@ The crafting system is built on a directed acyclic graph (DAG) of materials and 
 - Gateway skill per tier (can reach that tier from T(N-1) alone): LW(T1), SM(T2), WW(T3), AL(T4), EN(T5), TL(T6), JC(T7), RC(T8), AF(T9), TH(T10)
 
 **Equipment production (end-product items):**
-10 equipment lines, each producing a weapon + armor at every tier (T1-T10) = 200 equipment items total.
+10 equipment lines, each producing a weapon + 5 armor slot pieces at every tier (T1-T10) = 600 equipment items total (100 weapons + 500 armor pieces).
 
 | Line | Skills | Weapon | Armor |
 |------|--------|--------|-------|

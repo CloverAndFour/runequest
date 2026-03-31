@@ -4,7 +4,7 @@
 
 10 crafting skills form a **gateway staircase** — each skill is the exclusive gateway to one tier. This forces cross-skill cooperation that scales exponentially with tier.
 
-**Graph statistics:** 336 materials, 282 recipes (82 intermediate + 200 equipment).
+**Graph statistics:** 336 materials, 682 recipes (82 intermediate + 600 equipment).
 
 ## The 10 Crafting Skills
 
@@ -86,9 +86,9 @@ Each recipe requires:
 3. A **crafting station** at the player's current town that supports the skill and tier
 4. Produces an **output** material or equipment item
 
-### Equipment Recipes (200 total)
+### Equipment Recipes (600 total)
 
-10 equipment lines x 10 tiers = 200 equipment recipes. Each produces a weapon or armor piece. See [Equipment Lines](equipment.md) for full details.
+10 equipment lines x 10 tiers x 6 slots (1 weapon + 5 armor) = 600 equipment recipes. Each produces a weapon or armor slot piece. Equipment IDs now use slot names: `{line}_{slot}_t{N}` (e.g., `blade_chest_t5`, `bow_head_t3`). See [Equipment Lines](equipment.md) for full details.
 
 ### Intermediate Recipes (82 total)
 

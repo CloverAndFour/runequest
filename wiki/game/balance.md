@@ -113,3 +113,39 @@ Standard 5-person party (WAR+CLR+MAG+ROG+BRD) at 5x boss HP scaling:
 | v2 | Compressed HP range, added Mage Arcane Burst, Bard Cutting Words | Mage fixed, Monk OP, Rogue still high |
 | v3 | Nerfed Rogue hide rounds (3→2), buffed Ranger/Monk, matched monster growth to player | Monk still OP, type spread too wide |
 | v4 | Reduced type multipliers (1.25→1.20), nerfed Monk flurry | **Balanced.** All classes 45-65% avg |
+
+
+## Consumable Impact (v5)
+
+> Calibrated via simulator v5. Target: 15-25% win rate improvement with full consumable loadout.
+
+### Healing Potions
+
+- **Formula:** `2 * tier + 5` HP
+- **Cooldown:** 5 rounds between uses
+- **Design intent:** Buys ~1 extra round of survival. Not enough to replace a dedicated healer at T6+.
+
+### Buff Potions
+
+- **To-hit bonus:** `1 + floor(tier / 3)`
+- **Duration:** `3 + floor(tier / 2)` rounds
+- **Design intent:** Meaningful accuracy boost without stacking to guaranteed hits.
+
+### Alchemical Weapons
+
+- **Damage (after saves):** `tier + 1` effective damage per use
+- **Mechanic:** AoE, no to-hit roll, DEX save for half
+- **Design intent:** Reliable chip damage. Strong in multi-target encounters, weak vs single bosses.
+
+### Win Rate Impact (Full Loadout)
+
+| Tier | No Consumables | Full Loadout | Improvement |
+|------|----------------|--------------|-------------|
+| T1-T3 | 50-60% | 65-80% | +15-20% |
+| T4-T5 | 45-55% | 60-75% | +15-20% |
+| T6-T7 | 40-50% | 55-70% | +15-20% |
+| T8+ | 30-45% | 50-65% | +20-25% |
+
+**Key finding:** Consumables cannot replace missing gear at T5+. A player missing one armor slot loses more AC than potions can compensate for. This makes the crafting supply chain essential, not optional.
+
+**Balance lever:** The 5-round healing cooldown is the primary knob. At 3 rounds (old value), potions gave +30-40% win rate which trivialized mid-tier content. At 5 rounds, players must choose when to heal carefully.
