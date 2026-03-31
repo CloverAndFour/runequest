@@ -61,6 +61,8 @@ runequest/
       dice.rs                   # Dice rolling, DC checks, probability calc
       dungeon.rs                # Procedural dungeon generation
       equipment.rs              # Item database, equipment slots, AC calculation
+      rate_limit.rs             # Per-character action cooldowns (API vs WS)
+      drops.rs                  # Combat loot drop generation
       executor.rs               # Tool call -> engine mutation mapping
       inventory.rs              # Inventory management
       world.rs                  # Legacy world map (20-location, kept for backwards compat)
@@ -162,6 +164,8 @@ CORS is fully open (any origin/method/headers).
 | `POST` | `/api/adventures/:id/message` | Yes | `{content}` | `GameResponse` |
 | `POST` | `/api/adventures/:id/choice` | Yes | `{index, text}` | `GameResponse` |
 | `POST` | `/api/adventures/:id/roll` | Yes | -- | `GameResponse` |
+| `POST` | `/api/adventures/:id/travel` | Yes | `{direction}` | `{county_name, county_tier, biome, region, encounter, state}` |
+| `POST` | `/api/adventures/:id/work` | Yes | -- | `{job, gold_earned, skill, skill_xp, state}` |
 
 ### Combat
 
@@ -352,6 +356,8 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_item` | `recipe_id` | Craft an item using a recipe |
 | `list_recipes` | `skill?, tier?` | List crafting recipes (optional filters) |
 | `list_materials` | -- | List all crafting materials |
+| `travel` | `direction` | Travel to adjacent county (fixed action, no LLM) |
+| `work` | -- | Do odd jobs for gold and skill XP (fixed action) |
 
 #### Account Management
 
@@ -408,13 +414,16 @@ All messages are JSON with a `type` field (snake_case).
 | `combat_turn_start` | `combatant, is_player, round, actions, bonus_actions, movement, available_actions, enemies` | Turn start |
 | `combat_action_result` | `actor, action, description, roll?, hit?, damage?` | Action outcome |
 | `combat_enemy_turn` | `enemy_name, attack_name, attack_roll, target_ac, hit, damage, player_hp, player_max_hp` | Enemy acts |
-| `combat_ended` | `xp_reward, victory` | Combat ends |
+| `combat_ended` | `xp_reward, victory, drops` | Combat ends (drops = list of item names gained) |
 | `state_changes` | `gold_delta, xp_delta, hp_delta, level_up, items_gained, items_lost, conditions_added, conditions_removed` | State diff after tool loop |
 | `error` | `code, message` | Error message |
 
 | `craft_result` | `recipe_name, output, quantity, skill_progress` | Crafting outcome |
 | `recipe_list` | `recipes` | List of recipes |
 | `material_list` | `materials` | List of materials |
+| `travel_result` | `county_name, county_tier, biome, region, encounter` | Travel outcome (followed by state_update) |
+| `work_result` | `job, gold_earned, skill, skill_xp` | Odd job outcome (followed by state_update) |
+| `cooldown_state` | `llm_remaining_ms, fixed_remaining_ms` | Remaining cooldowns after rate-limited action |
 | `password_changed` | -- | Password changed successfully |
 | `api_key_created` | `id, name, key, prefix, created_at` | New API key (plaintext key shown once) |
 | `api_key_list` | `keys[]` | List of API keys (id, name, prefix, created_at, last_used) |
@@ -449,12 +458,14 @@ All messages are JSON with a `type` field (snake_case).
 
 ### Fixed Actions Bar
 When not in combat or a dungeon, the UI shows context-sensitive action buttons at the bottom of the story panel:
-- Travel to connected locations
+- Travel to connected locations (direct engine action, no LLM)
 - Visit shop (if available)
 - Enter dungeon/tower (if at dungeon/tower location)
 - Talk to NPCs at current location
+- Do Odd Jobs (available at every county)
+- Gather materials
 
-These send messages through the LLM for narrative context. The LLM is instructed not to duplicate these options in present_choices.
+Travel and work are handled as fixed engine actions -- they bypass the LLM entirely and go directly through the game engine. Other fixed actions (shop, dungeon, tower) also bypass the LLM.
 
 ### Client Settings (localStorage)
 Settings are stored in `localStorage` under key `rq_settings`:
@@ -607,7 +618,9 @@ The `Enemy` struct has an optional `enemy_type` field. The LLM can specify `enem
 
 **Enemy AI:** Picks highest to_hit attack, rolls d20 + to_hit vs player AC.
 **Death:** HP <= 0 = character dies, adventure over.
-**Victory:** All enemies down. Awards 50 XP per enemy. LLM narrates victory.
+**Victory:** All enemies down. Awards 50 XP per enemy. Generates material drops from defeated enemies (see Drop System below). LLM narrates victory.
+
+**Combat drops:** `generate_drops()` is called on combat victory BEFORE `combat.end()` clears the enemy list. The `CombatEnded` message includes a `drops: Vec<String>` field listing item names gained. Drop rates: 60% at-tier materials, 30% one tier below, 10% two tiers below.
 
 Enemy names from `start_combat` are automatically truncated to 40 characters. Stats, descriptions, and flavor text are stripped from names.
 
@@ -634,7 +647,12 @@ The game world is a massive hex grid of ~251,000 counties generated deterministi
 
 **County properties:** name, tier (difficulty 0-10), biome, region, has_town, has_dungeon, dungeon_tier (hidden from players), has_tower, has_exchange, has_guild_hall, stations (list of CraftingStationType)
 
-**Travel:** Directional (6 hex directions: east, west, NE, NW, SE, SW). Each move discovers the target county + its neighbors. Random encounters based on county tier.
+**Travel:** Directional (6 hex directions: east, west, NE, NW, SE, SW). Each move discovers the target county + its neighbors. Travel is a fixed engine action (no LLM) via `Travel { direction }` (WS) or `POST /api/adventures/:id/travel` (REST). Random encounters may trigger combat.
+
+**Safe Zones Near Spawns:** Counties near race spawn points have reduced encounter rates:
+- 0-2 hexes from spawn: 2% encounter rate, T0 enemies only
+- 3-5 hexes from spawn: 3-6% encounter rate (scales with distance), T0 enemies only
+- Beyond 5 hexes: normal rates (5% + county_tier * 4%), enemies match county tier
 
 **Shops:** Dynamically generated from county tier. Shops stock:
 - Consumables (health potions, greater health potions at T2+)
@@ -812,6 +830,13 @@ cargo run -- crafting --mixing      # Show mixing scores
 - Falls back to `material_to_item()` for intermediate crafting materials
 
 **Gather tool:** `gather` collects 1-3 T0 raw materials based on the current county biome and awards 5-10 Survival skill XP.
+
+**Work tool (Menial Labour):** `work` provides low-paying odd jobs available at every county. Jobs vary by location:
+- **Universal:** Chopping firewood (Woodworking), Hauling cargo (Fortitude)
+- **Towns:** Serving tables (Charm), Sweeping market (Fortitude), Running errands (Charm)
+- **Biome-specific:** Collecting kindling (Forest), Breaking rocks (Hills/Mountains), Mending nets (Coast), Draining ditches (Swamp), Digging wells (Desert), Tending crops (Plains)
+
+Pays 1-2 gold base + tier/2 bonus. Awards 3-5 skill XP to the relevant skill. Fixed action cooldown (4s API / 1s browser).
 
 **Biome material pools:**
 | Biome | Materials |
@@ -996,6 +1021,50 @@ Locations may have `has_exchange: true` (exchange order book) or `has_guild_hall
 **REST API:** 7 endpoints -- `GET /api/towers` (list), `GET /api/towers/:tower_id/floor/:floor_num` (floor info), and 5 under `/api/adventures/:id/tower/` -- `enter`, `move`, `ascend`, `checkpoint`, `teleport`. See REST API Endpoints section above.
 
 **WebSocket:** Client sends `tower_list`, `tower_enter`, `tower_move`, `tower_ascend`, `tower_checkpoint`, `tower_teleport`, `tower_floor_status`. Server responds with `tower_list`, `tower_entered`, `tower_floor_status`, `tower_player_nearby`, `tower_first_clear`.
+## Rate Limiting
+
+**Module:** `src/engine/rate_limit.rs`
+
+Per-character action cooldowns prevent spam and bot abuse. Cooldowns are tracked per adventure (stored as `last_llm_action_at` and `last_fixed_action_at` on `AdventureState`).
+
+### Action Categories
+
+| Category | REST Cooldown | WebSocket Cooldown | Actions |
+|----------|--------------|-------------------|---------|
+| LLM | 6 seconds | 1 second | `send_message`, `select_choice`, `combat_action` |
+| Fixed | 4 seconds | 1 second | `gather`, `craft_item`, `shop_buy`, `shop_sell`, `travel`, `work`, dungeon/tower moves |
+| Equipment | 100ms | 100ms | `equip_item`, `unequip_item` |
+| ReadOnly | No limit | No limit | `list_adventures`, `get_skills`, `view_shop`, social/query actions |
+
+### Admin Bypass
+
+Users with `role: "admin"` bypass all rate limits on both REST and WebSocket.
+
+### REST API Response on Cooldown
+
+When a rate-limited action is attempted too soon, the REST API returns:
+
+```
+HTTP 429 Too Many Requests
+{
+  "error": "Action on cooldown",
+  "code": "cooldown",
+  "remaining_ms": 3421
+}
+```
+
+### WebSocket Cooldown Feedback
+
+After each rate-limited action via WebSocket, the server sends a `CooldownState` message:
+
+```json
+{
+  "type": "cooldown_state",
+  "llm_remaining_ms": 850,
+  "fixed_remaining_ms": 0
+}
+```
+
 
 ## LLM Integration
 

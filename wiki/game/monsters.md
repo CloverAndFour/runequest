@@ -53,7 +53,7 @@ Monsters are generated dynamically via `generate_monster(tier, enemy_type)` usin
 
 Module: `src/engine/drops.rs`
 
-When combat ends and enemies are defeated, `generate_drops()` rolls for material drops.
+When combat ends in victory, `generate_drops()` is called BEFORE `combat.end()` clears the enemy list. This ensures the enemy data (tier, type) is still available for drop calculation. Drops are included in the `CombatEnded` message/response via the `drops: Vec<String>` field.
 
 ### Drop Chances
 

@@ -34,6 +34,8 @@ All messages are JSON with a `type` field (snake_case).
 | `get_quests` | -- | Request state update |
 | `get_npcs` | -- | Request NPC list |
 | `set_model` | `model` | Switch LLM model |
+| `travel` | `direction` | Travel to adjacent county (fixed action, no LLM) |
+| `work` | -- | Do odd jobs for gold and skill XP (fixed action) |
 
 ### Combat
 
@@ -222,7 +224,7 @@ All messages are JSON with a `type` field (snake_case).
 | `combat_turn_start` | `combatant, is_player, round, actions, bonus_actions, movement, available_actions, enemies` | Turn start |
 | `combat_action_result` | `actor, action, description, roll?, hit?, damage?` | Action outcome |
 | `combat_enemy_turn` | `enemy_name, attack_name, attack_roll, target_ac, hit, damage, player_hp, player_max_hp` | Enemy acts |
-| `combat_ended` | `xp_reward, victory` | Combat ends |
+| `combat_ended` | `xp_reward, victory, drops` | Combat ends (drops = Vec<String> of item names gained) |
 | `condition_effects` | `effects` | Condition damage at turn start |
 
 ### Crafting
@@ -232,6 +234,9 @@ All messages are JSON with a `type` field (snake_case).
 | `craft_result` | `recipe_name, output, quantity, skill_progress` | Crafting outcome |
 | `recipe_list` | `recipes` | List of recipes (with filters applied) |
 | `material_list` | `materials` | List of all materials |
+| `travel_result` | `county_name, county_tier, biome, region, encounter` | Travel outcome (followed by state_update) |
+| `work_result` | `job, gold_earned, skill, skill_xp` | Odd job outcome (followed by state_update) |
+| `cooldown_state` | `llm_remaining_ms, fixed_remaining_ms` | Remaining cooldowns after rate-limited action |
 
 ### Account Management
 
@@ -370,6 +375,33 @@ On successful buy/sell, the server also sends a `state_update` with the full upd
 | `model_info` | `model, available_models` | Current LLM model info |
 | `chat_history` | `entries` | Display history replay on adventure load |
 | `error` | `code, message` | Error message |
+
+## Rate Limiting
+
+All game actions are subject to per-character cooldowns. WebSocket cooldowns are shorter than REST API cooldowns. Admin users (role=admin) bypass all limits.
+
+### Action Categories & Cooldowns
+
+| Category | WebSocket Cooldown | Actions |
+|----------|-------------------|---------|
+| LLM | 1 second | `send_message`, `select_choice`, `combat_action` |
+| Fixed | 1 second | `travel`, `work`, `gather`, `craft_item`, `shop_buy`, `shop_sell`, dungeon/tower actions |
+| Equipment | 100ms | `equip_item`, `unequip_item` |
+| Read-only | None | `list_adventures`, `view_shop`, `get_skills`, social/query messages |
+
+### Cooldown Feedback
+
+After each rate-limited action, the server sends a `cooldown_state` message with remaining milliseconds for both categories:
+
+```json
+{
+  "type": "cooldown_state",
+  "llm_remaining_ms": 850,
+  "fixed_remaining_ms": 0
+}
+```
+
+If an action is attempted during cooldown, the server sends an `error` message with `code: "cooldown"` instead.
 
 ## Display Event Types
 

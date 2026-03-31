@@ -130,6 +130,63 @@ Two creation paths:
 | POST | `/api/adventures/:id/message` | Yes | `{content}` | `GameResponse` |
 | POST | `/api/adventures/:id/choice` | Yes | `{index, text}` | `GameResponse` |
 | POST | `/api/adventures/:id/roll` | Yes | -- | `GameResponse` |
+| POST | `/api/adventures/:id/travel` | Yes | `{direction}` | `{county_name, county_tier, biome, region, encounter, state}` |
+| POST | `/api/adventures/:id/work` | Yes | -- | `{job, gold_earned, skill, skill_xp, state}` |
+
+## Travel (Fixed Action)
+
+`POST /api/adventures/:id/travel`
+
+Move to an adjacent county. This is a direct engine action (no LLM involved). Subject to fixed action cooldown (4s).
+
+**Request:**
+```json
+{
+  "direction": "east"
+}
+```
+
+`direction` values: `"east"`, `"west"`, `"northeast"`, `"northwest"`, `"southeast"`, `"southwest"`
+
+**Success response (200):**
+```json
+{
+  "county_name": "Greenmeadow",
+  "county_tier": 1.2,
+  "biome": "Plains",
+  "region": "Western Reaches",
+  "encounter": false,
+  "state": { ... }
+}
+```
+
+If `encounter` is `true`, combat has been initiated with a random monster. The `state.combat` field will be populated.
+
+**Error response (400):**
+```json
+{ "error": "Unknown direction 'north'. Use: east, west, northeast, northwest, southeast, southwest" }
+```
+
+## Work (Menial Labour)
+
+`POST /api/adventures/:id/work`
+
+Do an odd job for a small amount of gold and skill XP. Available at every county. Subject to fixed action cooldown (4s).
+
+**Request:** No body required.
+
+**Success response (200):**
+```json
+{
+  "job": "Serving tables at the tavern",
+  "gold_earned": 2,
+  "skill": "charm",
+  "skill_xp": 5,
+  "state": { ... }
+}
+```
+
+Jobs vary by location: towns offer tavern/merchant work, wilderness has biome-specific tasks (collecting kindling in forests, breaking rocks in hills, mending nets on coasts, etc.). Gold scales slightly with county tier (base + tier/2).
 
 ## Combat
 
@@ -322,6 +379,37 @@ Note: REST endpoints do not include real-time presence updates (use WebSocket fo
 | POST | `/api/guilds/donate` | Yes | `{adventure_id, gold}` | Donation result |
 | POST | `/api/guilds/promote` | Yes | `{adventure_id, username}` | Promotion result |
 | POST | `/api/guilds/kick` | Yes | `{adventure_id, username}` | Kick result |
+
+## Rate Limiting
+
+All game actions are subject to per-character cooldowns. Admin users (role=admin) bypass all limits.
+
+### Action Categories & Cooldowns
+
+| Category | Cooldown | Actions |
+|----------|----------|---------|
+| LLM | 6 seconds | `/message`, `/choice`, `/combat` |
+| Fixed | 4 seconds | `/travel`, `/work`, `/craft`, `/shop/buy`, `/shop/sell`, `/dungeon/*`, `/tower/*` |
+| Equipment | 100ms | `/equip`, `/unequip` |
+| Read-only | None | `GET` endpoints, `/shop` (view), `/dungeon/status` |
+
+### Cooldown Response
+
+When an action is attempted before the cooldown expires:
+
+```
+HTTP 429 Too Many Requests
+```
+
+```json
+{
+  "error": "Action on cooldown",
+  "code": "cooldown",
+  "remaining_ms": 3421
+}
+```
+
+The `remaining_ms` field tells the client exactly how long to wait before retrying.
 
 ## GameResponse Format
 

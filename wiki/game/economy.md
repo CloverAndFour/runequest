@@ -9,6 +9,7 @@
 - Selling items/materials to shops (60% of dynamic buy price)
 - Trading with other players
 - Exchange sales (limit orders)
+- **Menial labour / odd jobs** (1-2 gold + tier bonus, available everywhere)
 
 ### Gold Sinks
 - Buying from shops (dynamic pricing)
@@ -70,6 +71,44 @@ Restocking is calculated on access (no background timer):
 | T8 | 26,000 gp | Legendary | 78,000 gp | 104,000 gp |
 | T9 | 90,000 gp | Legendary | 270,000 gp | 360,000 gp |
 | T10 | 300,000 gp | Legendary | 900,000 gp | 1,200,000 gp |
+
+## Menial Labour (Odd Jobs)
+
+Players can do odd jobs at any county for a small amount of gold and skill XP. This provides a reliable, always-available income source for new players or anyone low on gold.
+
+### Endpoints
+
+- **WS:** `work` -> `work_result { job, gold_earned, skill, skill_xp }` + `state_update`
+- **REST:** `POST /api/adventures/:id/work` -> `{ job, gold_earned, skill, skill_xp, state }`
+- Subject to fixed action cooldown (4s API / 1s browser)
+
+### Jobs by Location
+
+| Context | Available Jobs | Skill | Base Gold |
+|---|---|---|---|
+| Everywhere | Chopping firewood | Woodworking | 1 |
+| Everywhere | Hauling cargo | Fortitude | 1 |
+| Towns only | Serving tables at the tavern | Charm | 2 |
+| Towns only | Sweeping the market square | Fortitude | 1 |
+| Towns only | Running errands for merchants | Charm | 2 |
+| Forest | Collecting kindling | Survival | 1 |
+| Hills / Mountains | Breaking rocks | Smithing | 1 |
+| Coast | Mending fishing nets | Leatherworking | 1 |
+| Swamp | Draining ditches | Fortitude | 1 |
+| Desert | Digging wells | Fortitude | 2 |
+| Plains / other | Tending crops | Survival | 1 |
+
+### Pay Scaling
+
+- **Gold:** `base_gold + floor(county_tier / 2)`
+  - T0 county: 1-2 gold
+  - T4 county: 3-4 gold
+  - T8 county: 5-6 gold
+- **Skill XP:** 3-5 XP to the job's associated skill
+
+### Design Rationale
+
+Odd jobs exist to prevent soft-locking: a player who has lost all equipment and gold can always work their way back. The gold rate is intentionally low so it never competes with crafting/combat as a primary income source. The skill XP is a small bonus that encourages varied skill development.
 
 ## Player Trading
 

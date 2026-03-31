@@ -36,6 +36,8 @@
 - [WebSocket Protocol](api/websocket.md) — All ClientMsg/ServerMsg types on port 2999 (supports TLS/WSS)
 - [Crafting API](api/crafting.md) — Recipe lookup, crafting execution, material queries
 
+**Rate Limiting:** Per-character cooldowns on all game actions. LLM actions: 6s API / 1s WS. Fixed actions: 4s API / 1s WS. Equipment: 100ms. Admin users bypass all limits. See REST and WebSocket docs for details.
+
 **Authentication:** All protected endpoints accept JWT tokens or API keys (`rq_` prefix). API keys are long-lived tokens for programmatic access (AI agents, bots). See the REST API reference for key management endpoints.
 
 **TLS:** All servers support TLS via `--tls-cert` and `--tls-key` CLI args. Frontend auto-detects `wss://` vs `ws://`.

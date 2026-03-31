@@ -28,9 +28,12 @@ Gather several times to stock up. Each gather gives 1-3 materials and some Survi
 
 T0 monsters are weak: Giant Rats, Cave Spiders, Glow Wisps, Shambling Corpses. They have 3-6 HP and AC 8. Your starting weapon can handle them easily.
 
+The area around your spawn (0-2 hexes) is a safe zone with only a 2% encounter chance, so you may need to venture 3-5 hexes out to find more combat. Even in the outer safe zone (3-5 hexes), encounters are still T0 enemies only.
+
 Each enemy killed:
 - Awards 50 XP (legacy) or passive skill XP (weapon mastery on hit, fortitude on damage taken)
-- Has a 60% chance to drop T0 crafting materials (Rat Hide, Spider Silk, etc.)
+- Has a 60% chance to drop T0 crafting materials (Rat Hide, Spider Silk Strand, Wisp Essence, Bone Dust, etc.)
+- Drops are shown in the `combat_ended` message
 
 ### 5. Find a Tanning Rack
 
@@ -52,7 +55,10 @@ Each craft has a 15% chance to improve your Leatherworking skill rank.
 
 ### 7. Travel to a T1 Town
 
-Move to an adjacent county. Use the 6 hex directions (East, West, NE, NW, SE, SW). Travel toward higher-tier areas to find T1 towns.
+Move to an adjacent county using the travel action (no LLM needed). Use the 6 hex directions (East, West, NE, NW, SE, SW). Travel toward higher-tier areas to find T1 towns.
+
+- WebSocket: `travel { direction: "east" }`
+- REST: `POST /api/adventures/:id/travel { direction: "east" }`
 
 T1 towns have:
 - **Basic Forge** (Smithing, up to T3)
@@ -60,7 +66,7 @@ T1 towns have:
 - **Loom** (Tailoring, up to T3)
 - **Shops** with basic weapons and armor
 
-Watch for travel encounters! T1 counties have a 9% encounter chance.
+Watch for travel encounters! Outside the safe zone (>5 hexes from spawn), T1 counties have a 9% encounter chance. Within the safe zone, encounters are rare and always T0.
 
 ### 8. Find a Forge and Craft Your First Weapon
 
@@ -77,6 +83,14 @@ Craft equipment from one of the 10 equipment lines:
 - **Bow line** (WW+LW+AL): Bows + Ranger Leather
 
 Equip your crafted weapon and armor for a major power boost.
+
+### Do Odd Jobs When Low on Gold
+
+If you're low on gold, you can always do odd jobs at any county:
+- WebSocket: `work`
+- REST: `POST /api/adventures/:id/work`
+
+Jobs pay 1-2 gold plus a small amount of skill XP. The job varies by location -- towns have tavern/merchant work, and wilderness areas have biome-specific tasks. It won't make you rich, but it prevents you from ever being completely stuck.
 
 ### 10. The Loop Continues
 
@@ -107,5 +121,6 @@ The core gameplay loop:
 | List recipes | `list_recipes { skill?, tier? }` | `GET /api/recipes` |
 | Craft item | `craft_item { recipe_id }` | `POST /api/adventures/:id/craft` |
 | Equip item | -- | `POST /api/adventures/:id/equip { item_name }` |
-| Travel | `send_message { content: "travel east" }` | LLM-driven |
+| Travel | `travel { direction: "east" }` | `POST /api/adventures/:id/travel { direction: "east" }` |
+| Do odd jobs | `work` | `POST /api/adventures/:id/work` |
 | Combat action | `combat_action { action_id }` | `POST /api/adventures/:id/combat` |

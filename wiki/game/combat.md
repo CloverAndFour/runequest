@@ -158,8 +158,25 @@ HP <= 0 = **permanent death**. The adventure is over. No respawns, no resurrecti
 
 When all enemies reach 0 HP:
 - **XP:** 50 XP per enemy defeated (split in party combat)
-- **Material drops:** Generated based on enemy type and tier (see Monster System)
+- **Material drops:** `generate_drops()` is called BEFORE `combat.end()` clears the enemy list. Each dead enemy rolls independently for material drops based on their tier. The `combat_ended` message includes a `drops: Vec<String>` field listing all item names gained.
 - Level-up check performed (legacy characters only)
+
+### Drop System
+
+Module: `src/engine/drops.rs`
+
+| Tier Difference (enemy tier - material tier) | Drop Chance |
+|---|---|
+| 0 (at-tier) | 60% |
+| 1 (one tier below) | 30% |
+| 2 (two tiers below) | 10% |
+| 3+ (three or more below) | 0% |
+
+Example: A T2 Goblin Warrior can drop T2 materials (60%), T1 materials (30%), or T0 materials (10%). T0 drops include monster-specific materials like Rat Hide, Spider Silk Strand, Wisp Essence, and Bone Dust.
+
+The `CombatEnded` message/response now includes drops:
+- **WS:** `combat_ended { xp_reward, victory, drops }` where `drops` is a `Vec<String>` of item names
+- **REST:** Same fields in the `GameResponse` when combat ends
 
 ## Passive Skill XP During Combat
 

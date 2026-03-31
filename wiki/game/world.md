@@ -101,9 +101,29 @@ Station distribution across the world:
 
 ## Travel
 
-- Moving between adjacent counties = 1 travel action
+- Moving between adjacent counties = 1 travel action (fixed engine action, no LLM)
 - Six directions: East, West, Northeast, Northwest, Southeast, Southwest
-- **Encounter chance:** `5% + (county_tier * 4%)` -- T0 = 5%, T5 = 25%, T10 = 45%
+- **WS:** `travel { direction }` -> `travel_result` + `state_update`
+- **REST:** `POST /api/adventures/:id/travel { direction }`
+- Subject to fixed action cooldown (4s API / 1s browser)
+
+### Encounter Rates
+
+**Outside safe zones:** `5% + (county_tier * 4%)` -- T0 = 5%, T5 = 25%, T10 = 45%
+
+### Safe Zones Near Spawns
+
+Counties near the 10 race spawn points have reduced encounter rates, giving new players a gentle on-ramp:
+
+| Distance from Spawn | Encounter Rate | Enemy Tier | Notes |
+|---|---|---|---|
+| 0-2 hexes (inner safe zone) | 2% | T0 only | Very safe starting area |
+| 3-5 hexes (outer safe zone) | 3-6% (scales with distance) | T0 only | Gradually increasing risk |
+| 6+ hexes (wilderness) | Normal (5% + tier*4%) | Matches county tier | Full danger |
+
+The outer safe zone rate formula: `0.03 + (distance - 2) * 0.01`. So 3 hexes = 4%, 4 hexes = 5%, 5 hexes = 6%.
+
+Even in safe zones, encounters spawn T0 enemies regardless of the county's actual tier. This ensures new players won't face tier-inappropriate enemies.
 - **Fog of war:** Undiscovered counties show as "Unknown" / "???"
 - Visiting a county reveals it and all its neighbors
 - Travel is leader-controlled in party play
